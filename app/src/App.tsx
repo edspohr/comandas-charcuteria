@@ -6,6 +6,7 @@ import ColaDespacho from './routes/despacho/ColaDespacho';
 import DetalleArmado from './routes/despacho/DetalleArmado';
 import Produccion from './routes/produccion/Produccion';
 import Facturacion from './routes/admin/Facturacion';
+import Panel from './routes/admin/Panel';
 import AppShell from './components/AppShell';
 import RouteGuard from './components/RouteGuard';
 import { useCurrentUser, ROLE_HOME } from './data/auth';
@@ -86,7 +87,7 @@ export default function App() {
           element={
             <RouteGuard current={current} allow={['admin', 'superAdmin']}>
               <AppShell current={current!}>
-                <Placeholder title="Panel de dueños" hint="Llega en el hito 8." />
+                <Panel />
               </AppShell>
             </RouteGuard>
           }

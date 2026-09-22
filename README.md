@@ -36,24 +36,29 @@ Para mostrar el flujo completo en la URL en vivo. Recomiendo dos ventanas de inc
 1. **Login** — Muestra las tarjetas de rol y el sello LC. Entrá como **Rafael** (vendedor).
 2. **Nuevo pedido** — Wizard 4 pasos:
    - Cliente: buscá "Magnolia" y tocá la tarjeta **Magnolia** (razón social *Hotel Magnolia*).
-   - Productos: agregá 3 líneas mixtas (jamón cocido en sachet, mortadela pistacho en granel, gouda ahumado en sachet 200 g). El semáforo verde/ámbar/rojo aparece por formato. El picker de formatos se abre como panel modal desde abajo.
+   - Productos: agregá 3 líneas mixtas (jamón cocido en sachet 200 g, mortadela pistacho en granel, queso gouda ahumado en sachet 200 g). El picker de formatos abre como bottom-sheet, muestra **el precio por formato** debajo del label y un **subtotal en vivo** mientras se mueve el stepper.
    - Entrega: dejá la fecha por defecto (mañana), despacho.
-   - Confirmar → Enviar. Ves el flash en Mis pedidos con el ID `PED-2026-XXXX`.
-3. **Pegar pedido (opcional)** — Volvé a Nuevo pedido → **Pegar pedido**. Cargá el ejemplo, "Interpretar", revisá las líneas identificadas y "Continuar en el wizard" para probar el mapping.
-4. **Split a producción** — Elegí un cliente y pedí `20 sachet 5 kg` de **Longaniza chillán** (hay 8 disponibles). Ves el aviso "12 a producción" en el paso Confirmar. Este pedido queda en `confirmado_parcial` — todavía **no** se puede armar hasta que producción cubra las líneas pendientes.
-5. **Cambiá a Yuri (producción)** — Ves la card **Longaniza chillán · Sachet 5 kg** en "Con demanda pendiente" (la cifra depende de los split previos; con la seed limpia hay 12 pendientes, y aumenta si el paso 4 sumó otro pedido parcial).
+   - Confirmar → Enviar. Se ve el **total estimado** destacado. Flash en Mis pedidos con `PED-2026-XXXX` y el monto.
+3. **Pegar pedido (opcional)** — Volvé a Nuevo pedido → **Pegar pedido**. Cargá el ejemplo, "Interpretar" (por defecto va a **Gemini 2.5 Flash** via Firebase AI Logic; si falla, fallback local). Un chip en el header dice qué motor corrió. Revisá y "Continuar en el wizard".
+4. **Split a producción** — Elegí un cliente y pedí `20 kg` de **Longaniza chillán** en granel (hay 8 kg disponibles). Ves el aviso "12 kg a producción" en Confirmar. Este pedido queda `confirmado_parcial` — todavía **no** se puede armar hasta que producción cubra las líneas pendientes.
+5. **Cambiá a Yuri (producción)** — Ves la card **Longaniza chillán · Granel laminado (kg)** en "Con demanda pendiente".
    - Tocá la card para ver los pedidos que dependen; Registrar producción abre pre-seleccionado el producto+formato.
    - Ingresá una cantidad ≥ pendiente y "Registrar". El pedido parcial se promueve a `confirmado` y aparece en el aviso "Pedidos promovidos".
 6. **Cambiá a Edu (despacho)** — Nueva ventana incógnito.
    - Cola: aplicá el filtro **Sin asignar**. Ves los pedidos listos para armar — el del paso 2 y el del paso 4 (que ya se promovió tras el paso 5).
    - Tomá uno → estado `en_armado`.
-   - En una línea con formato `Granel laminado (kg)`, bajá el stepper *Empacado* respecto al vendido para simular la merma (p. ej. 3 kg vendidos → 2,5 kg empacados). Para formatos `pieza` aparece además el campo *Peso real (kg)* opcional (útil para el brisket).
+   - En una línea `Granel laminado (kg)` bajá el stepper *Empacado* respecto al vendido para simular la merma (p. ej. 3 kg vendidos → 2,5 kg empacados). El **subtotal se recalcula en vivo**. Para líneas `pieza` (Pastrami Americano, Bresaola, Coppa) también podés ingresar `Peso real (kg)` — la factura se ajusta a ese peso × precio/kg.
    - "Marcar armado". Repetí para el otro pedido si querés ver dos facturas en el paso 7.
 7. **Cambiá a Miguel (admin)** — Facturación:
-   - Tab **Por facturar**: `Facturar` en el pedido armado. Modal muestra el número `FA-000XXX` **y el payload JSON** que se enviaría a Bsale.
+   - Cards muestran total CLP por pedido.
+   - Tab **Por facturar**: `Facturar` → confirmación → modal muestra `FA-000XXX` **+ payload JSON con `netUnitValue` calculado** (subtotal / 1,19 / cantidad).
    - Tab **Por despachar**: `Despachar` con courier + nota.
    - Tab **Por entregar**: `Marcar entregado`.
-8. **Panel** — Ves 4 métricas, chart de kg por vendedor, top 8 kg por producto, y la lista de deltas empacado/vendido. La línea de granel ajustada en el paso 5 aparece ahí con el delta negativo (si tocaste `packedWeightKg` en una `pieza`, ese caso queda en el detalle del pedido pero no cuenta en el chart de deltas porque las piezas no tienen gramaje asociado).
+8. **Panel** — Métricas valorizadas:
+   - **Ventas facturadas** con ticket promedio.
+   - Chart **Ventas por vendedor (CLP)**.
+   - Chart **Top 8 productos por venta**.
+   - Lista de deltas empacado/vendido (el granel del paso 5 aparece con delta negativo).
 9. **Cambiá a Ciro (super admin)** — Aparece la sección **Sincronizar con Bsale** al fondo del Panel + nav item **Usuarios**. Tocá Sincronizar para ver el batch de payloads.
 10. **Catálogo → Ajustar stock** — Elegí un producto, expandí un formato, tocá **Ajustar**, cambiá la cantidad con un motivo → la disponibilidad se actualiza en vivo. El movimiento `ajuste` queda registrado como bitácora en Firestore (no hay vista de historial en esta versión).
 
@@ -62,7 +67,9 @@ Para mostrar el flujo completo en la URL en vivo. Recomiendo dos ventanas de inc
 ## Arquitectura
 
 - **App:** Vite + React + TypeScript + Tailwind (Montserrat, paleta charcoal/crema/oro apagado inspirada en la web del cliente).
-- **Backend:** Firebase (Firestore + Auth + Hosting; Functions Blaze preparado para el parser IA).
+- **Backend:** Firebase (Firestore + Auth + Hosting; Firebase AI Logic con Vertex AI para el parseo IA).
+- **Catálogo:** 48 productos transcritos del pricelist oficial de agosto + catálogo de fotos. Cada `ProductFormat` lleva `priceCLP` (sachet/unidad) o `pricePerKgCLP` + `avgWeightKg` (granel / pieza). Los pedidos guardan `subtotalCLP` por línea y `totalCLP` en snapshot.
+- **Parser IA:** Gemini 2.5 Flash via Firebase AI Logic (`@firebase/ai`, backend `VertexAIBackend` region `us-central1`). Un manifest compacto del catálogo se inyecta como contexto y un JSON schema estructurado obliga a devolver IDs exactos. Timeout 8 s → si falla, el parser determinista (Fuse.js + regex) toma el relevo automáticamente.
 - **Modelo de stock:** colección `stock/{productId__formatId}` con `{ onHand, reserved }` mutada solo en transacciones. `stockMovements` es bitácora append-only para auditoría — nunca se agrega en cliente.
 - **Transacciones que tocan stock:**
   - `createOrder` — reserva + creación de pedido + contador `PED-YYYY-NNNN` en una sola transacción.
@@ -184,6 +191,21 @@ comandas-charcuteria/
 - Rules tests más allá de los 3 críticos.
 
 ---
+
+## Habilitar Gemini (una sola vez)
+
+Firebase AI Logic requiere las APIs de Vertex AI habilitadas en el proyecto Google Cloud. En la consola:
+
+1. Ir a **Firebase Console → Build → AI Logic** y aceptar el bootstrap (habilita `firebaseml.googleapis.com` y `aiplatform.googleapis.com`).
+2. Alternativa CLI:
+   ```bash
+   gcloud services enable aiplatform.googleapis.com firebaseml.googleapis.com --project=comandas-charcuteria
+   ```
+3. Verificar en **Vertex AI → Model Garden** que `gemini-2.5-flash` esté disponible en `us-central1` (default).
+
+El costo aproximado al volumen del cliente (≈5 M tokens/mes) es de USD 1–2. Cabe en la cuota gratuita mensual de Vertex AI.
+
+Si la llamada a Gemini falla por cualquier motivo (API deshabilitada, timeout, red, etc.), la app usa el parser determinista automáticamente y sigue funcionando.
 
 ## Notas operativas
 

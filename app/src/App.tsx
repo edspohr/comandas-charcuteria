@@ -4,6 +4,7 @@ import Placeholder from './routes/Placeholder';
 import NuevoPedido from './routes/vendedor/NuevoPedido';
 import ColaDespacho from './routes/despacho/ColaDespacho';
 import DetalleArmado from './routes/despacho/DetalleArmado';
+import Produccion from './routes/produccion/Produccion';
 import AppShell from './components/AppShell';
 import RouteGuard from './components/RouteGuard';
 import { useCurrentUser, ROLE_HOME } from './data/auth';
@@ -74,7 +75,7 @@ export default function App() {
           element={
             <RouteGuard current={current} allow={['produccion', 'admin', 'superAdmin']}>
               <AppShell current={current!}>
-                <Placeholder title="Producción" hint="Llega en el hito 6." />
+                <Produccion />
               </AppShell>
             </RouteGuard>
           }

@@ -11,6 +11,7 @@ import Facturacion from './routes/admin/Facturacion';
 import Panel from './routes/admin/Panel';
 import Catalogo from './routes/admin/Catalogo';
 import Usuarios from './routes/admin/Usuarios';
+import PWAInstallHint from './components/PWAInstallHint';
 import AppShell from './components/AppShell';
 import RouteGuard from './components/RouteGuard';
 import { useCurrentUser, ROLE_HOME } from './data/auth';
@@ -28,6 +29,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <PWAInstallHint />
       <Routes>
         <Route path="/login" element={current ? <Navigate to={ROLE_HOME[current.appUser.role]} replace /> : <Login />} />
 

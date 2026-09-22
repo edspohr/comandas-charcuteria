@@ -5,13 +5,14 @@ import type { Role } from '@/domain/types';
 interface NavItem { to: string; label: string; roles: Role[]; }
 
 const NAV: NavItem[] = [
-  { to: '/vendedor/nuevo',    label: 'Nuevo pedido',   roles: ['vendedor', 'admin'] },
-  { to: '/vendedor/mis',      label: 'Mis pedidos',    roles: ['vendedor', 'admin'] },
-  { to: '/armador/cola',      label: 'Cola de armado', roles: ['armador', 'admin'] },
-  { to: '/produccion',        label: 'Producción',     roles: ['produccion', 'admin'] },
-  { to: '/admin/facturacion', label: 'Facturación',    roles: ['admin'] },
-  { to: '/admin/panel',       label: 'Panel',          roles: ['admin'] },
-  { to: '/admin/catalogo',    label: 'Catálogo',       roles: ['admin'] },
+  { to: '/vendedor/nuevo',    label: 'Nuevo pedido',   roles: ['vendedor', 'admin', 'superAdmin'] },
+  { to: '/vendedor/mis',      label: 'Mis pedidos',    roles: ['vendedor', 'admin', 'superAdmin'] },
+  { to: '/despacho/cola',     label: 'Cola de despacho', roles: ['despacho', 'admin', 'superAdmin'] },
+  { to: '/produccion',        label: 'Producción',     roles: ['produccion', 'admin', 'superAdmin'] },
+  { to: '/admin/facturacion', label: 'Facturación',    roles: ['admin', 'superAdmin'] },
+  { to: '/admin/panel',       label: 'Panel',          roles: ['admin', 'superAdmin'] },
+  { to: '/admin/catalogo',    label: 'Catálogo',       roles: ['admin', 'superAdmin'] },
+  { to: '/admin/usuarios',    label: 'Usuarios',       roles: ['superAdmin'] },
 ];
 
 export default function AppShell({ current, children }: { current: CurrentUser; children: React.ReactNode }) {

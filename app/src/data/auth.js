@@ -35,13 +35,15 @@ export async function signOut() {
 }
 export const ROLE_HOME = {
     vendedor: '/vendedor/nuevo',
-    armador: '/armador/cola',
+    despacho: '/despacho/cola',
     produccion: '/produccion',
     admin: '/admin/panel',
+    superAdmin: '/admin/panel',
 };
 export const ROLE_LABEL = {
     vendedor: 'Vendedor',
-    armador: 'Armador',
+    despacho: 'Despacho',
     produccion: 'Producción',
     admin: 'Administración',
+    superAdmin: 'Super Administrador',
 };

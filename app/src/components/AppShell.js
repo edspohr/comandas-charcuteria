@@ -2,13 +2,14 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Link, useLocation } from 'react-router-dom';
 import { ROLE_LABEL, signOut } from '@/data/auth';
 const NAV = [
-    { to: '/vendedor/nuevo', label: 'Nuevo pedido', roles: ['vendedor', 'admin'] },
-    { to: '/vendedor/mis', label: 'Mis pedidos', roles: ['vendedor', 'admin'] },
-    { to: '/armador/cola', label: 'Cola de armado', roles: ['armador', 'admin'] },
-    { to: '/produccion', label: 'Producción', roles: ['produccion', 'admin'] },
-    { to: '/admin/facturacion', label: 'Facturación', roles: ['admin'] },
-    { to: '/admin/panel', label: 'Panel', roles: ['admin'] },
-    { to: '/admin/catalogo', label: 'Catálogo', roles: ['admin'] },
+    { to: '/vendedor/nuevo', label: 'Nuevo pedido', roles: ['vendedor', 'admin', 'superAdmin'] },
+    { to: '/vendedor/mis', label: 'Mis pedidos', roles: ['vendedor', 'admin', 'superAdmin'] },
+    { to: '/despacho/cola', label: 'Cola de despacho', roles: ['despacho', 'admin', 'superAdmin'] },
+    { to: '/produccion', label: 'Producción', roles: ['produccion', 'admin', 'superAdmin'] },
+    { to: '/admin/facturacion', label: 'Facturación', roles: ['admin', 'superAdmin'] },
+    { to: '/admin/panel', label: 'Panel', roles: ['admin', 'superAdmin'] },
+    { to: '/admin/catalogo', label: 'Catálogo', roles: ['admin', 'superAdmin'] },
+    { to: '/admin/usuarios', label: 'Usuarios', roles: ['superAdmin'] },
 ];
 export default function AppShell({ current, children }) {
     const { pathname } = useLocation();

@@ -1,4 +1,4 @@
-export type Role = 'vendedor' | 'armador' | 'produccion' | 'admin';
+export type Role = 'vendedor' | 'despacho' | 'produccion' | 'admin' | 'superAdmin';
 
 export type Unit = 'g' | 'kg' | 'unidad';
 

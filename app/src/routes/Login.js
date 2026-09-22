@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { DEMO_PASSWORD, demoUsers } from '@/data/demo-users';
 import { signInWithPassword } from '@/data/auth';
 import { ROLE_LABEL } from '@/data/auth';
-const ROLE_ORDER = ['vendedor', 'armador', 'produccion', 'admin'];
+const ROLE_ORDER = ['vendedor', 'despacho', 'produccion', 'admin', 'superAdmin'];
 export default function Login() {
     const [pending, setPending] = useState(null);
     const [error, setError] = useState(null);

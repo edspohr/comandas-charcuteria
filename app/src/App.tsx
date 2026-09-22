@@ -29,7 +29,7 @@ export default function App() {
         <Route
           path="/vendedor/nuevo"
           element={
-            <RouteGuard current={current} allow={['vendedor', 'admin']}>
+            <RouteGuard current={current} allow={['vendedor', 'admin', 'superAdmin']}>
               <AppShell current={current!}>
                 <Placeholder title="Nuevo pedido" hint="Wizard llega en el hito 4." />
               </AppShell>
@@ -39,7 +39,7 @@ export default function App() {
         <Route
           path="/vendedor/mis"
           element={
-            <RouteGuard current={current} allow={['vendedor', 'admin']}>
+            <RouteGuard current={current} allow={['vendedor', 'admin', 'superAdmin']}>
               <AppShell current={current!}>
                 <Placeholder title="Mis pedidos" hint="Llega en el hito 9." />
               </AppShell>
@@ -47,11 +47,11 @@ export default function App() {
           }
         />
         <Route
-          path="/armador/cola"
+          path="/despacho/cola"
           element={
-            <RouteGuard current={current} allow={['armador', 'admin']}>
+            <RouteGuard current={current} allow={['despacho', 'admin', 'superAdmin']}>
               <AppShell current={current!}>
-                <Placeholder title="Cola de armado" hint="Llega en el hito 5." />
+                <Placeholder title="Cola de despacho" hint="Llega en el hito 5." />
               </AppShell>
             </RouteGuard>
           }
@@ -59,7 +59,7 @@ export default function App() {
         <Route
           path="/produccion"
           element={
-            <RouteGuard current={current} allow={['produccion', 'admin']}>
+            <RouteGuard current={current} allow={['produccion', 'admin', 'superAdmin']}>
               <AppShell current={current!}>
                 <Placeholder title="Producción" hint="Llega en el hito 6." />
               </AppShell>
@@ -69,7 +69,7 @@ export default function App() {
         <Route
           path="/admin/panel"
           element={
-            <RouteGuard current={current} allow={['admin']}>
+            <RouteGuard current={current} allow={['admin', 'superAdmin']}>
               <AppShell current={current!}>
                 <Placeholder title="Panel de dueños" hint="Llega en el hito 8." />
               </AppShell>
@@ -79,7 +79,7 @@ export default function App() {
         <Route
           path="/admin/facturacion"
           element={
-            <RouteGuard current={current} allow={['admin']}>
+            <RouteGuard current={current} allow={['admin', 'superAdmin']}>
               <AppShell current={current!}>
                 <Placeholder title="Facturación y despacho" hint="Llega en el hito 7." />
               </AppShell>
@@ -89,9 +89,19 @@ export default function App() {
         <Route
           path="/admin/catalogo"
           element={
-            <RouteGuard current={current} allow={['admin']}>
+            <RouteGuard current={current} allow={['admin', 'superAdmin']}>
               <AppShell current={current!}>
                 <Placeholder title="Catálogo y clientes" hint="Llega en el hito 11." />
+              </AppShell>
+            </RouteGuard>
+          }
+        />
+        <Route
+          path="/admin/usuarios"
+          element={
+            <RouteGuard current={current} allow={['superAdmin']}>
+              <AppShell current={current!}>
+                <Placeholder title="Usuarios" hint="Solo Super Administrador. Llega en el hito 11." />
               </AppShell>
             </RouteGuard>
           }

@@ -4,7 +4,7 @@ import { signInWithPassword } from '@/data/auth';
 import { ROLE_LABEL } from '@/data/auth';
 import type { Role } from '@/domain/types';
 
-const ROLE_ORDER: Role[] = ['vendedor', 'armador', 'produccion', 'admin'];
+const ROLE_ORDER: Role[] = ['vendedor', 'despacho', 'produccion', 'admin', 'superAdmin'];
 
 export default function Login() {
   const [pending, setPending] = useState<string | null>(null);

@@ -1,11 +1,112 @@
 rules_version = '2';
 
-// Placeholder rules for milestone 1 — hardened in milestone 13.
-// While emulators are used exclusively, allowing authenticated read/write is safe.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    // -------- Helpers
+    function isAuth() { return request.auth != null; }
+
+    function role() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isSuperAdmin()  { return isAuth() && role() == 'superAdmin'; }
+    function isAdminOrSup()  { return isAuth() && (role() == 'admin' || role() == 'superAdmin'); }
+    function isVendedor()    { return isAuth() && role() == 'vendedor'; }
+    function isDespacho()    { return isAuth() && role() == 'despacho'; }
+    function isProduccion()  { return isAuth() && role() == 'produccion'; }
+
+    // -------- Reference data
+    match /products/{id} {
+      allow read:  if isAuth();
+      allow write: if isAdminOrSup();
+    }
+
+    match /clients/{id} {
+      allow read:  if isAuth();
+      allow write: if isAdminOrSup();
+    }
+
+    match /settings/{doc} {
+      allow read:  if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    match /users/{uid} {
+      allow read:  if isAuth();
+      allow write: if isSuperAdmin();
+    }
+
+    // -------- Counters (order-id + Bsale doc-number generators)
+    // Any authenticated caller can bump these inside their transactions.
+    match /counters/{id} {
+      allow read, write: if isAuth();
+    }
+
+    // -------- Stock (mutated only by transactions in code)
+    // The rules just gate authentication + protect impossible values.
+    // The business logic (delta on reserved / onHand) lives in code.
+    match /stock/{id} {
+      allow read: if isAuth();
+      allow create, update: if isAuth()
+        && request.resource.data.onHand >= 0
+        && request.resource.data.reserved >= 0;
+      allow delete: if isAdminOrSup();
+    }
+
+    // -------- Stock movements (append-only audit log)
+    match /stockMovements/{id} {
+      allow read:   if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if false;
+    }
+
+    // -------- Orders
+    match /orders/{id} {
+      allow read: if isAuth();
+
+      // Create: vendedor/admin/superAdmin; must own the order (createdBy = uid),
+      // must start in a legal initial state.
+      allow create: if isAuth()
+        && (isVendedor() || isAdminOrSup())
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status in ['recibido', 'confirmado', 'confirmado_parcial'];
+
+      // Update: split by role.
+      // Admin/SuperAdmin can update anything on an order.
+      // Vendedor: only own orders, only to transition to 'anulado' from a
+      //   pre-invoice state. Cannot set invoiceRef, cannot change createdBy.
+      // Despacho: cannot set invoiceRef; can only push order forward through
+      //   pack states (en_armado / armado).
+      // Producción: reassigns pending → reserved on lines and may transition
+      //   confirmado_parcial → confirmado. Cannot set invoiceRef.
+      allow update: if isAuth() && (
+        isAdminOrSup()
+        || (
+          isVendedor()
+          && resource.data.createdBy == request.auth.uid
+          && resource.data.status in ['recibido', 'confirmado', 'confirmado_parcial', 'en_armado']
+          && request.resource.data.status == 'anulado'
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.invoiceRef == resource.data.get('invoiceRef', null)
+        )
+        || (
+          isDespacho()
+          && resource.data.status in ['confirmado', 'confirmado_parcial', 'en_armado']
+          && request.resource.data.status in ['en_armado', 'armado']
+          && request.resource.data.get('invoiceRef', null) == resource.data.get('invoiceRef', null)
+          && request.resource.data.createdBy == resource.data.createdBy
+        )
+        || (
+          isProduccion()
+          && resource.data.status in ['confirmado_parcial', 'recibido']
+          && request.resource.data.status in ['confirmado_parcial', 'confirmado']
+          && request.resource.data.get('invoiceRef', null) == resource.data.get('invoiceRef', null)
+          && request.resource.data.createdBy == resource.data.createdBy
+        )
+      );
+
+      allow delete: if isSuperAdmin();
     }
   }
 }

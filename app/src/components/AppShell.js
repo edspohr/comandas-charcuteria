@@ -4,6 +4,7 @@ import { ROLE_LABEL, signOut } from '@/data/auth';
 import Logo from '@/components/ui/Logo';
 const NAV = [
     { to: '/vendedor/nuevo', label: 'Nuevo pedido', roles: ['vendedor', 'admin', 'superAdmin'] },
+    { to: '/vendedor/pegar', label: 'Pegar pedido', roles: ['vendedor', 'admin', 'superAdmin'] },
     { to: '/vendedor/mis', label: 'Mis pedidos', roles: ['vendedor', 'admin', 'superAdmin'] },
     { to: '/despacho/cola', label: 'Cola de despacho', roles: ['despacho', 'admin', 'superAdmin'] },
     { to: '/produccion', label: 'Producción', roles: ['produccion', 'admin', 'superAdmin'] },

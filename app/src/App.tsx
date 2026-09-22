@@ -4,6 +4,7 @@ import Placeholder from './routes/Placeholder';
 import NuevoPedido from './routes/vendedor/NuevoPedido';
 import MisPedidos from './routes/vendedor/MisPedidos';
 import DetallePedido from './routes/vendedor/DetallePedido';
+import PegarPedido from './routes/vendedor/PegarPedido';
 import ColaDespacho from './routes/despacho/ColaDespacho';
 import DetalleArmado from './routes/despacho/DetalleArmado';
 import Produccion from './routes/produccion/Produccion';
@@ -40,6 +41,16 @@ export default function App() {
             <RouteGuard current={current} allow={['vendedor', 'admin', 'superAdmin']}>
               <AppShell current={current!}>
                 <NuevoPedido />
+              </AppShell>
+            </RouteGuard>
+          }
+        />
+        <Route
+          path="/vendedor/pegar"
+          element={
+            <RouteGuard current={current} allow={['vendedor', 'admin', 'superAdmin']}>
+              <AppShell current={current!}>
+                <PegarPedido />
               </AppShell>
             </RouteGuard>
           }

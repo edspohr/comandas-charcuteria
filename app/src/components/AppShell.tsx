@@ -7,6 +7,7 @@ interface NavItem { to: string; label: string; roles: Role[]; }
 
 const NAV: NavItem[] = [
   { to: '/vendedor/nuevo',    label: 'Nuevo pedido',     roles: ['vendedor', 'admin', 'superAdmin'] },
+  { to: '/vendedor/pegar',    label: 'Pegar pedido',     roles: ['vendedor', 'admin', 'superAdmin'] },
   { to: '/vendedor/mis',      label: 'Mis pedidos',      roles: ['vendedor', 'admin', 'superAdmin'] },
   { to: '/despacho/cola',     label: 'Cola de despacho', roles: ['despacho', 'admin', 'superAdmin'] },
   { to: '/produccion',        label: 'Producción',       roles: ['produccion', 'admin', 'superAdmin'] },

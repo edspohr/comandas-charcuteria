@@ -9,7 +9,9 @@
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "baseUrl": ".."
+    "paths": {
+      "@/*": ["../app/src/*"]
+    }
   },
   "include": ["./**/*.ts", "../app/src/domain/**/*.ts"]
 }

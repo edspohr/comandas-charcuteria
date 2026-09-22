@@ -1,7 +1,10 @@
 node_modules
 dist
 .env
-.env.local
+.env.*
+!.env.example
+service-account*.json
+*firebase-adminsdk*.json
 .firebase
 .emulator-data
 firebase-debug.log*

@@ -17,20 +17,42 @@ import { users } from './data/users.ts';
 import { weekOrders } from './data/orders-week.ts';
 import { stockDocId, type StockMovement } from '../app/src/domain/types.ts';
 
-process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:8080';
-process.env.FIREBASE_AUTH_EMULATOR_HOST ??= '127.0.0.1:9099';
+// Target selection:
+//   - Default: Firebase emulators (safer; won't touch production).
+//   - Set USE_REAL_FIREBASE=1 + GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json
+//     to run against the real project. The service account must have
+//     Firebase Admin permissions on the target project.
+const useEmulators = process.env.USE_REAL_FIREBASE !== '1';
 
-const PROJECT_ID = 'comandas-charcuteria-demo';
+if (useEmulators) {
+  process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:8080';
+  process.env.FIREBASE_AUTH_EMULATOR_HOST ??= '127.0.0.1:9099';
+} else {
+  delete process.env.FIRESTORE_EMULATOR_HOST;
+  delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+}
 
-function assertEmulator() {
-  if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
-    throw new Error('Seed only runs against emulators. Set FIRESTORE_EMULATOR_HOST and FIREBASE_AUTH_EMULATOR_HOST.');
+const PROJECT_ID = useEmulators ? 'comandas-charcuteria-demo' : 'comandas-charcuteria';
+
+function assertTarget() {
+  if (useEmulators) {
+    if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+      throw new Error('Seed refused: emulator env vars missing.');
+    }
+    return;
   }
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    throw new Error('Seed against real Firebase requires GOOGLE_APPLICATION_CREDENTIALS pointing to a service account JSON.');
+  }
+  console.warn(`⚠️  Running against REAL project ${PROJECT_ID}. This will wipe products/clients/users/orders/stock. Ctrl-C to abort.`);
 }
 
 if (!getApps().length) initializeApp({ projectId: PROJECT_ID });
 const auth = getAuth();
 const db = getFirestore();
+// Real Firestore rejects undefined values; the seed data has optional fields
+// (aliases, notes, rut, …). Emulators accept them either way.
+db.settings({ ignoreUndefinedProperties: true });
 
 async function wipeFirestore() {
   const collections = ['products', 'clients', 'orders', 'stock', 'stockMovements', 'users', 'settings', 'counters'];
@@ -195,8 +217,8 @@ async function seedOrdersAndMovements() {
 }
 
 async function main() {
-  assertEmulator();
-  console.log(`→ Wiping emulator project "${PROJECT_ID}"...`);
+  assertTarget();
+  console.log(`→ Wiping project "${PROJECT_ID}"...`);
   await wipeFirestore();
   await wipeAuth();
 

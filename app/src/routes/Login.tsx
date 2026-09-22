@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DEMO_PASSWORD, demoUsers, type DemoUser } from '@/data/demo-users';
-import { signInWithPassword } from '@/data/auth';
-import { ROLE_LABEL } from '@/data/auth';
+import { signInWithPassword, ROLE_LABEL } from '@/data/auth';
+import Logo from '@/components/ui/Logo';
 import type { Role } from '@/domain/types';
 
 const ROLE_ORDER: Role[] = ['vendedor', 'despacho', 'produccion', 'admin', 'superAdmin'];
@@ -15,46 +15,51 @@ export default function Login() {
     setError(null);
     try {
       await signInWithPassword(user.email, DEMO_PASSWORD);
-    } catch (e) {
-      setError('No se pudo iniciar sesión. ¿Corrió el seed contra el emulador?');
+    } catch {
+      setError('No se pudo iniciar sesión. Verifique que los usuarios estén sembrados en el proyecto.');
       setPending(null);
     }
   }
 
   return (
-    <main className="min-h-screen bg-brand-50 p-6 flex flex-col items-center">
-      <div className="w-full max-w-lg">
-        <header className="text-center mb-8 mt-4">
-          <h1 className="text-3xl font-semibold text-brand-700">Comandas</h1>
-          <p className="text-sm text-slate-600 mt-1">La Charcutería Artesanal</p>
+    <main className="min-h-screen bg-cream-50">
+      <div className="mx-auto max-w-lg px-6 pt-12 pb-16">
+        <header className="text-center mb-10">
+          <div className="flex flex-col items-center gap-4">
+            <Logo size={68} />
+            <div>
+              <p className="eyebrow">La Charcutería Artesanal</p>
+              <h1 className="mt-1 text-3xl font-semibold text-charcoal-900 tracking-display uppercase">Comandas</h1>
+              <p className="mt-2 text-xs text-charcoal-300 tracking-display uppercase">
+                Barrio Franklin · Santiago
+              </p>
+            </div>
+          </div>
         </header>
 
         <section className="space-y-6">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500 font-medium mb-2 px-1">
-              Ingrese como usuario de demo
-            </p>
-            <div className="space-y-4">
-              {ROLE_ORDER.map((role) => (
-                <RoleGroup
-                  key={role}
-                  role={role}
-                  users={demoUsers.filter((u) => u.role === role)}
-                  pending={pending}
-                  onPick={loginAs}
-                />
-              ))}
-            </div>
+          <div className="text-center">
+            <p className="eyebrow">Elija su perfil</p>
+          </div>
+
+          <div className="space-y-5">
+            {ROLE_ORDER.map((role) => {
+              const users = demoUsers.filter((u) => u.role === role);
+              if (users.length === 0) return null;
+              return (
+                <RoleGroup key={role} role={role} users={users} pending={pending} onPick={loginAs} />
+              );
+            })}
           </div>
 
           {error && (
-            <div className="rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm p-3">
+            <div className="rounded-md border border-red-200 bg-red-50 text-red-800 text-sm px-3 py-2">
               {error}
             </div>
           )}
 
-          <p className="text-xs text-slate-500 text-center">
-            Contraseña de todos los usuarios: <code className="font-mono">{DEMO_PASSWORD}</code>
+          <p className="text-[11px] text-charcoal-300 text-center tracking-[0.03em]">
+            Contraseña demo: <code className="font-mono text-charcoal-500">{DEMO_PASSWORD}</code>
           </p>
         </section>
       </div>
@@ -72,7 +77,11 @@ function RoleGroup({
 }) {
   return (
     <div>
-      <p className="text-sm font-semibold text-slate-700 mb-2 px-1">{ROLE_LABEL[role]}</p>
+      <div className="flex items-center gap-2 mb-2 px-1">
+        <span className="h-px flex-1 bg-charcoal-100" />
+        <span className="eyebrow whitespace-nowrap">{ROLE_LABEL[role]}</span>
+        <span className="h-px flex-1 bg-charcoal-100" />
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {users.map((u) => {
           const isPending = pending === u.uid;
@@ -82,10 +91,10 @@ function RoleGroup({
               type="button"
               onClick={() => onPick(u)}
               disabled={pending !== null}
-              className="rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm active:scale-[0.98] transition disabled:opacity-50"
+              className="group card p-3 text-left transition hover:border-brass-500 hover:shadow-lift active:scale-[0.98] disabled:opacity-50"
             >
-              <div className="font-medium text-slate-900">{u.displayName}</div>
-              <div className="text-xs text-slate-500 mt-0.5">
+              <div className="font-semibold text-charcoal-700 text-sm">{u.displayName}</div>
+              <div className="text-[11px] text-charcoal-300 mt-0.5 tracking-[0.02em]">
                 {isPending ? 'Ingresando…' : ROLE_LABEL[u.role]}
               </div>
             </button>

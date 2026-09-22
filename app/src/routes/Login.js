@@ -1,8 +1,8 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState } from 'react';
 import { DEMO_PASSWORD, demoUsers } from '@/data/demo-users';
-import { signInWithPassword } from '@/data/auth';
-import { ROLE_LABEL } from '@/data/auth';
+import { signInWithPassword, ROLE_LABEL } from '@/data/auth';
+import Logo from '@/components/ui/Logo';
 const ROLE_ORDER = ['vendedor', 'despacho', 'produccion', 'admin', 'superAdmin'];
 export default function Login() {
     const [pending, setPending] = useState(null);
@@ -13,16 +13,21 @@ export default function Login() {
         try {
             await signInWithPassword(user.email, DEMO_PASSWORD);
         }
-        catch (e) {
-            setError('No se pudo iniciar sesión. ¿Corrió el seed contra el emulador?');
+        catch {
+            setError('No se pudo iniciar sesión. Verifique que los usuarios estén sembrados en el proyecto.');
             setPending(null);
         }
     }
-    return (_jsx("main", { className: "min-h-screen bg-brand-50 p-6 flex flex-col items-center", children: _jsxs("div", { className: "w-full max-w-lg", children: [_jsxs("header", { className: "text-center mb-8 mt-4", children: [_jsx("h1", { className: "text-3xl font-semibold text-brand-700", children: "Comandas" }), _jsx("p", { className: "text-sm text-slate-600 mt-1", children: "La Charcuter\u00EDa Artesanal" })] }), _jsxs("section", { className: "space-y-6", children: [_jsxs("div", { children: [_jsx("p", { className: "text-xs uppercase tracking-wide text-slate-500 font-medium mb-2 px-1", children: "Ingrese como usuario de demo" }), _jsx("div", { className: "space-y-4", children: ROLE_ORDER.map((role) => (_jsx(RoleGroup, { role: role, users: demoUsers.filter((u) => u.role === role), pending: pending, onPick: loginAs }, role))) })] }), error && (_jsx("div", { className: "rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm p-3", children: error })), _jsxs("p", { className: "text-xs text-slate-500 text-center", children: ["Contrase\u00F1a de todos los usuarios: ", _jsx("code", { className: "font-mono", children: DEMO_PASSWORD })] })] })] }) }));
+    return (_jsx("main", { className: "min-h-screen bg-cream-50", children: _jsxs("div", { className: "mx-auto max-w-lg px-6 pt-12 pb-16", children: [_jsx("header", { className: "text-center mb-10", children: _jsxs("div", { className: "flex flex-col items-center gap-4", children: [_jsx(Logo, { size: 68 }), _jsxs("div", { children: [_jsx("p", { className: "eyebrow", children: "La Charcuter\u00EDa Artesanal" }), _jsx("h1", { className: "mt-1 text-3xl font-semibold text-charcoal-900 tracking-display uppercase", children: "Comandas" }), _jsx("p", { className: "mt-2 text-xs text-charcoal-300 tracking-display uppercase", children: "Barrio Franklin \u00B7 Santiago" })] })] }) }), _jsxs("section", { className: "space-y-6", children: [_jsx("div", { className: "text-center", children: _jsx("p", { className: "eyebrow", children: "Elija su perfil" }) }), _jsx("div", { className: "space-y-5", children: ROLE_ORDER.map((role) => {
+                                const users = demoUsers.filter((u) => u.role === role);
+                                if (users.length === 0)
+                                    return null;
+                                return (_jsx(RoleGroup, { role: role, users: users, pending: pending, onPick: loginAs }, role));
+                            }) }), error && (_jsx("div", { className: "rounded-md border border-red-200 bg-red-50 text-red-800 text-sm px-3 py-2", children: error })), _jsxs("p", { className: "text-[11px] text-charcoal-300 text-center tracking-[0.03em]", children: ["Contrase\u00F1a demo: ", _jsx("code", { className: "font-mono text-charcoal-500", children: DEMO_PASSWORD })] })] })] }) }));
 }
 function RoleGroup({ role, users, pending, onPick, }) {
-    return (_jsxs("div", { children: [_jsx("p", { className: "text-sm font-semibold text-slate-700 mb-2 px-1", children: ROLE_LABEL[role] }), _jsx("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-2", children: users.map((u) => {
+    return (_jsxs("div", { children: [_jsxs("div", { className: "flex items-center gap-2 mb-2 px-1", children: [_jsx("span", { className: "h-px flex-1 bg-charcoal-100" }), _jsx("span", { className: "eyebrow whitespace-nowrap", children: ROLE_LABEL[role] }), _jsx("span", { className: "h-px flex-1 bg-charcoal-100" })] }), _jsx("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-2", children: users.map((u) => {
                     const isPending = pending === u.uid;
-                    return (_jsxs("button", { type: "button", onClick: () => onPick(u), disabled: pending !== null, className: "rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm active:scale-[0.98] transition disabled:opacity-50", children: [_jsx("div", { className: "font-medium text-slate-900", children: u.displayName }), _jsx("div", { className: "text-xs text-slate-500 mt-0.5", children: isPending ? 'Ingresando…' : ROLE_LABEL[u.role] })] }, u.uid));
+                    return (_jsxs("button", { type: "button", onClick: () => onPick(u), disabled: pending !== null, className: "group card p-3 text-left transition hover:border-brass-500 hover:shadow-lift active:scale-[0.98] disabled:opacity-50", children: [_jsx("div", { className: "font-semibold text-charcoal-700 text-sm", children: u.displayName }), _jsx("div", { className: "text-[11px] text-charcoal-300 mt-0.5 tracking-[0.02em]", children: isPending ? 'Ingresando…' : ROLE_LABEL[u.role] })] }, u.uid));
                 }) })] }));
 }

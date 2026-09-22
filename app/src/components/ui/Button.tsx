@@ -3,18 +3,18 @@ import type { ButtonHTMLAttributes } from 'react';
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
-const BASE = 'inline-flex items-center justify-center gap-2 rounded-xl font-medium transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none';
+const BASE = 'inline-flex items-center justify-center gap-2 rounded-md font-medium tracking-[0.02em] transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brass-500/40';
 
 const VARIANT: Record<Variant, string> = {
-  primary:   'bg-brand-500 text-white hover:bg-brand-600 shadow-sm',
-  secondary: 'bg-white border border-slate-200 text-slate-900 hover:bg-slate-50 shadow-sm',
-  ghost:     'text-slate-700 hover:bg-slate-100',
-  danger:    'bg-red-600 text-white hover:bg-red-700 shadow-sm',
+  primary:   'bg-charcoal-700 text-cream-50 hover:bg-charcoal-900 shadow-soft',
+  secondary: 'bg-white border border-charcoal-200 text-charcoal-700 hover:border-charcoal-300 hover:bg-cream-50',
+  ghost:     'text-charcoal-500 hover:bg-cream-100',
+  danger:    'bg-red-700 text-white hover:bg-red-800 shadow-soft',
 };
 
 const SIZE: Record<Size, string> = {
   sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-sm',
+  md: 'px-4 py-2.5 text-sm',
   lg: 'px-5 py-3 text-base',
 };
 

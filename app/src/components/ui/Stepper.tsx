@@ -21,11 +21,11 @@ export default function Stepper({ value, onChange, min = 0, step = 1, quick = [1
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white overflow-hidden">
+      <div className="inline-flex items-center rounded-md border border-charcoal-200 bg-white overflow-hidden">
         <button
           type="button"
           onClick={() => commit(value - step)}
-          className="w-10 h-10 text-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100"
+          className="w-11 h-11 text-xl text-charcoal-500 hover:bg-cream-100 active:bg-cream-200"
           aria-label="Restar"
         >−</button>
         <input
@@ -34,12 +34,12 @@ export default function Stepper({ value, onChange, min = 0, step = 1, quick = [1
           value={raw}
           onChange={(e) => setRaw(e.target.value)}
           onBlur={() => commit(parseFloat(raw))}
-          className="w-16 h-10 text-center outline-none border-x border-slate-200"
+          className="w-16 h-11 text-center outline-none border-x border-charcoal-200 font-medium"
         />
         <button
           type="button"
           onClick={() => commit(value + step)}
-          className="w-10 h-10 text-lg text-slate-700 hover:bg-slate-50 active:bg-slate-100"
+          className="w-11 h-11 text-xl text-charcoal-500 hover:bg-cream-100 active:bg-cream-200"
           aria-label="Sumar"
         >+</button>
       </div>
@@ -49,7 +49,7 @@ export default function Stepper({ value, onChange, min = 0, step = 1, quick = [1
             key={q}
             type="button"
             onClick={() => commit(value + q)}
-            className="rounded-full bg-slate-100 hover:bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700"
+            className="rounded-full bg-cream-100 hover:bg-cream-200 px-3 py-1 text-xs font-semibold text-charcoal-500 tracking-[0.03em]"
           >
             +{q}
           </button>

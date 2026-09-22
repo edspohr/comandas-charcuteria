@@ -15,6 +15,7 @@ import { stockDocId } from '@/domain/types';
 import { useProducts } from './products';
 import { useAllStock } from './stock';
 import { addDaysIso, todayInSantiago } from '@/lib/format';
+import { describeFirestoreError } from '@/lib/errors';
 
 // Orders that still consume/hold reservations or have pending production
 const OPEN_STATUSES: OrderStatus[] = [
@@ -46,11 +47,13 @@ export interface DemandRow {
 export function useProduccionData(): {
   rows: DemandRow[];
   loading: boolean;
+  error: string | null;
 } {
   const { products, loading: pLoading } = useProducts();
   const { stock, loading: sLoading } = useAllStock();
   const [openOrders, setOpenOrders] = useState<Order[]>([]);
   const [oLoading, setOLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(
@@ -58,12 +61,17 @@ export function useProduccionData(): {
       where('status', 'in', OPEN_STATUSES),
       orderBy('requestedDate', 'asc'),
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const list: Order[] = [];
-      snap.forEach((d) => list.push(d.data() as Order));
-      setOpenOrders(list);
-      setOLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: Order[] = [];
+        snap.forEach((d) => list.push(d.data() as Order));
+        setOpenOrders(list);
+        setError(null);
+        setOLoading(false);
+      },
+      (err) => { setError(describeFirestoreError(err)); setOLoading(false); },
+    );
     return unsub;
   }, []);
 
@@ -124,7 +132,7 @@ export function useProduccionData(): {
     return list;
   }, [products, stock, openOrders, pLoading, sLoading, oLoading]);
 
-  return { rows, loading: pLoading || sLoading || oLoading };
+  return { rows, loading: pLoading || sLoading || oLoading, error };
 }
 
 // Horizon helper for the "7 días" view

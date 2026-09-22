@@ -182,3 +182,45 @@ Login por tarjetas y sello LC · wizard 4 pasos con búsqueda de cliente, semáf
 - `firestore.indexes.json` — las 3 definiciones de #3 (ya desplegadas; falta commit).
 - `.claude/launch.json` — config para levantar Vite en modo production (`npx vite --mode production` desde `app/`).
 - Este archivo.
+
+*(Sección histórica: todo lo anterior quedó commiteado en `d62e9f5`.)*
+
+---
+
+## Revisión del fix `d62e9f5` — 22-09-2026, 17:00
+
+Re-corrí el guión completo **contra la URL en vivo** (bundle `index-Dk-e-T1l.js`), con reseed al final.
+
+### Verificado en vivo ✅
+| # | Evidencia |
+|---|---|
+| 1 | Login Rafael → Nuevo pedido sin crash; las 5 cuentas del guión entran. |
+| 2 | `PED-2026-0041` creado (1 línea, `notes`/`rawText` vacíos). |
+| 3 | Mis pedidos, Repetir último y Producción cargan sin `failed-precondition`. |
+| 5 | Longaniza 5 kg → "Disponible 8 u"; Confirmar → "8 u reservado · 12 u a producción". Seed termina con "Verifying stock invariant ✓". |
+| 6 | Sincronizar (Ciro) lista FA-000811…FA-000823 existentes, sin consumir contador; botón se deshabilita. |
+| 7 | Facturar PED-0041 → **FA-000823**; payload con `invoiceRef`. |
+| 8 | Edu abre PED-0041 parcial: banner + sin botón Tomar. Tras producción (Yuri, 24 u → promovidos PED-0029 y PED-0041) Edu lo toma y arma normal. |
+| 10 | Picker de formatos aparece como bottom-sheet al tocar el producto. |
+| 15 | Flash "estado **Confirmado parcial**"; historial con etiquetas. |
+| 27 | Anular PED-2026-0030 (recibido) → OK, desaparece de Activos. |
+| 24 | `git ls-files app/src \| grep .js$` = 0; `tsc --noEmit` limpio. |
+| 4 | `scripts/verify-parser.ts` 4/4 verified (offline). |
+
+### Observaciones nuevas del fix (para el próximo pase)
+
+**31. Service worker sirve el bundle viejo en la primera carga tras el deploy (P1 para la demo).** Con `registerType: 'autoUpdate'` ([vite.config.ts:10](../app/vite.config.ts)) la primera navegación después del deploy todavía sirvió `index-Dilu4ME9.js` (el que crashea); recién la segunda recarga trajo el nuevo. Cualquier teléfono que haya abierto la versión anterior va a ver la pantalla en blanco una vez más. Antes de la demo: abrir la URL y recargar dos veces en cada dispositivo (o borrar datos del sitio). A futuro: `registerType: 'prompt'` con un toast "Nueva versión — recargar", o `navigateFallback` con `NetworkFirst` para `index.html`.
+
+**32. README paso 5 quedó inconsistente con #8.** Ahora Edu **no puede tomar** el pedido parcial del paso 4 hasta que Yuri registre producción (paso 6), pero el paso 5 sigue diciendo "Verás el pedido de Rafael. Tomar pedido → en_armado". Opciones: reordenar 4 → 6 → 5, o aclarar que Edu toma el pedido del paso 2 (que sale `confirmado` si las cantidades caben en stock) y que el del paso 4 se arma después del paso 6.
+
+**33. Banner de despacho hardcodea "Yuri"** ([DetalleArmado.tsx:120](../app/src/routes/despacho/DetalleArmado.tsx)). Debería decir "Producción" — el nombre viene de la seed.
+
+**34. Parser: aliases genéricos ganan sobre el producto correcto.** Casos extra probados offline: `"gouda ahumado x 10 sachet 200"` → **Jamón ahumado** (alias `'ahumado'` en [products.ts:29](../scripts/data/products.ts)), en `review`. `"5 potes pate de hongos 250"` → `pote-150g` (la pista `\bpote\s*250` de [local.ts:50](../app/src/domain/parse/local.ts) exige adyacencia). `"mortadela pistacho 1,5 kg"` deja `notas: "pistacho"`. Sugerencia: eliminar aliases de una sola palabra genérica (`ahumado`, `cocido`), preferir el needle más largo en empates, y no volcar tokens del nombre del producto a notas. Agregar estos casos a `verify-parser.ts`. Lo demás anduvo bien (8/8 con producto correcto salvo el de gouda; saludos descartados).
+
+**35. El test positivo de anular está duplicado y no se ejecutó.** [firestore.rules.test.ts:85](../tests/rules/firestore.rules.test.ts) ya hacía `assertSucceeds(... anulado)` dentro del test "cannot change status beyond anular"; el nuevo test repite lo mismo. Y como no hay Java en la máquina, ninguno corrió — el commit dice "Reglas re-desplegadas" (cierto, verificado en vivo) pero no "test pasa". Correr `npm run test:rules` en una máquina con JDK antes de darlo por cubierto.
+
+**36. Quedó pendiente la parte de UI de #3:** los `onSnapshot` de [orders.ts:403](../app/src/data/orders.ts) y [produccion.ts:61](../app/src/data/produccion.ts) siguen sin callback de error; si una query falla la pantalla queda en "Cargando…" para siempre.
+
+**37. `.gitignore` tiene un comentario huérfano** (líneas 4-5: "keep hand-written .d.ts… nothing to ignore here now") que no describe ninguna regla. Borrar.
+
+**38. Menor:** Sincronizar ahora incluye también pedidos `entregado` (cualquiera con `invoiceRef`); el texto de la sección dice "facturados/despachados". Ajustar texto o filtro.

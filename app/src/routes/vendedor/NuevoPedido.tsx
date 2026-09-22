@@ -11,6 +11,7 @@ import { createOrder, useLastOrderForClient, type DraftLine } from '@/data/order
 import { clearDraft, loadDraft, saveDraft } from '@/lib/draft';
 import { defaultRequestedDate, minRequestedDate } from '@/domain/cutoff';
 import { formatDateLong, formatQty } from '@/lib/format';
+import { describeFirestoreError } from '@/lib/errors';
 import type { Client, Product, ProductFormat, StockDoc } from '@/domain/types';
 
 interface Draft {
@@ -87,8 +88,7 @@ export default function NuevoPedido() {
         state: { justCreated: res.orderId, status: res.status, parcialLines: res.parcialLines },
       });
     } catch (e: unknown) {
-      const msg = (e as Error).message ?? 'Error al crear el pedido';
-      setError(msg);
+      setError(describeFirestoreError(e));
       setSubmitting(false);
     }
   }

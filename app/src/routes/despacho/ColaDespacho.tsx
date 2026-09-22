@@ -4,6 +4,7 @@ import { useCurrentUser } from '@/data/auth';
 import { useDespachoQueue } from '@/data/orders';
 import { formatDateShort, formatQty, todayInSantiago, addDaysIso } from '@/lib/format';
 import StatusPill from '@/components/ui/StatusPill';
+import ErrorBanner from '@/components/ui/ErrorBanner';
 import type { Order } from '@/domain/types';
 import { demoUsers } from '@/data/demo-users';
 
@@ -17,7 +18,7 @@ const PACKER_NAME: Record<string, string> = Object.fromEntries(
 export default function ColaDespacho() {
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
-  const { orders, loading } = useDespachoQueue();
+  const { orders, loading, error } = useDespachoQueue();
   const [day, setDay] = useState<DayFilter>('todos');
   const [owner, setOwner] = useState<OwnerFilter>('todos');
 
@@ -54,8 +55,9 @@ export default function ColaDespacho() {
         </FilterRow>
       </section>
 
-      {loading && <p className="text-sm text-charcoal-300">Cargando…</p>}
-      {!loading && filtered.length === 0 && (
+      {loading && !error && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {error && <ErrorBanner message={error} />}
+      {!loading && !error && filtered.length === 0 && (
         <div className="card p-8 text-center">
           <p className="eyebrow mb-2">Vacío</p>
           <p className="text-sm text-charcoal-500">Nada por armar con estos filtros.</p>

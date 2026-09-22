@@ -40,15 +40,15 @@ Para mostrar el flujo completo en la URL en vivo. Recomiendo dos ventanas de inc
    - Entrega: dejá la fecha por defecto (mañana), despacho.
    - Confirmar → Enviar. Ves el flash en Mis pedidos con el ID `PED-2026-XXXX`.
 3. **Pegar pedido (opcional)** — Volvé a Nuevo pedido → **Pegar pedido**. Cargá el ejemplo, "Interpretar", revisá las líneas identificadas y "Continuar en el wizard" para probar el mapping.
-4. **Split a producción** — Elegí un cliente y pedí `20 sachet 5 kg` de **Longaniza chillán** (hay 8 disponibles). Ves el aviso "12 a producción" en el paso Confirmar.
-5. **Cambiá a Edu (despacho)** — Nueva ventana incógnito.
-   - Cola: aplicá el filtro **Sin asignar**. Verás el pedido de Rafael.
-   - Tomar pedido → estado `en_armado`.
-   - En una línea con formato `Granel laminado (kg)`, bajá el stepper *Empacado* respecto al vendido para simular la merma (p. ej. 3 kg vendidos → 2,5 kg empacados). Para formatos `pieza` aparece además el campo *Peso real (kg)* opcional (útil para el brisket).
-   - "Marcar armado".
-6. **Cambiá a Yuri (producción)** — Ves la card **Longaniza chillán · Sachet 5 kg** en "Con demanda pendiente" (la cifra depende de los split previos; con la seed limpia hay 12 pendientes, y aumenta si el paso 4 sumó otro pedido parcial).
+4. **Split a producción** — Elegí un cliente y pedí `20 sachet 5 kg` de **Longaniza chillán** (hay 8 disponibles). Ves el aviso "12 a producción" en el paso Confirmar. Este pedido queda en `confirmado_parcial` — todavía **no** se puede armar hasta que producción cubra las líneas pendientes.
+5. **Cambiá a Yuri (producción)** — Ves la card **Longaniza chillán · Sachet 5 kg** en "Con demanda pendiente" (la cifra depende de los split previos; con la seed limpia hay 12 pendientes, y aumenta si el paso 4 sumó otro pedido parcial).
    - Tocá la card para ver los pedidos que dependen; Registrar producción abre pre-seleccionado el producto+formato.
    - Ingresá una cantidad ≥ pendiente y "Registrar". El pedido parcial se promueve a `confirmado` y aparece en el aviso "Pedidos promovidos".
+6. **Cambiá a Edu (despacho)** — Nueva ventana incógnito.
+   - Cola: aplicá el filtro **Sin asignar**. Ves los pedidos listos para armar — el del paso 2 y el del paso 4 (que ya se promovió tras el paso 5).
+   - Tomá uno → estado `en_armado`.
+   - En una línea con formato `Granel laminado (kg)`, bajá el stepper *Empacado* respecto al vendido para simular la merma (p. ej. 3 kg vendidos → 2,5 kg empacados). Para formatos `pieza` aparece además el campo *Peso real (kg)* opcional (útil para el brisket).
+   - "Marcar armado". Repetí para el otro pedido si querés ver dos facturas en el paso 7.
 7. **Cambiá a Miguel (admin)** — Facturación:
    - Tab **Por facturar**: `Facturar` en el pedido armado. Modal muestra el número `FA-000XXX` **y el payload JSON** que se enviaría a Bsale.
    - Tab **Por despachar**: `Despachar` con courier + nota.
@@ -192,4 +192,5 @@ comandas-charcuteria/
   - Habilitar App Check para bloquear cliente no oficial.
   - Reglas más específicas por transición de estado (hoy admin/superAdmin tienen paso libre).
 - El bundle actual es ~730 KB pre-gzip. Optimización con code-splitting queda para producción.
+- **Service worker:** el bundle se cachea por PWA. Tras cada `firebase deploy`, los dispositivos que ya abrieron la app antes ven un toast **"Nueva versión disponible — Recargar"** cuando el SW detecta el nuevo build; hasta que se toque *Recargar* siguen viendo el bundle anterior. Si en la demo alguien no ve un fix reciente, hacer *Recargar* una vez.
 

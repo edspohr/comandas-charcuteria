@@ -9,6 +9,8 @@ import {
   useOrdersByStatuses,
 } from '@/data/orders';
 import { formatDateShort, formatQty } from '@/lib/format';
+import { describeFirestoreError } from '@/lib/errors';
+import ErrorBanner from '@/components/ui/ErrorBanner';
 import { bsale } from '@/integrations/bsale/MockBsaleClient';
 import type { Order } from '@/domain/types';
 
@@ -30,7 +32,7 @@ export default function Facturacion() {
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
   const [tab, setTab] = useState<Tab>('facturar');
-  const { orders, loading } = useOrdersByStatuses(TAB_STATUSES[tab]);
+  const { orders, loading, error } = useOrdersByStatuses(TAB_STATUSES[tab]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ orderId: string; text: string } | null>(null);
   const [dispatchModal, setDispatchModal] = useState<Order | null>(null);
@@ -45,7 +47,7 @@ export default function Facturacion() {
       const res = await facturarOrder(o.id, uid, (order) => bsale.createDocument(order));
       setPayloadModal({ docNumber: res.invoiceRef, payload: res.payload, orderId: o.id });
     } catch (e) {
-      setMessage({ orderId: o.id, text: (e as Error).message });
+      setMessage({ orderId: o.id, text: describeFirestoreError(e) });
     } finally {
       setBusyId(null);
     }
@@ -81,7 +83,8 @@ export default function Facturacion() {
         </div>
       )}
 
-      {loading && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {loading && !error && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {error && <ErrorBanner message={error} />}
 
       {!loading && orders.length === 0 && (
         <div className="card p-8 text-center">
@@ -229,7 +232,7 @@ function DispatchDialog({ order, uid, onClose }: { order: Order; uid: string; on
   async function submit() {
     setBusy(true); setError(null);
     try { await despacharOrder(order.id, uid, deliveredBy, note || undefined); onClose(); }
-    catch (e) { setError((e as Error).message); setBusy(false); }
+    catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
   }
   return (
     <ModalShell title="Despachar pedido" eyebrow={order.id} onClose={onClose}>
@@ -261,7 +264,7 @@ function DeliverDialog({ order, uid, onClose }: { order: Order; uid: string; onC
   async function submit() {
     setBusy(true); setError(null);
     try { await entregarOrder(order.id, uid, note || undefined); onClose(); }
-    catch (e) { setError((e as Error).message); setBusy(false); }
+    catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
   }
   return (
     <ModalShell title="Marcar entregado" eyebrow={order.id} onClose={onClose}>

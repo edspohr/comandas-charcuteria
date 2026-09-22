@@ -6,6 +6,8 @@ import StatusPill from '@/components/ui/StatusPill';
 import { useCurrentUser } from '@/data/auth';
 import { assignPacker, markArmado, useOrder } from '@/data/orders';
 import { formatDateLong, formatQty } from '@/lib/format';
+import { describeFirestoreError } from '@/lib/errors';
+import ErrorBanner from '@/components/ui/ErrorBanner';
 import { demoUsers } from '@/data/demo-users';
 import { ORDER_STATUS_LABEL } from '@/domain/types';
 
@@ -20,7 +22,7 @@ export default function DetalleArmado() {
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
   const navigate = useNavigate();
-  const { order, loading } = useOrder(orderId ?? null);
+  const { order, loading, error: loadError } = useOrder(orderId ?? null);
 
   const [state, setState] = useState<Record<string, PackedState>>({});
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +54,7 @@ export default function DetalleArmado() {
   async function take() {
     if (!order) return;
     setError(null);
-    try { await assignPacker(order.id, uid); } catch (e) { setError((e as Error).message); }
+    try { await assignPacker(order.id, uid); } catch (e) { setError(describeFirestoreError(e)); }
   }
 
   async function done() {
@@ -76,11 +78,12 @@ export default function DetalleArmado() {
       );
       navigate('/despacho/cola');
     } catch (e) {
-      setError((e as Error).message);
+      setError(describeFirestoreError(e));
       setSubmitting(false);
     }
   }
 
+  if (loadError) return <div className="max-w-2xl mx-auto"><ErrorBanner message={loadError} /></div>;
   if (loading || !order) return <p className="text-sm text-charcoal-300">Cargando…</p>;
 
   return (
@@ -117,7 +120,7 @@ export default function DetalleArmado() {
 
       {anyPendingProduction && (order.status === 'confirmado_parcial' || order.status === 'en_armado') && (
         <div className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 p-3 text-sm mb-4">
-          Este pedido tiene líneas esperando producción. Yuri debe registrar la producción antes de armar.
+          Este pedido tiene líneas esperando producción. Producción debe registrar el producto pendiente antes de armar.
         </div>
       )}
 

@@ -6,6 +6,8 @@ import { useCurrentUser } from '@/data/auth';
 import { anularOrder, useOrder } from '@/data/orders';
 import { demoUsers } from '@/data/demo-users';
 import { formatDateLong, formatQty } from '@/lib/format';
+import { describeFirestoreError } from '@/lib/errors';
+import ErrorBannerLazy from '@/components/ui/ErrorBanner';
 import { ORDER_STATUS_LABEL, type OrderStatus } from '@/domain/types';
 
 const NAME_BY_UID: Record<string, string> = Object.fromEntries(demoUsers.map((u) => [u.uid, u.displayName]));
@@ -16,9 +18,10 @@ export default function DetallePedido() {
   const navigate = useNavigate();
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
-  const { order, loading } = useOrder(orderId ?? null);
+  const { order, loading, error } = useOrder(orderId ?? null);
   const [anularOpen, setAnularOpen] = useState(false);
 
+  if (error) return <div className="max-w-2xl mx-auto"><ErrorBannerLazy message={error} /></div>;
   if (loading || !order) return <p className="text-sm text-charcoal-300">Cargando…</p>;
 
   const isMine = order.createdBy === uid;
@@ -133,7 +136,7 @@ function AnularDialog({ orderId, uid, onClose, onDone }: { orderId: string; uid:
     if (reason.trim().length < 3) { setError('Indique un motivo (mínimo 3 caracteres)'); return; }
     setBusy(true); setError(null);
     try { await anularOrder(orderId, uid, reason.trim()); onDone(); }
-    catch (e) { setError((e as Error).message); setBusy(false); }
+    catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
   }
 
   return (

@@ -4,6 +4,7 @@ import { useCurrentUser } from '@/data/auth';
 import { useMyOrders } from '@/data/orders';
 import StatusPill from '@/components/ui/StatusPill';
 import { formatDateShort, formatQty } from '@/lib/format';
+import ErrorBanner from '@/components/ui/ErrorBanner';
 import { ORDER_STATUS_LABEL, type Order, type OrderStatus } from '@/domain/types';
 
 type Group = 'activos' | 'historial';
@@ -13,7 +14,7 @@ const ACTIVE: OrderStatus[] = ['recibido', 'confirmado', 'confirmado_parcial', '
 export default function MisPedidos() {
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
-  const { orders, loading } = useMyOrders(uid);
+  const { orders, loading, error } = useMyOrders(uid);
   const [group, setGroup] = useState<Group>('activos');
   const location = useLocation();
   const flash = location.state as null | { justCreated?: string; status?: OrderStatus; parcialLines?: Array<{ productName: string; formatLabel: string; missing: number }> };
@@ -60,9 +61,10 @@ export default function MisPedidos() {
         ))}
       </nav>
 
-      {loading && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {loading && !error && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {error && <ErrorBanner message={error} />}
 
-      {!loading && filtered.length === 0 && (
+      {!loading && !error && filtered.length === 0 && (
         <div className="card p-8 text-center">
           <p className="text-sm text-charcoal-500">Sin pedidos.</p>
         </div>

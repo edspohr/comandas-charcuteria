@@ -1,26 +1,33 @@
 import { useEffect, useState } from 'react';
 import { collection, doc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { db } from './firebase';
+import { describeFirestoreError } from '@/lib/errors';
 import { stockDocId, type StockDoc, type StockMovement } from '@/domain/types';
 
 // Loads the whole stock collection once (~150 docs, one per product+format).
 // Cheaper than per-product listeners for a mockup and lets the picker show
 // availability without waterfall reads.
-export function useAllStock(): { stock: Map<string, StockDoc>; loading: boolean } {
+export function useAllStock(): { stock: Map<string, StockDoc>; loading: boolean; error: string | null } {
   const [stock, setStock] = useState<Map<string, StockDoc>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'stock'), (snap) => {
-      const next = new Map<string, StockDoc>();
-      snap.forEach((d) => next.set(d.id, d.data() as StockDoc));
-      setStock(next);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      collection(db, 'stock'),
+      (snap) => {
+        const next = new Map<string, StockDoc>();
+        snap.forEach((d) => next.set(d.id, d.data() as StockDoc));
+        setStock(next);
+        setError(null);
+        setLoading(false);
+      },
+      (err) => { setError(describeFirestoreError(err)); setLoading(false); },
+    );
     return unsub;
   }, []);
 
-  return { stock, loading };
+  return { stock, loading, error };
 }
 
 export function availableFor(

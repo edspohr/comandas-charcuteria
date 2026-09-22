@@ -12,6 +12,7 @@ import {
 import { db } from './firebase';
 import type { Client, Order, OrderLine, OrderStatus, StockDoc, StockMovement } from '@/domain/types';
 import { stockDocId } from '@/domain/types';
+import { describeFirestoreError } from '@/lib/errors';
 
 export interface DraftLine {
   productId: string;
@@ -171,43 +172,55 @@ export async function createOrder(
 
 const DESPACHO_STATUSES: OrderStatus[] = ['confirmado', 'confirmado_parcial', 'en_armado', 'armado'];
 
-export function useDespachoQueue(): { orders: Order[]; loading: boolean } {
+export function useDespachoQueue(): { orders: Order[]; loading: boolean; error: string | null } {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'orders'), where('status', 'in', DESPACHO_STATUSES));
-    const unsub = onSnapshot(q, (snap) => {
-      const list: Order[] = [];
-      snap.forEach((d) => list.push(d.data() as Order));
-      list.sort((a, b) => {
-        if (a.requestedDate !== b.requestedDate) return a.requestedDate.localeCompare(b.requestedDate);
-        return a.createdAt - b.createdAt;
-      });
-      setOrders(list);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: Order[] = [];
+        snap.forEach((d) => list.push(d.data() as Order));
+        list.sort((a, b) => {
+          if (a.requestedDate !== b.requestedDate) return a.requestedDate.localeCompare(b.requestedDate);
+          return a.createdAt - b.createdAt;
+        });
+        setOrders(list);
+        setError(null);
+        setLoading(false);
+      },
+      (err) => { setError(describeFirestoreError(err)); setLoading(false); },
+    );
     return unsub;
   }, []);
 
-  return { orders, loading };
+  return { orders, loading, error };
 }
 
-export function useOrder(orderId: string | null): { order: Order | null; loading: boolean } {
+export function useOrder(orderId: string | null): { order: Order | null; loading: boolean; error: string | null } {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setLoading(false); return; }
+    if (!orderId) { setOrder(null); setLoading(false); setError(null); return; }
     setLoading(true);
-    const unsub = onSnapshot(doc(db, 'orders', orderId), (snap) => {
-      setOrder(snap.exists() ? (snap.data() as Order) : null);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      doc(db, 'orders', orderId),
+      (snap) => {
+        setOrder(snap.exists() ? (snap.data() as Order) : null);
+        setError(null);
+        setLoading(false);
+      },
+      (err) => { setError(describeFirestoreError(err)); setLoading(false); },
+    );
     return unsub;
   }, [orderId]);
 
-  return { order, loading };
+  return { order, loading, error };
 }
 
 // Assign self as packer + advance to en_armado if still confirmado(_parcial).
@@ -398,9 +411,10 @@ export async function entregarOrder(orderId: string, by: string, note?: string):
 
 // ---------- Vendedor: mis pedidos ----------
 
-export function useMyOrders(vendedorUid: string): { orders: Order[]; loading: boolean } {
+export function useMyOrders(vendedorUid: string): { orders: Order[]; loading: boolean; error: string | null } {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(
@@ -408,16 +422,21 @@ export function useMyOrders(vendedorUid: string): { orders: Order[]; loading: bo
       where('createdBy', '==', vendedorUid),
       orderBy('createdAt', 'desc'),
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const list: Order[] = [];
-      snap.forEach((d) => list.push(d.data() as Order));
-      setOrders(list);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: Order[] = [];
+        snap.forEach((d) => list.push(d.data() as Order));
+        setOrders(list);
+        setError(null);
+        setLoading(false);
+      },
+      (err) => { setError(describeFirestoreError(err)); setLoading(false); },
+    );
     return unsub;
   }, [vendedorUid]);
 
-  return { orders, loading };
+  return { orders, loading, error };
 }
 
 // Anular pedido — releases any active reservations back to stock, writes
@@ -478,26 +497,32 @@ export async function anularOrder(orderId: string, by: string, reason: string): 
   });
 }
 
-export function useOrdersByStatuses(statuses: OrderStatus[]): { orders: Order[]; loading: boolean } {
+export function useOrdersByStatuses(statuses: OrderStatus[]): { orders: Order[]; loading: boolean; error: string | null } {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   // Serialize array into stable key to keep the effect deps sane.
   const key = statuses.slice().sort().join(',');
 
   useEffect(() => {
     const q = query(collection(db, 'orders'), where('status', 'in', statuses));
-    const unsub = onSnapshot(q, (snap) => {
-      const list: Order[] = [];
-      snap.forEach((d) => list.push(d.data() as Order));
-      list.sort((a, b) => a.requestedDate.localeCompare(b.requestedDate) || a.createdAt - b.createdAt);
-      setOrders(list);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: Order[] = [];
+        snap.forEach((d) => list.push(d.data() as Order));
+        list.sort((a, b) => a.requestedDate.localeCompare(b.requestedDate) || a.createdAt - b.createdAt);
+        setOrders(list);
+        setError(null);
+        setLoading(false);
+      },
+      (err) => { setError(describeFirestoreError(err)); setLoading(false); },
+    );
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  return { orders, loading };
+  return { orders, loading, error };
 }
 
 export function useLastOrderForClient(vendedorUid: string, clientId: string | null): Order | null {
@@ -512,10 +537,18 @@ export function useLastOrderForClient(vendedorUid: string, clientId: string | nu
       orderBy('createdAt', 'desc'),
       limit(1),
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const first = snap.docs[0];
-      setOrder(first ? (first.data() as Order) : null);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const first = snap.docs[0];
+        setOrder(first ? (first.data() as Order) : null);
+      },
+      (err) => {
+        // Non-fatal for the wizard — just skip the "Repetir último" suggestion.
+        console.warn('[orders] useLastOrderForClient failed:', describeFirestoreError(err));
+        setOrder(null);
+      },
+    );
     return unsub;
   }, [vendedorUid, clientId]);
 

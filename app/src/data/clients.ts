@@ -1,24 +1,31 @@
 import { useEffect, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
+import { describeFirestoreError } from '@/lib/errors';
 import type { Client } from '@/domain/types';
 
-export function useClients(): { clients: Client[]; loading: boolean } {
+export function useClients(): { clients: Client[]; loading: boolean; error: string | null } {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'clients'), (snap) => {
-      const list: Client[] = [];
-      snap.forEach((d) => list.push(d.data() as Client));
-      list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
-      setClients(list);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      collection(db, 'clients'),
+      (snap) => {
+        const list: Client[] = [];
+        snap.forEach((d) => list.push(d.data() as Client));
+        list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+        setClients(list);
+        setError(null);
+        setLoading(false);
+      },
+      (err) => { setError(describeFirestoreError(err)); setLoading(false); },
+    );
     return unsub;
   }, []);
 
-  return { clients, loading };
+  return { clients, loading, error };
 }
 
 const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');

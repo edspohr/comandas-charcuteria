@@ -5,6 +5,8 @@ import { useClients } from '@/data/clients';
 import { useProducts } from '@/data/products';
 import { ajustarStock, availableFor, useAllStock } from '@/data/stock';
 import { formatQty } from '@/lib/format';
+import { describeFirestoreError } from '@/lib/errors';
+import ErrorBanner from '@/components/ui/ErrorBanner';
 import type { Product, ProductFormat, Client } from '@/domain/types';
 
 type Tab = 'productos' | 'clientes';
@@ -46,8 +48,9 @@ export default function Catalogo() {
 function ProductosTab() {
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
-  const { products, loading } = useProducts();
-  const { stock } = useAllStock();
+  const { products, loading, error: productsError } = useProducts();
+  const { stock, error: stockError } = useAllStock();
+  const error = productsError ?? stockError;
   const [q, setQ] = useState('');
   const [adjust, setAdjust] = useState<{ product: Product; format: ProductFormat } | null>(null);
 
@@ -65,7 +68,8 @@ function ProductosTab() {
         placeholder="Buscar producto"
         className="field mb-4"
       />
-      {loading && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {loading && !error && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {error && <div className="mb-3"><ErrorBanner message={error} /></div>}
       <div className="card divide-y divide-charcoal-100">
         {filtered.map((p) => (
           <details key={p.id} className="group">
@@ -144,7 +148,7 @@ function AjusteStockDialog({
   async function submit() {
     setBusy(true); setError(null);
     try { await ajustarStock(product.id, format.formatId, newQty, reason, uid); onClose(); }
-    catch (e) { setError((e as Error).message); setBusy(false); }
+    catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
   }
 
   return (
@@ -206,7 +210,7 @@ function AjusteStockDialog({
 }
 
 function ClientesTab() {
-  const { clients, loading } = useClients();
+  const { clients, loading, error } = useClients();
   const [q, setQ] = useState('');
 
   const filtered = useMemo(() => {
@@ -227,7 +231,8 @@ function ClientesTab() {
         placeholder="Buscar cliente"
         className="field mb-4"
       />
-      {loading && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {loading && !error && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {error && <div className="mb-3"><ErrorBanner message={error} /></div>}
       <ul className="space-y-1.5">
         {filtered.map((c) => (
           <li key={c.id} className="card p-3.5">

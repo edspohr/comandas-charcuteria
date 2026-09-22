@@ -7,7 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' lets us show a toast when a new SW is waiting, instead of
+      // silently replacing the bundle (which surfaces as "still serving the
+      // old build on the first navigation after a deploy").
+      registerType: 'prompt',
       injectRegister: 'auto',
       workbox: {
         // Only cache the app shell — Firestore data flows through onSnapshot

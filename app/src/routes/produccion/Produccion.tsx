@@ -10,12 +10,14 @@ import {
   type DemandRow,
 } from '@/data/produccion';
 import { formatDateShort, formatQty } from '@/lib/format';
+import { describeFirestoreError } from '@/lib/errors';
+import ErrorBanner from '@/components/ui/ErrorBanner';
 import type { ProductFormat } from '@/domain/types';
 
 export default function Produccion() {
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
-  const { rows, loading } = useProduccionData();
+  const { rows, loading, error } = useProduccionData();
   const products = useProductsForProduccion();
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -41,7 +43,8 @@ export default function Produccion() {
         </Button>
       </header>
 
-      {loading && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {loading && !error && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {error && <ErrorBanner message={error} />}
 
       {!loading && (
         <div className="space-y-6">
@@ -210,7 +213,7 @@ function RegistrarDialog({
       const r = await registrarProduccion(product.id, format.formatId, qty, uid, reason || undefined);
       setResult(r);
     } catch (e) {
-      setError((e as Error).message);
+      setError(describeFirestoreError(e));
       setSubmitting(false);
     }
   }

@@ -1,0 +1,21 @@
+{
+  "name": "comandas-charcuteria",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Mockup funcional de captura y fulfillment de pedidos para La Charcutería Artesanal (Cecinas Marcosi SpA)",
+  "workspaces": [
+    "app",
+    "functions"
+  ],
+  "scripts": {
+    "dev": "npm --workspace app run dev",
+    "build": "npm --workspace app run build",
+    "emulators": "firebase emulators:start --import=.emulator-data --export-on-exit",
+    "seed": "tsx scripts/seed.ts",
+    "test:rules": "vitest run tests/rules"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

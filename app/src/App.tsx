@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Login from './routes/Login';
 import Placeholder from './routes/Placeholder';
+import NuevoPedido from './routes/vendedor/NuevoPedido';
 import AppShell from './components/AppShell';
 import RouteGuard from './components/RouteGuard';
 import { useCurrentUser, ROLE_HOME } from './data/auth';
@@ -31,7 +32,7 @@ export default function App() {
           element={
             <RouteGuard current={current} allow={['vendedor', 'admin', 'superAdmin']}>
               <AppShell current={current!}>
-                <Placeholder title="Nuevo pedido" hint="Wizard llega en el hito 4." />
+                <NuevoPedido />
               </AppShell>
             </RouteGuard>
           }

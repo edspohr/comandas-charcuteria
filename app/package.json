@@ -10,6 +10,7 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@firebase/ai": "^2.16.0",
     "date-fns": "^4.1.0",
     "firebase": "^11.1.0",
     "fuse.js": "^7.5.0",

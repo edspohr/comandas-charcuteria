@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button';
 import { useCurrentUser } from '@/data/auth';
 import { useProducts } from '@/data/products';
 import { parseLocal, type ParsedLine, type MatchStatus } from '@/domain/parse/local';
+import { geminiEnabled, parseWithGemini } from '@/domain/parse/gemini';
 import { loadDraft, saveDraft } from '@/lib/draft';
 import { defaultRequestedDate } from '@/domain/cutoff';
 import { useSettings } from '@/data/settings';
@@ -43,9 +44,32 @@ export default function PegarPedido() {
   const { settings } = useSettings();
   const [text, setText] = useState('');
   const [parsed, setParsed] = useState<ParsedLine[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [engine, setEngine] = useState<'ai' | 'local' | null>(null);
 
-  function interpret() {
-    setParsed(parseLocal(text, products));
+  async function interpret() {
+    if (busy || text.trim().length < 3) return;
+    setBusy(true);
+    setEngine(null);
+    try {
+      if (geminiEnabled()) {
+        try {
+          const remote = await parseWithGemini(text, products);
+          if (remote.length > 0) {
+            setParsed(remote);
+            setEngine('ai');
+            return;
+          }
+        } catch (err) {
+          // Log to console and fall back — the local parser always works offline.
+          console.warn('[parse] Gemini failed, falling back to local:', err);
+        }
+      }
+      setParsed(parseLocal(text, products));
+      setEngine('local');
+    } finally {
+      setBusy(false);
+    }
   }
 
   function useSample() {
@@ -146,15 +170,21 @@ export default function PegarPedido() {
           className="field h-auto py-3 text-sm resize-y"
         />
         <div className="flex items-center gap-2 mt-3">
-          <Button onClick={interpret} disabled={loading || text.trim().length < 3} className="flex-1">Interpretar</Button>
-          <Button variant="secondary" onClick={useSample}>Ejemplo</Button>
+          <Button onClick={interpret} disabled={loading || busy || text.trim().length < 3} className="flex-1">
+            {busy ? 'Interpretando…' : 'Interpretar'}
+          </Button>
+          <Button variant="secondary" onClick={useSample} disabled={busy}>Ejemplo</Button>
         </div>
       </div>
 
       {parsed && parsed.length > 0 && (
         <section>
-          <div className="flex items-center justify-between mb-2">
-            <p className="eyebrow">Líneas propuestas · {parsed.length}</p>
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+            <p className="eyebrow">
+              Líneas propuestas · {parsed.length}
+              {engine === 'ai' && <span className="ml-2 normal-case tracking-normal text-brass-700">· Gemini</span>}
+              {engine === 'local' && <span className="ml-2 normal-case tracking-normal text-charcoal-300">· fallback local</span>}
+            </p>
             <span className="text-[10px] uppercase tracking-display text-charcoal-300">
               {parsed.filter((l) => l.status === 'verified').length} verificadas · {parsed.filter((l) => l.status === 'review').length} a revisar · {parsed.filter((l) => l.status === 'not_found').length} no encontradas
             </span>

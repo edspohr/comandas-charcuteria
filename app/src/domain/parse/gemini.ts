@@ -1,0 +1,135 @@
+import { getAI, getGenerativeModel, Schema, VertexAIBackend } from '@firebase/ai';
+import { app } from '@/data/firebase';
+import type { Product, Unit } from '@/domain/types';
+import type { ParsedLine, MatchStatus } from './local';
+
+// Firebase AI Logic wire-up. We route through Vertex AI (project data lives in
+// Google Cloud, App Check hooks apply, cheaper than routing through Anthropic).
+// Model choice: gemini-2.5-flash — sobra para parseo estructurado de 5-10 líneas
+// de WhatsApp y cabe en la cuota gratuita al volumen esperado.
+
+const REGION = 'us-central1';
+const MODEL_NAME = 'gemini-2.5-flash';
+// The client can time out fast: if the SDK hasn't returned in this window we
+// fall back to the local deterministic parser so the demo never stalls.
+const TIMEOUT_MS = 8000;
+
+interface GeminiParsed {
+  lines: Array<{
+    rawLine: string;
+    productId: string;
+    formatId: string;
+    qty: number;
+    unit: Unit;
+    notes?: string | null;
+    confidence: 'verified' | 'review' | 'not_found';
+  }>;
+}
+
+let cachedModel: ReturnType<typeof getGenerativeModel> | null = null;
+function getModel() {
+  if (cachedModel) return cachedModel;
+  const ai = getAI(app, { backend: new VertexAIBackend(REGION) });
+  const responseSchema = Schema.object({
+    properties: {
+      lines: Schema.array({
+        items: Schema.object({
+          properties: {
+            rawLine:   Schema.string({ description: 'Trozo original del mensaje del cliente.' }),
+            productId: Schema.string({ description: 'ID exacto del catálogo. Vacío si no reconocés el producto.' }),
+            formatId:  Schema.string({ description: 'ID de formato del producto elegido.' }),
+            qty:       Schema.number({ description: 'Cantidad. En unidades para sachet/pieza; en kg para granel.' }),
+            unit:      Schema.enumString({ enum: ['g', 'kg', 'unidad'] }),
+            notes:     Schema.string({ nullable: true, description: 'Instrucciones extra (laminado fino, sin jugo, etc.).' }),
+            confidence: Schema.enumString({
+              enum: ['verified', 'review', 'not_found'],
+              description: 'verified = producto+formato+cantidad seguros. review = alguno dudoso. not_found = no matchea nada.',
+            }),
+          },
+          required: ['rawLine', 'productId', 'formatId', 'qty', 'unit', 'confidence'],
+        }),
+      }),
+    },
+    required: ['lines'],
+  });
+  cachedModel = getGenerativeModel(ai, {
+    model: MODEL_NAME,
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema,
+      temperature: 0.1,
+    },
+    systemInstruction:
+      'Sos un asistente que interpreta pedidos escritos en español chileno para una charcutería artesanal en Santiago. Convertís texto libre en líneas estructuradas usando SOLO productos y formatos del catálogo que se te pasa. Nunca inventás IDs. Si una línea es un saludo, agradecimiento o comentario sin cantidades, no la incluyas. Cuando el cliente diga "granel", "laminado" o precise kg, preferí el formato granel-kg. Cuando diga "sachet" o similar, elegí el sachet coincidente. Si menciona "pieza" o "entera", usá formato pieza. Cantidades en kg cuando la unidad del formato es kg, en unidades cuando es unidad.',
+  });
+  return cachedModel;
+}
+
+function buildCatalogManifest(products: Product[]): string {
+  const rows: string[] = [];
+  for (const p of products) {
+    if (p.discontinued || !p.active) continue;
+    for (const f of p.formats) {
+      const aliases = (p.aliases ?? []).join(', ') || '-';
+      rows.push(`${p.id} | ${p.name} | ${f.formatId} | ${f.label} | ${f.unit} | aliases: ${aliases}`);
+    }
+  }
+  return rows.join('\n');
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('gemini-timeout')), ms);
+    promise.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
+}
+
+export async function parseWithGemini(text: string, products: Product[]): Promise<ParsedLine[]> {
+  const manifest = buildCatalogManifest(products);
+  const prompt = [
+    'Catálogo disponible (productId | nombre | formatId | etiqueta formato | unidad | aliases):',
+    manifest,
+    '',
+    'Interpretá el siguiente mensaje y devolvé un JSON con las líneas de pedido encontradas.',
+    'Regla: si el texto no mapea a ningún producto del catálogo, no incluyas esa línea.',
+    '',
+    'Mensaje:',
+    text,
+  ].join('\n');
+
+  const model = getModel();
+  const raw = await withTimeout(model.generateContent(prompt), TIMEOUT_MS);
+  const jsonText = raw.response.text();
+  const parsed = JSON.parse(jsonText) as GeminiParsed;
+  const productById = new Map(products.map((p) => [p.id, p]));
+
+  return parsed.lines.map((l): ParsedLine => {
+    const prod = productById.get(l.productId);
+    const fmt = prod?.formats.find((f) => f.formatId === l.formatId);
+    // Suggestions: same product, all formats — lets the user swap formatId inline.
+    const suggestions = prod ? [{ productId: prod.id, productName: prod.name }] : [];
+    const status: MatchStatus = l.confidence === 'verified' && prod && fmt ? 'verified'
+      : l.confidence === 'not_found' || !prod || !fmt ? 'not_found'
+      : 'review';
+    return {
+      raw: l.rawLine,
+      productId: prod?.id,
+      productName: prod?.name,
+      formatId: fmt?.formatId,
+      formatLabel: fmt?.label,
+      unit: fmt?.unit,
+      qty: l.qty,
+      notes: l.notes ?? undefined,
+      status,
+      suggestions,
+    };
+  });
+}
+
+// True when Firebase AI Logic looks callable in this environment. We keep this
+// separate so PegarPedido can pre-flight and stay silent about Gemini when the
+// feature is disabled (e.g. Vertex AI API not enabled on the project).
+export function geminiEnabled(): boolean {
+  // If we ever want a hard kill-switch (env var / feature flag) it goes here.
+  return true;
+}

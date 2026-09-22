@@ -1,5 +1,8 @@
 node_modules
 dist
+app/src/**/*.js
+# keep hand-written .d.ts (vite-env.d.ts, etc.) — only ignore compiled emit
+# via the noEmit change in app/tsconfig.json; nothing to ignore here now.
 .env
 .env.*
 !.env.example

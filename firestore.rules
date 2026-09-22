@@ -88,7 +88,7 @@ service cloud.firestore {
           && resource.data.status in ['recibido', 'confirmado', 'confirmado_parcial', 'en_armado']
           && request.resource.data.status == 'anulado'
           && request.resource.data.createdBy == resource.data.createdBy
-          && request.resource.data.invoiceRef == resource.data.get('invoiceRef', null)
+          && request.resource.data.get('invoiceRef', null) == resource.data.get('invoiceRef', null)
         )
         || (
           isDespacho()

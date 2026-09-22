@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "app-real-firebase",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--mode", "production", "--port", "5173", "--strictPort"],
+      "cwd": "app",
+      "port": 5173
+    }
+  ]
+}

@@ -85,6 +85,14 @@ describe('firestore rules', () => {
     await assertSucceeds(updateDoc(doc(alice, 'orders', 'PED-A-2'), { status: 'anulado' }));
   });
 
+  it('vendedor CAN anular a propio pedido en pre-invoice state', async () => {
+    await env.clearFirestore();
+    await seedUser('u-alice', 'vendedor');
+    await seedOrder('PED-A-anular', 'u-alice');   // status defaults to confirmado
+    const alice = env.authenticatedContext('u-alice').firestore();
+    await assertSucceeds(updateDoc(doc(alice, 'orders', 'PED-A-anular'), { status: 'anulado' }));
+  });
+
   it('despacho cannot set invoiceRef', async () => {
     await env.clearFirestore();
     await seedUser('u-edu', 'despacho');

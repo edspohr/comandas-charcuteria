@@ -2,9 +2,9 @@ import Fuse from 'fuse.js';
 import type { Product, ProductFormat, Unit } from '@/domain/types';
 
 // Rule-based parser for pasted WhatsApp orders.
-// Splits text into lines/phrases, matches product name via Fuse.js,
-// picks the best format from qty + unit hints, extracts qty via regex.
-// Deliberately conservative: unknown items surface for the user to fix.
+// Splits text into candidate lines, discards greetings/headers, extracts a
+// qty via regex, then scores each catalog needle by how well it appears
+// *inside* the line (contains + token overlap + Fuse fallback).
 
 export type MatchStatus = 'verified' | 'review' | 'not_found';
 
@@ -21,30 +21,28 @@ export interface ParsedLine {
   suggestions?: Array<{ productId: string; productName: string }>;
 }
 
-interface HaystackEntry {
-  productId: string;
-  productName: string;
-  needle: string;
-}
-
 const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');
+const STOPWORDS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'con', 'sin', 'para', 'por', 'y', 'o', 'un', 'una', 'uno']);
+const tokens = (s: string) => norm(s).split(/[^a-z0-9]+/).filter((t) => t.length >= 3 && !STOPWORDS.has(t));
 
 // Regexes for qty extraction — order matters (longer patterns first).
-const QTY_PATTERNS: Array<{ re: RegExp; unit: Unit; conv?: (n: number) => number }> = [
-  { re: /(\d+(?:[.,]\d+)?)\s*k(?:g|ilo|ilos)?\b/i,       unit: 'kg' },
-  { re: /(\d+(?:[.,]\d+)?)\s*g(?:r|ramos)?\b/i,          unit: 'g'      },
-  { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet|sobres?|paquete|paquetes|pote|potes)\b/i, unit: 'unidad' },
-  { re: /(\d+(?:[.,]\d+)?)\s*(?:pieza|piezas|piezas?\.)\b/i, unit: 'unidad' },
-  { re: /(\d+(?:[.,]\d+)?)\s*(?:un|u|und|unidades?)\b/i, unit: 'unidad' },
-  { re: /^\s*(\d+(?:[.,]\d+)?)\b/,                        unit: 'unidad' },
+// Sachet 5kg / 500g etc. detection wins over bare grams.
+const QTY_PATTERNS: Array<{ re: RegExp; unit: Unit; formatHint?: string }> = [
+  { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet\s*)?5\s*k(?:g|ilo|ilos)?\b/i,  unit: 'unidad', formatHint: 'sachet-5kg' },
+  { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet\s*)?1\s*k(?:g|ilo|ilos)?\b/i,  unit: 'unidad', formatHint: 'sachet-1kg' },
+  { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet\s*)?500\s*g\b/i,               unit: 'unidad', formatHint: 'sachet-500g' },
+  { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet\s*)?200\s*g\b/i,               unit: 'unidad', formatHint: 'sachet-200g' },
+  { re: /(\d+(?:[.,]\d+)?)\s*k(?:g|ilo|ilos)?\b/i,                    unit: 'kg' },
+  { re: /(\d+(?:[.,]\d+)?)\s*g(?:r|ramos)?\b/i,                       unit: 'g' },
+  { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet|sobres?|paquetes?)\b/i,        unit: 'unidad' },
+  { re: /(\d+(?:[.,]\d+)?)\s*(?:piezas?)\b/i,                         unit: 'unidad', formatHint: 'pieza' },
+  { re: /(\d+(?:[.,]\d+)?)\s*(?:potes?)\b/i,                          unit: 'unidad' },
+  { re: /(\d+(?:[.,]\d+)?)\s*(?:un|u|und|unidades?)\b/i,              unit: 'unidad' },
+  { re: /^\s*[-•·]?\s*(\d+(?:[.,]\d+)?)\b/,                            unit: 'unidad' },
 ];
 
-// Format hints — extra tokens after quantity that pin a specific format.
+// Format hints — extra tokens that pin a specific format when the qty regex didn't already fix it.
 const FORMAT_HINTS: Array<{ tokens: RegExp; formatIdHint: string }> = [
-  { tokens: /\bsachet\s*5\s*k/i,      formatIdHint: 'sachet-5kg' },
-  { tokens: /\bsachet\s*1\s*k/i,      formatIdHint: 'sachet-1kg' },
-  { tokens: /\b500\s*g|\bsachet\s*500/i, formatIdHint: 'sachet-500g' },
-  { tokens: /\b200\s*g|\bsachet\s*200/i, formatIdHint: 'sachet-200g' },
   { tokens: /\bgranel|\blaminado/i,   formatIdHint: 'granel-kg' },
   { tokens: /\bpieza\s*entera|\bpieza/i, formatIdHint: 'pieza' },
   { tokens: /\bx\s*12\b/i,            formatIdHint: 'sachet-x12' },
@@ -53,40 +51,42 @@ const FORMAT_HINTS: Array<{ tokens: RegExp; formatIdHint: string }> = [
   { tokens: /\bpote\s*150|\bpote/i,   formatIdHint: 'pote-150g' },
 ];
 
-// Extract note-y content: things after a dash, in parens, or after keywords.
-const NOTE_KEYWORDS = /\b(laminado\s+fino|sin\s+jugo|empaque\s+transparente|urgente|fino|grueso|entero)\b/gi;
+const NOTE_KEYWORDS = /\b(laminado\s+fino|sin\s+jugo|empaque\s+transparente|urgente|fino|grueso|entero|arandanos|cranberries|pistacho|picante)\b/gi;
 
-function extractQty(text: string): { qty: number; unit: Unit; matchedText: string } | null {
-  for (const { re, unit } of QTY_PATTERNS) {
-    const m = text.match(re);
+// Discard greetings, closings, thanks — anything without a digit or with < 6 chars.
+const GREETING_RE = /^(hola|buen[oa]s?|gracias|saludos|abrazo|para|necesito|solicito|listo|ok)[\s!,.:;-]*/i;
+
+function extractQty(text: string): { qty: number; unit: Unit; matchedText: string; formatHint?: string } | null {
+  for (const p of QTY_PATTERNS) {
+    const m = text.match(p.re);
     if (m) {
       const raw = m[1].replace(',', '.');
       const n = parseFloat(raw);
-      if (Number.isFinite(n) && n > 0) return { qty: n, unit, matchedText: m[0] };
+      if (Number.isFinite(n) && n > 0) return { qty: n, unit: p.unit, matchedText: m[0], formatHint: p.formatHint };
     }
   }
   return null;
 }
 
-function pickFormat(product: Product, raw: string, extractedUnit: Unit | undefined): ProductFormat | undefined {
-  // 1. Explicit format hint
+function pickFormat(product: Product, raw: string, extractedUnit: Unit | undefined, qtyHint: string | undefined): ProductFormat | undefined {
+  if (qtyHint) {
+    const fmt = product.formats.find((f) => f.formatId === qtyHint);
+    if (fmt) return fmt;
+  }
   for (const hint of FORMAT_HINTS) {
     if (hint.tokens.test(raw)) {
       const fmt = product.formats.find((f) => f.formatId === hint.formatIdHint);
       if (fmt) return fmt;
     }
   }
-  // 2. Format that matches the extracted unit exactly (single candidate)
   if (extractedUnit) {
-    const bySearchUnit = product.formats.filter((f) => f.unit === extractedUnit);
-    if (bySearchUnit.length === 1) return bySearchUnit[0];
-    // If unit is 'kg' and only granel exists → pick it
+    const byUnit = product.formats.filter((f) => f.unit === extractedUnit);
+    if (byUnit.length === 1) return byUnit[0];
     if (extractedUnit === 'kg') {
       const granel = product.formats.find((f) => f.unit === 'kg');
       if (granel) return granel;
     }
   }
-  // 3. Fallback: first format
   return product.formats[0];
 }
 
@@ -95,7 +95,6 @@ function extractNotes(raw: string, qtyMatch?: string): string | undefined {
   const notes: string[] = [];
   const kw = withoutQty.match(NOTE_KEYWORDS);
   if (kw) notes.push(...kw);
-  // dash or paren note (only content after a dash)
   const paren = withoutQty.match(/\(([^)]+)\)/);
   if (paren) notes.push(paren[1].trim());
   return notes.length ? [...new Set(notes.map((s) => s.toLowerCase()))].join(', ') : undefined;
@@ -103,56 +102,107 @@ function extractNotes(raw: string, qtyMatch?: string): string | undefined {
 
 function splitBlocks(text: string): string[] {
   return text
-    .split(/[\n;•·]+|(?<=\d)\s*,\s+/g)
+    .split(/[\n;•·]+|(?<=\d\s*[a-z]{0,4})\s*,\s+/gi)
     .map((s) => s.trim())
-    .filter((s) => s.length > 0 && s.length < 200);
+    .filter((s) => s.length > 3 && s.length < 200);
 }
 
+// Score how well a candidate needle (product name / alias) appears inside a line.
+// Rewards contiguous substring (best), token overlap, and prefix matches. Zero
+// when the needle's core tokens don't appear at all.
+function scoreMatch(lineNorm: string, lineTokens: string[], needle: string, needleTokens: string[]): number {
+  if (needleTokens.length === 0) return 0;
+  if (lineNorm.includes(needle)) return 1;
+  const overlap = needleTokens.filter((t) => lineTokens.some((lt) => lt === t || lt.startsWith(t) || t.startsWith(lt))).length;
+  const ratio = overlap / needleTokens.length;
+  return ratio >= 0.5 ? 0.4 + ratio * 0.5 : 0;
+}
+
+interface NeedleEntry { productId: string; productName: string; needle: string; tokens: string[]; }
+
 export function parseLocal(text: string, products: Product[]): ParsedLine[] {
-  const haystack: HaystackEntry[] = [];
+  const needles: NeedleEntry[] = [];
   for (const p of products) {
     if (p.discontinued || !p.active) continue;
-    haystack.push({ productId: p.id, productName: p.name, needle: norm(p.name) });
-    for (const alias of p.aliases ?? []) {
-      haystack.push({ productId: p.id, productName: p.name, needle: norm(alias) });
+    needles.push({ productId: p.id, productName: p.name, needle: norm(p.name), tokens: tokens(p.name) });
+    for (const a of p.aliases ?? []) {
+      needles.push({ productId: p.id, productName: p.name, needle: norm(a), tokens: tokens(a) });
     }
   }
-  const fuse = new Fuse(haystack, {
+  const productById = new Map(products.map((p) => [p.id, p]));
+
+  // Fuse for typo-tolerant fallback when the substring scoring misses (e.g. "chorico" vs "chorizo").
+  const fuse = new Fuse(needles, {
     keys: ['needle'],
-    threshold: 0.4,
-    ignoreLocation: true,
+    threshold: 0.35,
     includeScore: true,
-    minMatchCharLength: 3,
+    minMatchCharLength: 4,
+    ignoreLocation: true,
   });
 
-  const productById = new Map(products.map((p) => [p.id, p]));
   const results: ParsedLine[] = [];
 
   for (const raw of splitBlocks(text)) {
-    const normalized = norm(raw);
-    const qtyInfo = extractQty(raw);
-    const matches = fuse.search(normalized).slice(0, 3);
+    if (GREETING_RE.test(raw) && !/\d/.test(raw)) continue;
 
-    if (matches.length === 0) {
+    const lineNorm = norm(raw);
+    const lineTokens = tokens(raw);
+    const qtyInfo = extractQty(raw);
+
+    // Score every needle by "does its name appear in the line", keep best per product.
+    const bestByProduct = new Map<string, { entry: NeedleEntry; score: number }>();
+    for (const n of needles) {
+      const s = scoreMatch(lineNorm, lineTokens, n.needle, n.tokens);
+      if (s <= 0) continue;
+      const prev = bestByProduct.get(n.productId);
+      if (!prev || s > prev.score) bestByProduct.set(n.productId, { entry: n, score: s });
+    }
+    let ranked = [...bestByProduct.values()].sort((a, b) => b.score - a.score);
+
+    // Fuse fallback for typos — search each token of the line against the needle set.
+    if (ranked.length === 0 && lineTokens.length > 0) {
+      const guesses = new Map<string, number>();
+      for (const t of lineTokens) {
+        const hits = fuse.search(t).slice(0, 3);
+        for (const h of hits) {
+          const cur = guesses.get(h.item.productId) ?? 0;
+          const s = 1 - (h.score ?? 1);
+          if (s > cur) guesses.set(h.item.productId, s);
+        }
+      }
+      ranked = [...guesses.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([pid, score]) => {
+          const n = needles.find((x) => x.productId === pid)!;
+          return { entry: n, score };
+        });
+    }
+
+    if (ranked.length === 0) {
       results.push({ raw, status: 'not_found' });
       continue;
     }
-    const best = matches[0];
-    const prod = productById.get(best.item.productId);
+
+    const best = ranked[0];
+    const prod = productById.get(best.entry.productId);
     if (!prod) { results.push({ raw, status: 'not_found' }); continue; }
 
-    const fmt = pickFormat(prod, raw, qtyInfo?.unit);
+    const fmt = pickFormat(prod, raw, qtyInfo?.unit, qtyInfo?.formatHint);
     const notes = extractNotes(raw, qtyInfo?.matchedText);
-    const scoreOk = (best.score ?? 0) < 0.25;
-    const qtyOk = qtyInfo != null;
-    const otherStrong = matches.length > 1 && (matches[1].score ?? 1) - (best.score ?? 0) < 0.05;
-    const status: MatchStatus = scoreOk && qtyOk && !otherStrong ? 'verified' : 'review';
 
-    // If the qty was expressed in grams and we chose a unit-based format (sachet 200g), convert
+    // Grams → sachet-of-N-grams conversion when the format is a fixed sachet.
     let qty = qtyInfo?.qty;
     if (qty != null && qtyInfo!.unit === 'g' && fmt?.unit === 'unidad' && fmt.grams) {
       qty = Math.max(1, Math.round(qty / fmt.grams));
     }
+    // For sachet formats where the qty parser resolved to 'unidad' directly (e.g. "12 sachet 500g"),
+    // qty is already the count of sachets — no conversion needed.
+
+    const scoreOk = best.score >= 0.75;
+    const qtyOk = qty != null && qty > 0;
+    const ambiguous = ranked.length > 1 && ranked[1].score >= best.score * 0.9;
+    const status: MatchStatus = scoreOk && qtyOk && !ambiguous ? 'verified' : (qtyOk || scoreOk ? 'review' : 'review');
 
     results.push({
       raw,
@@ -164,7 +214,7 @@ export function parseLocal(text: string, products: Product[]): ParsedLine[] {
       qty,
       notes,
       status,
-      suggestions: matches.slice(0, 3).map((m) => ({ productId: m.item.productId, productName: m.item.productName })),
+      suggestions: ranked.slice(0, 3).map((r) => ({ productId: r.entry.productId, productName: r.entry.productName })),
     });
   }
 

@@ -38,7 +38,17 @@ export default function NuevoPedido() {
   const navigate = useNavigate();
   const uid = current!.appUser.uid;
 
-  const [draft, setDraft] = useState<Draft>(() => loadDraft<Draft>(uid) ?? emptyDraft());
+  const [draft, setDraft] = useState<Draft>(() => {
+    const loaded = loadDraft<Draft>(uid);
+    if (!loaded) return emptyDraft();
+    // Drafts persisted from a previous day would open with a requestedDate
+    // that's now in the past; snap it forward to the current default.
+    const min = minRequestedDate();
+    if (loaded.requestedDate < min) {
+      return { ...loaded, requestedDate: defaultRequestedDate(15) };
+    }
+    return loaded;
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -302,6 +312,15 @@ function StepProductos({
     <section className="space-y-5">
       <ProductGrid products={active} lines={lines} openId={openProductId} onOpen={setOpenProductId} />
 
+      <SelectedLines lines={lines} onRemove={(l) => onLines(lines.filter((x) => !(x.productId === l.productId && x.formatId === l.formatId)))} />
+
+      <div className="flex gap-2 pt-2 sticky bottom-0 bg-cream-50 py-3 border-t border-charcoal-100">
+        <Button variant="secondary" onClick={onBack} className="flex-1">Volver</Button>
+        <Button onClick={onNext} disabled={lines.length === 0} className="flex-1">
+          Siguiente ({lines.length} {lines.length === 1 ? 'línea' : 'líneas'})
+        </Button>
+      </div>
+
       {openProductId && (
         <FormatPicker
           product={active.find((p) => p.id === openProductId)!}
@@ -314,15 +333,6 @@ function StepProductos({
           onClose={() => setOpenProductId(null)}
         />
       )}
-
-      <SelectedLines lines={lines} onRemove={(l) => onLines(lines.filter((x) => !(x.productId === l.productId && x.formatId === l.formatId)))} />
-
-      <div className="flex gap-2 pt-2 sticky bottom-0 bg-cream-50 py-3 border-t border-charcoal-100">
-        <Button variant="secondary" onClick={onBack} className="flex-1">Volver</Button>
-        <Button onClick={onNext} disabled={lines.length === 0} className="flex-1">
-          Siguiente ({lines.length} {lines.length === 1 ? 'línea' : 'líneas'})
-        </Button>
-      </div>
     </section>
   );
 }
@@ -409,7 +419,8 @@ function FormatPicker({
   }
 
   return (
-    <div className="card p-4 border-brass-500 shadow-lift">
+    <div className="fixed inset-0 z-20 bg-charcoal-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-cream-50 rounded-t-xl sm:rounded-xl shadow-lift p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between mb-3">
         <div>
           <p className="eyebrow">Formatos</p>
@@ -448,6 +459,7 @@ function FormatPicker({
       <div className="flex gap-2 mt-5">
         <Button variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
         <Button onClick={commit} className="flex-1">Agregar</Button>
+      </div>
       </div>
     </div>
   );

@@ -260,6 +260,14 @@ export async function markArmado(
     if (order.status !== 'en_armado' && order.status !== 'confirmado' && order.status !== 'confirmado_parcial') {
       throw new Error(`No se puede armar un pedido en estado ${order.status}`);
     }
+    // Hard-block armado while any line still has production pending. The
+    // demo flow is: Registrar producción absorbs the pendiente, the order
+    // is promoted to `confirmado`, then despacho arma. Allowing armado
+    // here would leave the pendingProductionQty orphaned.
+    const stillPending = order.lines.some((l) => l.pendingProductionQty > 0);
+    if (stillPending) {
+      throw new Error('El pedido tiene líneas pendientes de producción. Espere a que Yuri registre la producción antes de armar.');
+    }
 
     const stockReads: Array<{ ref: ReturnType<typeof doc>; prev: StockDoc | null; line: OrderLine }> = [];
     for (const line of order.lines) {

@@ -73,7 +73,6 @@ export default function Panel() {
     let totalOrders = 0;
     let anuladas = 0;
     let incompleteInvoicing = 0;
-    let pendingProductionSum = 0;   // pending kg or units total (mixed; we show count of lines)
     let pendingProductionLines = 0;
     let deltaLines: Array<{ orderId: string; productName: string; formatLabel: string; sold: number; packed: number }> = [];
     let byVendedor = new Map<string, { orders: number; kg: number }>();
@@ -90,24 +89,27 @@ export default function Panel() {
       for (const l of o.lines) {
         if (l.pendingProductionQty > 0) {
           pendingProductionLines++;
-          pendingProductionSum += l.pendingProductionQty;
         }
         const kg = toKg(l, gramsByFormat);
         orderKg += kg;
         const pByKey = byProduct.get(l.productId) ?? { name: l.productName, kg: 0 };
         pByKey.kg += kg;
         byProduct.set(l.productId, pByKey);
-        // Delta packed vs sold — only when we have real packedWeightKg for a unidad line,
-        // or when packedQty differs from qty on a kg line.
-        if (l.packedQty != null) {
-          const sold = toKg(l, gramsByFormat);
+        // Delta packed vs reserved — reserved is what despacho committed to
+        // deliver in this run (pending-production quantities stay outside).
+        // Comparing against `qty` would show a phantom -12 delta on every
+        // confirmado_parcial we ever armed after Registrar Producción.
+        if (l.packedQty != null && l.reservedQty > 0) {
+          const kgReserved = l.unit === 'kg'
+            ? l.reservedQty
+            : (gramsByFormat.get(`${l.productId}::${l.formatId}`) ?? 0) * l.reservedQty / 1000;
           const pk = packedKg(l, gramsByFormat);
-          if (sold > 0 && Math.abs(pk - sold) >= 0.1) {
+          if (kgReserved > 0 && Math.abs(pk - kgReserved) >= 0.1) {
             deltaLines.push({
               orderId: o.id,
               productName: l.productName,
               formatLabel: l.formatLabel,
-              sold,
+              sold: kgReserved,
               packed: pk,
             });
           }
@@ -128,21 +130,31 @@ export default function Panel() {
       .slice(0, 8);
 
     deltaLines.sort((a, b) => Math.abs(b.sold - b.packed) - Math.abs(a.sold - a.packed));
-    deltaLines = deltaLines.slice(0, 5);
+    const deltaCount = deltaLines.length;
+    const deltaTop = deltaLines.slice(0, 5);
 
-    return { totalOrders, anuladas, incompleteInvoicing, pendingProductionSum, pendingProductionLines, deltaLines, vendedorArr, productArr };
+    return { totalOrders, anuladas, incompleteInvoicing, pendingProductionLines, deltaCount, deltaLines: deltaTop, vendedorArr, productArr };
   }, [filtered, gramsByFormat]);
 
   const [syncModal, setSyncModal] = useState<null | { payload: unknown }>(null);
 
+  const [syncing, setSyncing] = useState(false);
   async function syncBsale() {
-    const openOrders = orders.filter((o) => o.status === 'facturado' || o.status === 'despachado');
-    const payloads = [];
-    for (const o of openOrders.slice(0, 20)) {
-      const { docNumber, payload } = await bsale.createDocument(o).catch(() => ({ docNumber: '(no emitido)', payload: null }));
-      payloads.push({ docNumber, order: o.id, payload });
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      // Preview only: build payloads with each order's existing invoiceRef.
+      // Does NOT call createDocument, so no invoice numbers are consumed.
+      const invoiced = orders.filter((o) => !!o.invoiceRef).slice(0, 20);
+      const payloads = invoiced.map((o) => ({
+        docNumber: o.invoiceRef!,
+        order: o.id,
+        payload: bsale.buildPayload(o),
+      }));
+      setSyncModal({ payload: payloads });
+    } finally {
+      setSyncing(false);
     }
-    setSyncModal({ payload: payloads });
   }
 
   return (
@@ -162,8 +174,8 @@ export default function Panel() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <MetricCard label="Pedidos" value={metrics.totalOrders} sublabel={metrics.anuladas > 0 ? `${metrics.anuladas} anulados` : undefined} />
         <MetricCard label="Facturación incompleta" value={metrics.incompleteInvoicing} tone={metrics.incompleteInvoicing > 0 ? 'warn' : 'ok'} />
-        <MetricCard label="Líneas a producción" value={metrics.pendingProductionLines} sublabel={metrics.pendingProductionSum > 0 ? `${metrics.pendingProductionSum} u/kg pendientes` : undefined} />
-        <MetricCard label="Delta empacado/vendido" value={metrics.deltaLines.length} sublabel="líneas con diferencia" />
+        <MetricCard label="Líneas a producción" value={metrics.pendingProductionLines} sublabel={metrics.pendingProductionLines > 0 ? 'en pedidos abiertos' : undefined} />
+        <MetricCard label="Delta empacado/vendido" value={metrics.deltaCount} sublabel="líneas con diferencia" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
@@ -211,7 +223,7 @@ export default function Panel() {
                     <div className="text-xs text-charcoal-300">Vendido {d.sold.toFixed(1)} kg</div>
                     <div className={'text-sm font-semibold ' + (diff < 0 ? 'text-red-700' : 'text-brass-700')}>
                       Empacado {d.packed.toFixed(1)} kg
-                      <span className="ml-1 text-[10px] uppercase tracking-display">
+                      <span className="ml-2 text-[10px] uppercase tracking-display">
                         ({diff > 0 ? '+' : ''}{diff.toFixed(1)})
                       </span>
                     </div>
@@ -233,7 +245,9 @@ export default function Panel() {
                 Simulado. Muestra los payloads que se enviarían para pedidos facturados/despachados.
               </p>
             </div>
-            <Button onClick={syncBsale}>Sincronizar</Button>
+            <Button onClick={syncBsale} disabled={syncing}>
+              {syncing ? 'Preparando…' : 'Sincronizar'}
+            </Button>
           </div>
         </section>
       )}

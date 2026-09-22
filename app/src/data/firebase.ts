@@ -1,6 +1,6 @@
 import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 
 const useEmulators = import.meta.env.VITE_USE_EMULATORS === 'true';
@@ -14,7 +14,9 @@ const config: FirebaseOptions = {
 
 export const app = initializeApp(config);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Real Firestore rejects undefined field values (createOrder sends optional
+// notes / rawText / clientSnapshot.rut as undefined for some inputs).
+export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
 export const functions = getFunctions(app, 'us-central1');
 
 if (useEmulators && typeof window !== 'undefined' && !(globalThis as any).__emulatorsWired) {

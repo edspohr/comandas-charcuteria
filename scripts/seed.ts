@@ -55,6 +55,7 @@ const db = getFirestore();
 db.settings({ ignoreUndefinedProperties: true });
 
 async function wipeFirestore() {
+  // Note: `counters` is included so a re-seed resets both orders-YYYY and bsale-YYYY.
   const collections = ['products', 'clients', 'orders', 'stock', 'stockMovements', 'users', 'settings', 'counters'];
   for (const name of collections) {
     const snap = await db.collection(name).get();
@@ -97,6 +98,8 @@ async function seedCatalog() {
   for (const cli of clients) batch.set(db.collection('clients').doc(cli.id), cli);
   batch.set(db.collection('settings').doc('app'), { cutoffHour: 15, timezone: 'America/Santiago' });
   batch.set(db.collection('counters').doc('orders-2026'), { last: weekOrders.length });
+  // Bsale doc counter continues from the seeded invoice numbers (FA-000811..FA-000822).
+  batch.set(db.collection('counters').doc('bsale-2026'), { last: 822 });
   await batch.commit();
 }
 
@@ -104,10 +107,13 @@ async function seedCatalog() {
 // so the demo can exercise the confirmado_parcial + Registrar producción flows.
 // Keyed by "productId::formatId"; anything unlisted defaults to a comfortable buffer.
 const initialOnHand: Record<string, number> = {
-  'longaniza-chillan::sachet-5kg': 60,   // Santa Brasa uses 40+/wk, PED-0029 splits at 8 available
+  // Longaniza 5 kg: seeded orders consume 64 (PED-0002/0009/0010/0017) and reserve
+  // 18 more. Start at 90 so the wizard shows "8 disponibles" for the demo split
+  // and the Producción card can promise the ~12 pending → 24 after the demo order.
+  'longaniza-chillan::sachet-5kg': 90,
   'longaniza-chillan::sachet-1kg': 24,
   'longaniza-chillan::sachet-500g': 30,
-  'coppa::pieza': 4,                     // PED-0037 tests split
+  'coppa::pieza': 12,                     // PED-0037 splits at 4 reserved / 6 pending; keep headroom
   'brisket::pieza': 6,
   'jamon-cocido::sachet-200g': 200,
   'jamon-cocido::sachet-500g': 80,
@@ -216,6 +222,19 @@ async function seedOrdersAndMovements() {
   await batch.commit();
 }
 
+async function assertStockNonNegative() {
+  const snap = await db.collection('stock').get();
+  const bad: string[] = [];
+  snap.forEach((d) => {
+    const s = d.data() as { onHand: number; reserved: number };
+    if (s.onHand < 0) bad.push(`${d.id}: onHand=${s.onHand}`);
+    if (s.reserved < 0) bad.push(`${d.id}: reserved=${s.reserved}`);
+  });
+  if (bad.length) {
+    throw new Error(`Seed left non-negative stock invariant broken:\n  ${bad.join('\n  ')}`);
+  }
+}
+
 async function main() {
   assertTarget();
   console.log(`→ Wiping project "${PROJECT_ID}"...`);
@@ -233,6 +252,9 @@ async function main() {
 
   console.log(`→ Seeding ${weekOrders.length} orders + stock movements...`);
   await seedOrdersAndMovements();
+
+  console.log('→ Verifying stock invariant...');
+  await assertStockNonNegative();
 
   console.log('✅ Seed complete.');
   console.log('   Login: rafael@charcuteria.demo / demo1234 (vendedor)');

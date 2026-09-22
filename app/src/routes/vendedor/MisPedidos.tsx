@@ -4,7 +4,7 @@ import { useCurrentUser } from '@/data/auth';
 import { useMyOrders } from '@/data/orders';
 import StatusPill from '@/components/ui/StatusPill';
 import { formatDateShort, formatQty } from '@/lib/format';
-import type { Order, OrderStatus } from '@/domain/types';
+import { ORDER_STATUS_LABEL, type Order, type OrderStatus } from '@/domain/types';
 
 type Group = 'activos' | 'historial';
 
@@ -32,7 +32,7 @@ export default function MisPedidos() {
 
       {flash?.justCreated && (
         <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-4">
-          Pedido <span className="font-mono">{flash.justCreated}</span> creado — estado <strong>{flash.status}</strong>.
+          Pedido <span className="font-mono">{flash.justCreated}</span> creado — estado <strong>{flash.status ? ORDER_STATUS_LABEL[flash.status] : ''}</strong>.
           {flash.parcialLines && flash.parcialLines.length > 0 && (
             <ul className="mt-2 text-xs list-disc pl-4">
               {flash.parcialLines.map((p, i) => (

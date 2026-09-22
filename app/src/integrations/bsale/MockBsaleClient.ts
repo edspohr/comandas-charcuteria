@@ -38,23 +38,16 @@ export class MockBsaleClient implements BsaleClient {
     return out;
   }
 
-  // Simulates document creation. Bumps counters/bsale-YYYY, assigns
-  // FA-NNNNNN, returns both the number and the payload we would have
-  // POSTed to Bsale.
-  async createDocument(order: Order): Promise<{ docNumber: string; payload: unknown }> {
-    const year = new Date().getFullYear();
-    const counterRef = doc(db, 'counters', `bsale-${year}`);
-    const docNumber = await runTransaction(db, async (tx) => {
-      const snap = await tx.get(counterRef);
-      const nextN = ((snap.data()?.last as number | undefined) ?? 0) + 1;
-      tx.set(counterRef, { last: nextN }, { merge: true });
-      return `FA-${String(nextN).padStart(6, '0')}`;
-    });
-
-    const payload = {
+  // Pure payload builder. Passes through invoiceRef so previews can show the
+  // number that will (or already did) get assigned. Kept separate from
+  // createDocument so the Sincronizar preview doesn't accidentally consume
+  // invoice numbers.
+  buildPayload(order: Order, invoiceRef?: string): unknown {
+    return {
       documentTypeId: 1,       // Factura Electrónica
       officeId: 1,
       emissionDate: new Date().toISOString().slice(0, 10),
+      invoiceRef: invoiceRef ?? order.invoiceRef ?? null,
       client: {
         rut: order.clientSnapshot.rut ?? null,
         name: order.clientSnapshot.name,
@@ -71,7 +64,20 @@ export class MockBsaleClient implements BsaleClient {
         })),
       references: [{ documentReference: order.id, reason: 'Comandas' }],
     };
-    return { docNumber, payload };
+  }
+
+  // Bumps counters/bsale-YYYY transactionally and returns the new invoice
+  // number + the payload that was built with it. Only used from Facturar.
+  async createDocument(order: Order): Promise<{ docNumber: string; payload: unknown }> {
+    const year = new Date().getFullYear();
+    const counterRef = doc(db, 'counters', `bsale-${year}`);
+    const docNumber = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(counterRef);
+      const nextN = ((snap.data()?.last as number | undefined) ?? 0) + 1;
+      tx.set(counterRef, { last: nextN }, { merge: true });
+      return `FA-${String(nextN).padStart(6, '0')}`;
+    });
+    return { docNumber, payload: this.buildPayload(order, docNumber) };
   }
 
   async postStockConsumption(_movements: StockMovement[]): Promise<void> {

@@ -35,26 +35,27 @@ Para mostrar el flujo completo en la URL en vivo. Recomiendo dos ventanas de inc
 
 1. **Login** — Muestra las tarjetas de rol y el sello LC. Entrá como **Rafael** (vendedor).
 2. **Nuevo pedido** — Wizard 4 pasos:
-   - Cliente: buscá "Magnolia", tocá **Hotel Magnolia**.
-   - Productos: agregá 3 líneas mixtas (jamón cocido en sachet, mortadela pistacho en granel, gouda ahumado en sachet 200 g). El semáforo verde/ámbar/rojo aparece por formato.
+   - Cliente: buscá "Magnolia" y tocá la tarjeta **Magnolia** (razón social *Hotel Magnolia*).
+   - Productos: agregá 3 líneas mixtas (jamón cocido en sachet, mortadela pistacho en granel, gouda ahumado en sachet 200 g). El semáforo verde/ámbar/rojo aparece por formato. El picker de formatos se abre como panel modal desde abajo.
    - Entrega: dejá la fecha por defecto (mañana), despacho.
    - Confirmar → Enviar. Ves el flash en Mis pedidos con el ID `PED-2026-XXXX`.
 3. **Pegar pedido (opcional)** — Volvé a Nuevo pedido → **Pegar pedido**. Cargá el ejemplo, "Interpretar", revisá las líneas identificadas y "Continuar en el wizard" para probar el mapping.
 4. **Split a producción** — Elegí un cliente y pedí `20 sachet 5 kg` de **Longaniza chillán** (hay 8 disponibles). Ves el aviso "12 a producción" en el paso Confirmar.
 5. **Cambiá a Edu (despacho)** — Nueva ventana incógnito.
-   - Cola: filtrá por **Míos = no**, **Sin asignar**. Verás el pedido de Rafael.
+   - Cola: aplicá el filtro **Sin asignar**. Verás el pedido de Rafael.
    - Tomar pedido → estado `en_armado`.
-   - Ajustá el peso real de una línea con `granel-kg` (menor al vendido) para simular el brisket → "Marcar armado".
-6. **Cambiá a Yuri (producción)** — Ves la card **Longaniza chillán 5 kg** con "A producir: 60".
-   - "Registrar producción" → 60 → "Registrar".
-   - El pedido parcial de Rafael se promueve a `confirmado`. Yuri también ve qué pedidos afecta cada producción antes de tocar el botón.
+   - En una línea con formato `Granel laminado (kg)`, bajá el stepper *Empacado* respecto al vendido para simular la merma (p. ej. 3 kg vendidos → 2,5 kg empacados). Para formatos `pieza` aparece además el campo *Peso real (kg)* opcional (útil para el brisket).
+   - "Marcar armado".
+6. **Cambiá a Yuri (producción)** — Ves la card **Longaniza chillán · Sachet 5 kg** en "Con demanda pendiente" (la cifra depende de los split previos; con la seed limpia hay 12 pendientes, y aumenta si el paso 4 sumó otro pedido parcial).
+   - Tocá la card para ver los pedidos que dependen; Registrar producción abre pre-seleccionado el producto+formato.
+   - Ingresá una cantidad ≥ pendiente y "Registrar". El pedido parcial se promueve a `confirmado` y aparece en el aviso "Pedidos promovidos".
 7. **Cambiá a Miguel (admin)** — Facturación:
    - Tab **Por facturar**: `Facturar` en el pedido armado. Modal muestra el número `FA-000XXX` **y el payload JSON** que se enviaría a Bsale.
    - Tab **Por despachar**: `Despachar` con courier + nota.
    - Tab **Por entregar**: `Marcar entregado`.
-8. **Panel** — Ves 4 métricas, chart de kg por vendedor, top 8 kg por producto, y la lista de deltas empacado/vendido (el brisket del paso 5 debería estar ahí).
+8. **Panel** — Ves 4 métricas, chart de kg por vendedor, top 8 kg por producto, y la lista de deltas empacado/vendido. La línea de granel ajustada en el paso 5 aparece ahí con el delta negativo (si tocaste `packedWeightKg` en una `pieza`, ese caso queda en el detalle del pedido pero no cuenta en el chart de deltas porque las piezas no tienen gramaje asociado).
 9. **Cambiá a Ciro (super admin)** — Aparece la sección **Sincronizar con Bsale** al fondo del Panel + nav item **Usuarios**. Tocá Sincronizar para ver el batch de payloads.
-10. **Catálogo → Ajustar stock** — Elegí un producto, expandí un formato, tocá **Ajustar**, cambiá la cantidad con un motivo → se registra un movimiento `ajuste` en la bitácora.
+10. **Catálogo → Ajustar stock** — Elegí un producto, expandí un formato, tocá **Ajustar**, cambiá la cantidad con un motivo → la disponibilidad se actualiza en vivo. El movimiento `ajuste` queda registrado como bitácora en Firestore (no hay vista de historial en esta versión).
 
 ---
 

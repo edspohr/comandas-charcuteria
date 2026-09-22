@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -14,27 +14,43 @@ export interface CurrentUser {
   appUser: AppUser;
 }
 
+// Module-level auth state so every useCurrentUser() call sees the same
+// resolved user. Before this, each hook instance began with current=null
+// and any route that immediately dereferenced current!.appUser crashed.
+interface AuthState { current: CurrentUser | null; loading: boolean }
+let authState: AuthState = { current: null, loading: true };
+const listeners = new Set<() => void>();
+let started = false;
+
+function emit(next: AuthState) {
+  authState = next;
+  listeners.forEach((l) => l());
+}
+
+function startAuthListener() {
+  if (started) return;
+  started = true;
+  onAuthStateChanged(auth, async (fbUser) => {
+    if (!fbUser) { emit({ current: null, loading: false }); return; }
+    const snap = await getDoc(doc(db, 'users', fbUser.uid));
+    if (!snap.exists()) {
+      // Auth user without a users/{uid} doc — treat as signed out.
+      await fbSignOut(auth);
+      emit({ current: null, loading: false });
+    } else {
+      emit({ current: { fbUser, appUser: snap.data() as AppUser }, loading: false });
+    }
+  });
+}
+
+function subscribe(l: () => void) {
+  listeners.add(l);
+  return () => { listeners.delete(l); };
+}
+
 export function useCurrentUser(): { current: CurrentUser | null; loading: boolean } {
-  const [current, setCurrent] = useState<CurrentUser | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (fbUser) => {
-      if (!fbUser) { setCurrent(null); setLoading(false); return; }
-      const snap = await getDoc(doc(db, 'users', fbUser.uid));
-      if (!snap.exists()) {
-        // Auth user without a users/{uid} doc — treat as signed out.
-        await fbSignOut(auth);
-        setCurrent(null);
-      } else {
-        setCurrent({ fbUser, appUser: snap.data() as AppUser });
-      }
-      setLoading(false);
-    });
-    return unsub;
-  }, []);
-
-  return { current, loading };
+  startAuthListener();
+  return useSyncExternalStore(subscribe, () => authState);
 }
 
 export async function signInWithPassword(email: string, password: string) {

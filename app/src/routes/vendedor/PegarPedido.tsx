@@ -126,7 +126,7 @@ export default function PegarPedido() {
       <header className="mb-6">
         <p className="eyebrow">Vendedor</p>
         <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Pegar pedido</h1>
-        <p className="text-xs text-charcoal-300 mt-1">Pegue el mensaje del cliente. Interpretamos productos, formatos y cantidades. Ustd revisa antes de continuar.</p>
+        <p className="text-xs text-charcoal-300 mt-1">Pegue el mensaje del cliente. Interpretamos productos, formatos y cantidades. Usted revisa antes de continuar.</p>
       </header>
 
       <div className="card p-4 mb-4">

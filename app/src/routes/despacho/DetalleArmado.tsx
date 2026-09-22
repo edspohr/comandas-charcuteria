@@ -7,6 +7,7 @@ import { useCurrentUser } from '@/data/auth';
 import { assignPacker, markArmado, useOrder } from '@/data/orders';
 import { formatDateLong, formatQty } from '@/lib/format';
 import { demoUsers } from '@/data/demo-users';
+import { ORDER_STATUS_LABEL } from '@/domain/types';
 
 const NAME_BY_UID: Record<string, string> = Object.fromEntries(
   demoUsers.map((u) => [u.uid, u.displayName]),
@@ -38,8 +39,9 @@ export default function DetalleArmado() {
   }, [order]);
 
   const mine = order?.assignedPackerId === uid;
-  const canTake = order && (!order.assignedPackerId || mine) && (order.status === 'confirmado' || order.status === 'confirmado_parcial');
-  const canPack = order && mine && order.status === 'en_armado';
+  const anyPendingProduction = order?.lines.some((l) => l.pendingProductionQty > 0) ?? false;
+  const canTake = order && (!order.assignedPackerId || mine) && (order.status === 'confirmado' || order.status === 'confirmado_parcial') && !anyPendingProduction;
+  const canPack = order && mine && order.status === 'en_armado' && !anyPendingProduction;
   const isDone = order && (order.status === 'armado' || order.status === 'facturado' || order.status === 'despachado' || order.status === 'entregado');
 
   const anyPacked = useMemo(
@@ -110,6 +112,12 @@ export default function DetalleArmado() {
           <Button onClick={take} className="w-full">
             {order.assignedPackerId ? 'Comenzar armado' : 'Tomar este pedido'}
           </Button>
+        </div>
+      )}
+
+      {anyPendingProduction && (order.status === 'confirmado_parcial' || order.status === 'en_armado') && (
+        <div className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 p-3 text-sm mb-4">
+          Este pedido tiene líneas esperando producción. Yuri debe registrar la producción antes de armar.
         </div>
       )}
 
@@ -225,7 +233,7 @@ export default function DetalleArmado() {
           <ol className="space-y-1 text-xs">
             {order.statusHistory.map((h, i) => (
               <li key={i} className="flex justify-between gap-2">
-                <span className="text-charcoal-700 font-medium">{h.status}</span>
+                <span className="text-charcoal-700 font-medium">{ORDER_STATUS_LABEL[h.status]}</span>
                 <span className="text-charcoal-300">
                   {NAME_BY_UID[h.by] ?? h.by} · {new Date(h.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}
                 </span>

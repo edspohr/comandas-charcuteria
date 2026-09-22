@@ -42,6 +42,11 @@ export class MockBsaleClient implements BsaleClient {
   // number that will (or already did) get assigned. Kept separate from
   // createDocument so the Sincronizar preview doesn't accidentally consume
   // invoice numbers.
+  //
+  // netUnitValue matches how the real Bsale API expects it: neto (sin IVA)
+  // por unidad. For sachet/unit formats it's the snapshot price / 1.19; for
+  // weight-based formats we divide the line subtotal by the actual quantity
+  // (packedWeightKg si aplica, si no packedQty).
   buildPayload(order: Order, invoiceRef?: string): unknown {
     return {
       documentTypeId: 1,       // Factura Electrónica
@@ -55,13 +60,19 @@ export class MockBsaleClient implements BsaleClient {
       },
       details: order.lines
         .filter((l) => (l.packedQty ?? l.reservedQty) > 0)
-        .map((l) => ({
-          netUnitValue: 0,   // prices out of scope for the mockup
-          quantity: l.packedQty ?? l.reservedQty,
-          taxId: [1],
-          comment: `${l.productName} · ${l.formatLabel}${l.notes ? ` · ${l.notes}` : ''}`,
-          product: { id: l.productId, sku: l.productId },
-        })),
+        .map((l) => {
+          const invoicedQty = l.packedQty ?? l.reservedQty;
+          const subtotal = l.subtotalCLP ?? 0;
+          const netUnitValue = subtotal > 0 ? Math.round(subtotal / 1.19 / invoicedQty) : 0;
+          return {
+            netUnitValue,
+            quantity: invoicedQty,
+            taxId: [1],
+            comment: `${l.productName} · ${l.formatLabel}${l.notes ? ` · ${l.notes}` : ''}`,
+            product: { id: l.productId, sku: l.productId },
+          };
+        }),
+      totalCLP: order.totalCLP ?? null,
       references: [{ documentReference: order.id, reason: 'Comandas' }],
     };
   }

@@ -8,6 +8,7 @@ import { assignPacker, markArmado, useOrder } from '@/data/orders';
 import { formatDateLong, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 import ErrorBanner from '@/components/ui/ErrorBanner';
+import { formatCLP } from '@/lib/pricing';
 import { demoUsers } from '@/data/demo-users';
 import { ORDER_STATUS_LABEL } from '@/domain/types';
 
@@ -164,6 +165,22 @@ export default function DetalleArmado() {
                 </div>
               </div>
 
+              {line.unitPriceSnapshotCLP != null && (() => {
+                // Live subtotal preview: recomputes as the packer types weight
+                // so they know the invoice impact of the merma.
+                const previewSub = line.unit === 'kg'
+                  ? packed * line.unitPriceSnapshotCLP
+                  : (Number.isFinite(parsedWeight) && parsedWeight! > 0
+                      ? parsedWeight! * line.unitPriceSnapshotCLP
+                      : packed * line.unitPriceSnapshotCLP);
+                if (!Number.isFinite(previewSub) || previewSub <= 0) return null;
+                return (
+                  <p className="mt-2 text-xs text-charcoal-500">
+                    {readOnly ? 'Subtotal' : 'Subtotal estimado'} · <span className="font-semibold text-charcoal-700">{formatCLP(previewSub)}</span>
+                  </p>
+                );
+              })()}
+
               <div className="mt-3 pt-3 border-t border-charcoal-100">
                 <p className="eyebrow mb-2">Empacado</p>
                 {readOnly ? (
@@ -211,6 +228,12 @@ export default function DetalleArmado() {
             </div>
           );
         })}
+        {order.totalCLP != null && order.totalCLP > 0 && (
+          <div className="p-4 border-t border-charcoal-100 flex items-center justify-between">
+            <span className="eyebrow">Total {order.status === 'armado' ? 'a facturar' : 'estimado'}</span>
+            <span className="text-lg font-semibold text-charcoal-900 tracking-display">{formatCLP(order.totalCLP)}</span>
+          </div>
+        )}
       </div>
 
       {error && (

@@ -11,6 +11,7 @@ import {
 import { formatDateShort, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 import ErrorBanner from '@/components/ui/ErrorBanner';
+import { formatCLP } from '@/lib/pricing';
 import { bsale } from '@/integrations/bsale/MockBsaleClient';
 import type { Order } from '@/domain/types';
 
@@ -116,6 +117,9 @@ export default function Facturacion() {
                   </p>
                   <p className="text-xs text-charcoal-300 mt-0.5 first-letter:uppercase">
                     Solicitado {formatDateShort(o.requestedDate)} · {o.lines.length} {o.lines.length === 1 ? 'línea' : 'líneas'}
+                    {o.totalCLP != null && o.totalCLP > 0 && (
+                      <span className="text-charcoal-700 font-semibold ml-2">{formatCLP(o.totalCLP)}</span>
+                    )}
                   </p>
                   <details className="mt-2">
                     <summary className="text-[11px] uppercase tracking-display text-charcoal-300 hover:text-charcoal-500 cursor-pointer">
@@ -125,9 +129,10 @@ export default function Facturacion() {
                       {o.lines.map((l) => (
                         <li key={`${l.productId}-${l.formatId}`} className="flex items-center justify-between gap-2 text-xs">
                           <span className="text-charcoal-500 truncate">{l.productName} · {l.formatLabel}</span>
-                          <span className="text-charcoal-700 font-medium shrink-0">
-                            {formatQty(l.packedQty ?? l.reservedQty, l.unit)}
+                          <span className="text-charcoal-700 font-medium shrink-0 text-right">
+                            <span>{formatQty(l.packedQty ?? l.reservedQty, l.unit)}</span>
                             {l.packedWeightKg != null && <span className="text-charcoal-300 ml-1">· {l.packedWeightKg} kg reales</span>}
+                            {l.subtotalCLP != null && <span className="block text-[10px] text-charcoal-500">{formatCLP(l.subtotalCLP)}</span>}
                           </span>
                         </li>
                       ))}

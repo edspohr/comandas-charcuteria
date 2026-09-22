@@ -14,6 +14,7 @@ import { defaultRequestedDate, minRequestedDate } from '@/domain/cutoff';
 import { formatDateLong, formatDateShort, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 import { categoryLabel, categoryOrder } from '@/domain/categories';
+import { computeLineSubtotal, formatCLP, unitPriceLabel } from '@/lib/pricing';
 import type { Client, Product, ProductFormat, StockDoc } from '@/domain/types';
 
 interface Draft {
@@ -317,6 +318,7 @@ function StepProductos({
       productId: product.id, productName: product.name,
       formatId: format.formatId, formatLabel: format.label,
       unit: format.unit, qty, notes,
+      format,
     };
     if (idx >= 0) {
       const copy = [...lines]; copy[idx] = next; onLines(copy);
@@ -455,7 +457,14 @@ function FormatPicker({
           return (
             <li key={fmt.formatId} className="border-t border-charcoal-100 pt-4 first:border-none first:pt-0">
               <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-                <span className="font-medium text-charcoal-700">{fmt.label}</span>
+                <div className="min-w-0">
+                  <span className="font-medium text-charcoal-700">{fmt.label}</span>
+                  {unitPriceLabel(fmt) && (
+                    <span className="ml-2 text-[11px] uppercase tracking-display text-charcoal-500">
+                      {unitPriceLabel(fmt)}
+                    </span>
+                  )}
+                </div>
                 <SemaphoreBadge level={sem} note={`Disponible ${formatQty(av, fmt.unit)}`} />
               </div>
               <Stepper
@@ -465,6 +474,11 @@ function FormatPicker({
                 decimals={fmt.unit === 'kg' ? 2 : 0}
                 quick={fmt.unit === 'kg' ? [0.5, 1, 5] : [1, 5, 10]}
               />
+              {current.qty > 0 && computeLineSubtotal(fmt, current.qty) != null && (
+                <p className="mt-2 text-xs text-charcoal-500">
+                  Subtotal · <span className="font-semibold text-charcoal-700">{formatCLP(computeLineSubtotal(fmt, current.qty))}</span>
+                </p>
+              )}
               <input
                 value={current.notes}
                 onChange={(e) => setPending((s) => ({ ...s, [fmt.formatId]: { ...current, notes: e.target.value } }))}
@@ -486,11 +500,14 @@ function FormatPicker({
 
 function SelectedLines({ lines, onRemove }: { lines: DraftLine[]; onRemove: (l: DraftLine) => void }) {
   if (lines.length === 0) return null;
+  const total = lines.reduce((s, l) => s + (l.format ? (computeLineSubtotal(l.format, l.qty) ?? 0) : 0), 0);
   return (
     <div className="card p-4">
       <p className="eyebrow mb-2">Líneas en este pedido</p>
       <ul className="divide-y divide-charcoal-100">
-        {lines.map((l) => (
+        {lines.map((l) => {
+          const sub = l.format ? computeLineSubtotal(l.format, l.qty) : undefined;
+          return (
           <li key={`${l.productId}-${l.formatId}`} className="flex items-center justify-between gap-2 text-sm py-2 first:pt-0 last:pb-0">
             <div className="min-w-0">
               <div className="text-charcoal-700 truncate font-medium">{l.productName}</div>
@@ -499,12 +516,22 @@ function SelectedLines({ lines, onRemove }: { lines: DraftLine[]; onRemove: (l: 
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <span className="font-semibold text-charcoal-700">{formatQty(l.qty, l.unit)}</span>
+              <div className="text-right">
+                <div className="font-semibold text-charcoal-700">{formatQty(l.qty, l.unit)}</div>
+                {sub != null && <div className="text-[11px] text-charcoal-500">{formatCLP(sub)}</div>}
+              </div>
               <button onClick={() => onRemove(l)} className="text-[11px] uppercase tracking-display text-charcoal-300 hover:text-red-700">Quitar</button>
             </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
+      {total > 0 && (
+        <div className="mt-3 pt-3 border-t border-charcoal-100 flex items-center justify-between text-sm">
+          <span className="eyebrow">Total estimado</span>
+          <span className="font-semibold text-charcoal-900">{formatCLP(total)}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -599,10 +626,12 @@ function StepConfirmar({
 }) {
   const preview = useMemo(() => draft.lines.map((l) => {
     const av = availableFor(stock, l.productId, l.formatId);
-    return { line: l, available: av, reserved: Math.min(av, l.qty), pending: Math.max(0, l.qty - av) };
+    const subtotalCLP = l.format ? computeLineSubtotal(l.format, l.qty) : undefined;
+    return { line: l, available: av, reserved: Math.min(av, l.qty), pending: Math.max(0, l.qty - av), subtotalCLP };
   }), [draft.lines, stock]);
 
   const anyPending = preview.some((p) => p.pending > 0);
+  const totalCLP = preview.reduce((s, p) => s + (p.subtotalCLP ?? 0), 0);
 
   return (
     <section className="space-y-4">
@@ -652,7 +681,12 @@ function StepConfirmar({
                     {p.line.formatLabel}{p.line.notes ? ` · ${p.line.notes}` : ''}
                   </div>
                 </div>
-                <div className="font-semibold text-charcoal-700 shrink-0">{formatQty(p.line.qty, p.line.unit)}</div>
+                <div className="text-right shrink-0">
+                  <div className="font-semibold text-charcoal-700">{formatQty(p.line.qty, p.line.unit)}</div>
+                  {p.subtotalCLP != null && (
+                    <div className="text-[11px] text-charcoal-500">{formatCLP(p.subtotalCLP)}</div>
+                  )}
+                </div>
               </div>
               {p.pending > 0 && (
                 <p className="text-[11px] uppercase tracking-display text-brass-700 mt-1">
@@ -662,6 +696,12 @@ function StepConfirmar({
             </li>
           ))}
         </ul>
+        {totalCLP > 0 && (
+          <div className="mt-3 pt-3 border-t border-charcoal-100 flex items-center justify-between">
+            <span className="eyebrow">Total estimado</span>
+            <span className="text-lg font-semibold text-charcoal-900 tracking-display">{formatCLP(totalCLP)}</span>
+          </div>
+        )}
       </div>
 
       {anyPending && (

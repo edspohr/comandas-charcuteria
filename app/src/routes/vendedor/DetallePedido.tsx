@@ -6,6 +6,7 @@ import { useCurrentUser } from '@/data/auth';
 import { anularOrder, useOrder } from '@/data/orders';
 import { demoUsers } from '@/data/demo-users';
 import { formatDateLong, formatQty } from '@/lib/format';
+import { formatCLP } from '@/lib/pricing';
 import { describeFirestoreError } from '@/lib/errors';
 import ErrorBannerLazy from '@/components/ui/ErrorBanner';
 import { ORDER_STATUS_LABEL, type OrderStatus } from '@/domain/types';
@@ -89,11 +90,20 @@ export default function DetallePedido() {
                       {l.packedWeightKg != null && <span> · {l.packedWeightKg} kg reales</span>}
                     </p>
                   )}
+                  {l.subtotalCLP != null && (
+                    <p className="text-xs text-charcoal-700 font-semibold mt-1">{formatCLP(l.subtotalCLP)}</p>
+                  )}
                 </div>
               </div>
             </li>
           ))}
         </ul>
+        {order.totalCLP != null && order.totalCLP > 0 && (
+          <div className="p-4 border-t border-charcoal-100 flex items-center justify-between">
+            <span className="eyebrow">Total</span>
+            <span className="text-lg font-semibold text-charcoal-900 tracking-display">{formatCLP(order.totalCLP)}</span>
+          </div>
+        )}
       </div>
 
       <div className="card p-4 mb-4">

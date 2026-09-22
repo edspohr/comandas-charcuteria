@@ -10,9 +10,10 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Client, Order, OrderLine, OrderStatus, StockDoc, StockMovement } from '@/domain/types';
+import type { Client, Order, OrderLine, OrderStatus, ProductFormat, StockDoc, StockMovement } from '@/domain/types';
 import { stockDocId } from '@/domain/types';
 import { describeFirestoreError } from '@/lib/errors';
+import { computeLineSubtotal } from '@/lib/pricing';
 
 export interface DraftLine {
   productId: string;
@@ -22,6 +23,10 @@ export interface DraftLine {
   unit: OrderLine['unit'];
   qty: number;
   notes?: string;
+  // Optional pricing snapshot passed from the wizard (comes from the catalog
+  // format at the moment the line was added). If absent, createOrder computes
+  // it from `format` inside the transaction.
+  format?: ProductFormat;
 }
 
 export interface DraftOrderInput {
@@ -86,6 +91,8 @@ export async function createOrder(
           missing: pendingProductionQty,
         });
       }
+      const subtotalCLP = line.format ? computeLineSubtotal(line.format, line.qty) : undefined;
+      const unitPriceSnapshotCLP = line.format?.priceCLP ?? line.format?.pricePerKgCLP;
       enriched.push({
         productId: line.productId,
         productName: line.productName,
@@ -96,8 +103,12 @@ export async function createOrder(
         notes: line.notes,
         reservedQty,
         pendingProductionQty,
+        subtotalCLP,
+        unitPriceSnapshotCLP,
       });
     });
+
+    const totalCLP = enriched.reduce((s, l) => s + (l.subtotalCLP ?? 0), 0);
 
     const status: OrderStatus = anyPending ? 'confirmado_parcial' : 'confirmado';
     const now = Date.now();
@@ -127,6 +138,7 @@ export async function createOrder(
       invoicingComplete: input.client.invoicingComplete,
       createdAt: now,
       updatedAt: now,
+      totalCLP,
     };
 
     // ---- Writes
@@ -300,8 +312,22 @@ export async function markArmado(
       const key = `${line.productId}::${line.formatId}`;
       const p = packedMap.get(key);
       const packedQty = p?.packedQty ?? line.reservedQty;
-      return { ...line, packedQty, packedWeightKg: p?.packedWeightKg };
+      // Recompute the subtotal against actual packed values so pieza-by-weight
+      // invoices and the Panel delta reflect merma. Sachet formats and granel
+      // already priced qty × price, so packedQty doesn't shift them.
+      let subtotalCLP = line.subtotalCLP;
+      if (line.unitPriceSnapshotCLP != null) {
+        if (line.unit === 'kg') {
+          subtotalCLP = packedQty * line.unitPriceSnapshotCLP;
+        } else if (p?.packedWeightKg != null && p.packedWeightKg > 0) {
+          subtotalCLP = p.packedWeightKg * line.unitPriceSnapshotCLP;
+        } else if (line.subtotalCLP == null) {
+          subtotalCLP = packedQty * line.unitPriceSnapshotCLP;
+        }
+      }
+      return { ...line, packedQty, packedWeightKg: p?.packedWeightKg, subtotalCLP };
     });
+    const totalCLP = enrichedLines.reduce((s, l) => s + (l.subtotalCLP ?? 0), 0);
 
     stockReads.forEach(({ ref, prev, line }) => {
       if (line.reservedQty <= 0 || !prev) return;
@@ -329,6 +355,7 @@ export async function markArmado(
       status: 'armado',
       assignedPackerId: order.assignedPackerId ?? packerUid,
       updatedAt: now,
+      totalCLP,
       statusHistory: [...order.statusHistory, { status: 'armado', by: packerUid, at: now }],
     });
   });

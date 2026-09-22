@@ -4,6 +4,7 @@ import { useCurrentUser } from '@/data/auth';
 import { useMyOrders } from '@/data/orders';
 import StatusPill from '@/components/ui/StatusPill';
 import { formatDateShort, formatQty } from '@/lib/format';
+import { formatCLP } from '@/lib/pricing';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { ORDER_STATUS_LABEL, type Order, type OrderStatus } from '@/domain/types';
 
@@ -108,6 +109,9 @@ function OrderCard({ order }: { order: Order }) {
           <p className="text-sm font-semibold text-charcoal-900 mt-0.5 first-letter:uppercase">
             {formatDateShort(order.requestedDate)}
           </p>
+          {order.totalCLP != null && order.totalCLP > 0 && (
+            <p className="text-xs text-charcoal-500 mt-1">{formatCLP(order.totalCLP)}</p>
+          )}
         </div>
       </div>
 

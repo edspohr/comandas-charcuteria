@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button';
 import { useCurrentUser } from '@/data/auth';
 import { demoUsers } from '@/data/demo-users';
 import { addDaysIso, todayInSantiago } from '@/lib/format';
+import { formatCLP } from '@/lib/pricing';
 import { bsale } from '@/integrations/bsale/MockBsaleClient';
 import type { Order, OrderLine } from '@/domain/types';
 
@@ -75,25 +76,34 @@ export default function Panel() {
     let incompleteInvoicing = 0;
     let pendingProductionLines = 0;
     let deltaLines: Array<{ orderId: string; productName: string; formatLabel: string; sold: number; packed: number }> = [];
-    let byVendedor = new Map<string, { orders: number; kg: number }>();
-    let byProduct = new Map<string, { name: string; kg: number }>();
+    let byVendedor = new Map<string, { orders: number; kg: number; clp: number }>();
+    let byProduct = new Map<string, { name: string; kg: number; clp: number }>();
+    let totalRevenueCLP = 0;
+    let invoicedOrdersCount = 0;
 
     for (const o of filtered) {
       totalOrders++;
       if (o.status === 'anulado') anuladas++;
       if (!o.invoicingComplete) incompleteInvoicing++;
       const vName = VENDEDOR_NAME[o.createdBy] ?? o.createdBy;
-      const v = byVendedor.get(vName) ?? { orders: 0, kg: 0 };
+      const v = byVendedor.get(vName) ?? { orders: 0, kg: 0, clp: 0 };
       v.orders++;
       let orderKg = 0;
+      const isInvoiced = ['facturado', 'despachado', 'entregado'].includes(o.status);
+      if (isInvoiced && o.totalCLP != null) {
+        totalRevenueCLP += o.totalCLP;
+        invoicedOrdersCount++;
+      }
+      if (o.status !== 'anulado' && o.totalCLP != null) v.clp += o.totalCLP;
       for (const l of o.lines) {
         if (l.pendingProductionQty > 0) {
           pendingProductionLines++;
         }
         const kg = toKg(l, gramsByFormat);
         orderKg += kg;
-        const pByKey = byProduct.get(l.productId) ?? { name: l.productName, kg: 0 };
+        const pByKey = byProduct.get(l.productId) ?? { name: l.productName, kg: 0, clp: 0 };
         pByKey.kg += kg;
+        pByKey.clp += l.subtotalCLP ?? 0;
         byProduct.set(l.productId, pByKey);
         // Delta packed vs reserved — reserved is what despacho committed to
         // deliver in this run (pending-production quantities stay outside).
@@ -120,20 +130,22 @@ export default function Panel() {
     }
 
     const vendedorArr = [...byVendedor.entries()]
-      .map(([name, v]) => ({ name, orders: v.orders, kg: Number(v.kg.toFixed(1)) }))
-      .sort((a, b) => b.kg - a.kg);
+      .map(([name, v]) => ({ name, orders: v.orders, kg: Number(v.kg.toFixed(1)), clp: Math.round(v.clp) }))
+      .sort((a, b) => b.clp - a.clp);
 
     const productArr = [...byProduct.values()]
-      .map((p) => ({ name: p.name, kg: Number(p.kg.toFixed(1)) }))
-      .filter((p) => p.kg > 0)
-      .sort((a, b) => b.kg - a.kg)
+      .map((p) => ({ name: p.name, kg: Number(p.kg.toFixed(1)), clp: Math.round(p.clp) }))
+      .filter((p) => p.clp > 0)
+      .sort((a, b) => b.clp - a.clp)
       .slice(0, 8);
 
     deltaLines.sort((a, b) => Math.abs(b.sold - b.packed) - Math.abs(a.sold - a.packed));
     const deltaCount = deltaLines.length;
     const deltaTop = deltaLines.slice(0, 5);
 
-    return { totalOrders, anuladas, incompleteInvoicing, pendingProductionLines, deltaCount, deltaLines: deltaTop, vendedorArr, productArr };
+    const avgTicketCLP = invoicedOrdersCount > 0 ? totalRevenueCLP / invoicedOrdersCount : 0;
+
+    return { totalOrders, anuladas, incompleteInvoicing, pendingProductionLines, deltaCount, deltaLines: deltaTop, vendedorArr, productArr, totalRevenueCLP, avgTicketCLP };
   }, [filtered, gramsByFormat]);
 
   const [syncModal, setSyncModal] = useState<null | { payload: unknown }>(null);
@@ -173,33 +185,33 @@ export default function Panel() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <MetricCard label="Pedidos" value={metrics.totalOrders} sublabel={metrics.anuladas > 0 ? `${metrics.anuladas} anulados` : undefined} />
+        <MetricCard label="Ventas facturadas" value={formatCLP(metrics.totalRevenueCLP)} sublabel={metrics.avgTicketCLP > 0 ? `Ticket ~${formatCLP(metrics.avgTicketCLP)}` : undefined} />
         <MetricCard label="Facturación incompleta" value={metrics.incompleteInvoicing} tone={metrics.incompleteInvoicing > 0 ? 'warn' : 'ok'} />
-        <MetricCard label="Líneas a producción" value={metrics.pendingProductionLines} sublabel={metrics.pendingProductionLines > 0 ? 'en pedidos abiertos' : undefined} />
         <MetricCard label="Delta empacado/vendido" value={metrics.deltaCount} sublabel="líneas con diferencia" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <ChartCard title="Kg por vendedor">
+        <ChartCard title="Ventas por vendedor (CLP)">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={metrics.vendedorArr} margin={{ top: 8, right: 8, left: 0, bottom: 24 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e2dd" vertical={false} />
               <XAxis dataKey="name" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} interval={0} angle={-25} textAnchor="end" dy={4} />
-              <YAxis stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5e2dd', fontSize: 12 }} formatter={(v) => [`${v} kg`, 'Kg']} />
-              <Bar dataKey="kg" radius={[3, 3, 0, 0]}>
+              <YAxis stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${Math.round((v as number) / 1000)}k`} />
+              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5e2dd', fontSize: 12 }} formatter={(v) => [formatCLP(v as number), 'Ventas']} />
+              <Bar dataKey="clp" radius={[3, 3, 0, 0]}>
                 {metrics.vendedorArr.map((_, i) => <Cell key={i} fill={i === 0 ? '#a8834a' : '#4d3b28'} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-        <ChartCard title="Kg por producto (top 8)">
+        <ChartCard title="Top productos por venta (top 8)">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={metrics.productArr} layout="vertical" margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e2dd" horizontal={false} />
-              <XAxis type="number" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis dataKey="name" type="category" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} width={130} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5e2dd', fontSize: 12 }} formatter={(v) => [`${v} kg`, 'Kg']} />
-              <Bar dataKey="kg" fill="#7a5f42" radius={[0, 3, 3, 0]} />
+              <XAxis type="number" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${Math.round((v as number) / 1000)}k`} />
+              <YAxis dataKey="name" type="category" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} width={140} />
+              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5e2dd', fontSize: 12 }} formatter={(v) => [formatCLP(v as number), 'Ventas']} />
+              <Bar dataKey="clp" fill="#7a5f42" radius={[0, 3, 3, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>

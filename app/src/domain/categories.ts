@@ -1,18 +1,12 @@
 // Product category slugs and their user-visible labels. The order of the
 // keys defines display order across the catalog / wizard product picker.
 export const CATEGORY_LABEL: Record<string, string> = {
-  'jamones': 'Jamones',
-  'pastramis': 'Pastramis',
-  'mortadelas': 'Mortadelas',
-  'salames': 'Salames',
-  'chorizos': 'Chorizos y fuet',
-  'cabanossi': 'Cabanossi',
-  'embutidos-frescos': 'Embutidos frescos',
-  'carnes-curadas': 'Carnes curadas',
-  'quesos': 'Quesos',
-  'tablas': 'Tablas charcuteras',
-  'untables': 'Untables y patés',
+  'cocidos': 'Charcutería cocida',
+  'madurados': 'Charcutería madurada',
+  'longanizas': 'Longanizas y vienesas ahumadas',
+  'untables': 'Untables',
   'charqui': 'Charqui',
+  'tablas': 'Tablas charcuteras',
 };
 
 const ORDER = Object.keys(CATEGORY_LABEL);

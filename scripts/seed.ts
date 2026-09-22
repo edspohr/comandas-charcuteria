@@ -107,29 +107,30 @@ async function seedCatalog() {
 // so the demo can exercise the confirmado_parcial + Registrar producción flows.
 // Keyed by "productId::formatId"; anything unlisted defaults to a comfortable buffer.
 const initialOnHand: Record<string, number> = {
-  // Longaniza 5 kg: seeded orders consume 64 (PED-0002/0009/0010/0017) and reserve
-  // 18 more. Start at 90 so the wizard shows "8 disponibles" for the demo split
-  // and the Producción card can promise the ~12 pending → 24 after the demo order.
-  'longaniza-chillan::sachet-5kg': 90,
-  'longaniza-chillan::sachet-1kg': 24,
-  'longaniza-chillan::sachet-500g': 30,
-  'coppa::pieza': 12,                     // PED-0037 splits at 4 reserved / 6 pending; keep headroom
-  'brisket::pieza': 6,
+  // Longaniza chillán granel: PED-0029 pide 20 kg del wizard demo → 8 disponibles
+  // + 12 a producción. Suma también: PED-0002/0009/0010/0017 = 64, reservas
+  // abiertas ~ 26. Start at 100 → 100 − 64 − 28 = 8 disponibles.
+  'longaniza-chillan::granel-kg': 100,
+  'longaniza-chillan::sachet-4u-400g': 30,
+  'coppa::pieza': 10,                       // PED-0037 splits at 4 reserved / 6 pending; el wizard demo puede pedir hasta 4 más
+  'coppa::granel-kg': 15,
+  'coppa::sachet-100g': 40,
+  'pastrami-americano::pieza': 6,
   'jamon-cocido::sachet-200g': 200,
-  'jamon-cocido::sachet-500g': 80,
-  'jamon-cocido::sachet-1kg': 30,
   'jamon-cocido::granel-kg': 25,
-  'mortadela-pistacho::granel-kg': 20,
-  'gouda-ahumado::sachet-200g': 200,
-  'gouda-ahumado::sachet-500g': 60,
+  'jamon-ahumado::sachet-200g': 100,
+  'jamon-ahumado::granel-kg': 25,
+  'mortadela-pistacho::granel-kg': 30,
+  'mortadela-pistacho::sachet-200g': 100,
+  'queso-gouda-ahumado::sachet-200g': 200,
+  'queso-gouda-ahumado::granel-kg': 30,
   'salame-italiano::pieza': 40,
   'salame-milano::pieza': 40,
   'salame-angus::pieza': 30,
-  'cabanossi-x12::sachet-x12': 60,
+  'cabanossi-polaco::unidad-20g': 500,
+  'cabanossi-polaco::caja-20u': 30,
   'tabla-150::tabla-150': 100,
   'tabla-200::tabla-200': 60,
-  'tabla-120::tabla-120': 100,
-  'nduja::pote-150g': 10,
 };
 const DEFAULT_ONHAND = 40;
 

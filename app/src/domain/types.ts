@@ -28,6 +28,14 @@ export interface ProductFormat {
   label: string;
   unit: Unit;
   grams?: number;
+  // Pricing (CLP con IVA). Two possible shapes depending on the format:
+  //   - Fixed-weight sachets / units → `priceCLP` per unit (qty × priceCLP).
+  //   - Weight-based formats (granel-kg, pieza) → `pricePerKgCLP` × weight.
+  // For `pieza` formats we also carry `avgWeightKg` so the UI can preview a
+  // valorization at order time before the packer weighs the piece.
+  priceCLP?: number;
+  pricePerKgCLP?: number;
+  avgWeightKg?: number;
 }
 
 export interface Product {
@@ -83,6 +91,12 @@ export interface OrderLine {
   pendingProductionQty: number;
   packedQty?: number;
   packedWeightKg?: number;
+  // Valorization snapshot (CLP con IVA). Stored so historic orders keep
+  // their price even if the catalog moves later. For pieza formats the
+  // estimated subtotal at order time uses `avgWeightKg`; on markArmado we
+  // overwrite with the actual `packedWeightKg`-based figure.
+  unitPriceSnapshotCLP?: number;
+  subtotalCLP?: number;
 }
 
 export interface StatusEvent {
@@ -117,6 +131,9 @@ export interface Order {
   invoicingComplete: boolean;
   createdAt: number;
   updatedAt: number;
+  // Sum of lines[].subtotalCLP. Kept as a denormalized snapshot so the Panel
+  // aggregations don't need to look up the catalog.
+  totalCLP?: number;
 }
 
 export interface StockMovement {

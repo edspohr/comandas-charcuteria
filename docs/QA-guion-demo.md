@@ -271,3 +271,39 @@ Re-corrí el guión completo **contra la URL en vivo** (bundle `index-Dk-e-T1l.j
 - `mapear código → mensaje` para la sección catalogo del `Panel.tsx` cuando `Sincronizar Bsale` genera una excepción — hoy toma solo el happy path.
 - Historial de `stockMovements` en Catálogo (mencionado en #9 paso 10 del README anterior) sigue sin vista; el ajuste queda registrado pero no se puede ver desde la UI.
 - Tests de reglas (necesitan JDK). El archivo está actualizado y limpio de duplicados pero no corrió.
+
+---
+
+## Revisión de los bloques A–D (`30908b2` … `1783f25`) — 22-09-2026, 17:30
+
+Guión completo re-corrido **en vivo** (bundle `index-B9o_0GIF.js`) con reseed al final. `npm run typecheck` limpio; `verify-parser.ts` 10/10 + 4/4.
+
+### Verificado en vivo ✅
+| # | Evidencia |
+|---|---|
+| 25 | Con las reglas nuevas: vendedor crea `PED-2026-0041` (counter `orders-2026` + `stock.reserved`), vendedor anula PED-0030 (libera reserva), despacho marca armado (onHand/reserved), producción registra 6 u de coppa, admin factura (counter `bsale-2026`). Ninguna transacción denegada. |
+| 26 | Tarjetas con `aria-label` ("Ingresar como Rafael, Vendedor", "Elegir cliente Sofá"). |
+| 11 / 17 | Grilla del paso 2 arranca en Jamones → Pastramis → Mortadelas → Salames…; Catálogo muestra etiquetas. |
+| 28 | Tarjeta "Repetir último pedido · PED-2026-0030 · 22 de sep · 2 líneas" visible en el paso 2. |
+| 18 | Confirmar muestra Cliente (razón social, RUT/“Sin RUT”) + Entrega (fecha, modalidad, dirección) + aviso de facturación incompleta. |
+| 21 | 16:45 Santiago → fecha por defecto 24-sep (día+2, pasado el cutoff de 15:00). Correcto. |
+| 29 | PED-2026-0030 ahora `confirmado` (ya no hay `recibido`). |
+| 12 / 13 | Nav de Miguel arranca en Facturación · Panel · Catálogo; Edu y Yuri ven la barra con su único ítem. |
+| 14 | Cola sin pedidos `armado`; toast "Pedido PED-2026-0041 marcado como armado" al volver. |
+| 19 | Diálogo "Facturar pedido" con aviso de irreversibilidad antes de emitir; luego `FA-000823`. |
+| 33 | Banner de despacho ya no nombra a Yuri (verificado en pase anterior con el bloqueo). |
+| Panel | Delta 1 línea (2,5 vs 3 kg), 2 anulados, "Líneas a producción · en pedidos abiertos". |
+
+No verificado en vivo: #16 (no forcé ningún error), #36 (ídem), #23 (no tenía draft con líneas al pegar), #30 (no abrí un detalle parcial como vendedor).
+
+### Observaciones nuevas
+
+**39. (P1, antes de la demo) La transición `autoUpdate` → `prompt` deja pegados a los dispositivos que ya tenían la app.** El SW nuevo queda en `waiting: installed` y el viejo sigue controlando, pero el bundle viejo (`Dk-e-T1l`) no tiene el toast que envía `SKIP_WAITING`. Recargar no alcanza (lo probé dos veces); hay que **cerrar todas las pestañas/la PWA** y volver a abrir, o borrar datos del sitio. Lo destrabé a mano con `registration.waiting.postMessage({type:'SKIP_WAITING'})`. La nota del README ("van a ver el toast en la próxima visita") es falsa para esta transición puntual; corregirla: "cerrar la app por completo una vez". A partir del próximo deploy el toast sí debería aparecer — queda por confirmar en el siguiente deploy.
+
+**40. README paso 8 sigue diciendo "la línea de granel ajustada en el paso 5"** — con el reorden ahora es el paso 6.
+
+**41. Registrar 6 u de coppa (= pendiente) no promovió ningún pedido.** El modal dijo "Reasignadas 6 u a pedidos pendientes" sin lista de promovidos. Antes del cambio, `coppa::pieza` tenía 2 en bodega / 10 reservado / 6 pendiente; con onHand 12 en la seed nueva la card seguía mostrando "A producir 6 u · En bodega 10 · Reservado 10 · Disponible 0". Verificar si el pendiente está repartido entre PED-0021 y PED-0037 (entonces es correcto que ninguno se complete) o si hay un off-by en la promoción cuando `qty == pendiente`.
+
+**42. Copy del diálogo de facturar:** "con las 1 línea armada" → concordancia ("con 1 línea armada" / "con las 3 líneas armadas").
+
+**43. La tarjeta "Repetir último pedido" del paso 2 no es un `<button>`** (el árbol de accesibilidad la lista como `generic`); confirmar que sea tocable y darle rol/aria-label como al resto.

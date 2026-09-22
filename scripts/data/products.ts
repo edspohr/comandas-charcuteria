@@ -1,19 +1,28 @@
-import type { Product } from '../../app/src/domain/types.ts';
+import type { Product, ProductFormat } from '../../app/src/domain/types.ts';
 
-const SACHET_200: Product['formats'][number] = { formatId: 'sachet-200g', label: 'Sachet 200 g', unit: 'unidad', grams: 200 };
-const SACHET_500: Product['formats'][number] = { formatId: 'sachet-500g', label: 'Sachet 500 g', unit: 'unidad', grams: 500 };
-const SACHET_1KG: Product['formats'][number] = { formatId: 'sachet-1kg',  label: 'Sachet 1 kg',  unit: 'unidad', grams: 1000 };
-const SACHET_5KG: Product['formats'][number] = { formatId: 'sachet-5kg',  label: 'Sachet 5 kg',  unit: 'unidad', grams: 5000 };
-const PIEZA:      Product['formats'][number] = { formatId: 'pieza',       label: 'Pieza entera', unit: 'unidad' };
-const GRANEL:     Product['formats'][number] = { formatId: 'granel-kg',   label: 'Granel laminado (kg)', unit: 'kg' };
-const POTE_150:   Product['formats'][number] = { formatId: 'pote-150g',   label: 'Pote 150 g',   unit: 'unidad', grams: 150 };
-const POTE_250:   Product['formats'][number] = { formatId: 'pote-250g',   label: 'Pote 250 g',   unit: 'unidad', grams: 250 };
+// Catálogo transcrito del PDF oficial de La Charcutería (catálogo de agosto).
+// Precios (CLP con IVA) del pricelist "Precios directos de fábrica al por mayor · Agosto".
+// Tres tipos de precio por producto según el pricelist:
+//   - Sachet: precio por unidad de sachet (fijo).
+//   - Kilo Laminado (granel-kg): precio por kg de producto laminado.
+//   - Kilo Pza (pieza): precio por kg × peso real de la pieza al facturar.
+
+// ----- Helpers de formato
+
+const sachet = (id: string, label: string, grams: number, priceCLP: number): ProductFormat =>
+  ({ formatId: id, label, unit: 'unidad', grams, priceCLP });
+
+const granel = (pricePerKgCLP: number): ProductFormat =>
+  ({ formatId: 'granel-kg', label: 'Granel laminado (kg)', unit: 'kg', pricePerKgCLP });
+
+const pieza = (avgWeightKg: number, pricePerKgCLP: number, label = 'Pieza entera'): ProductFormat =>
+  ({ formatId: 'pieza', label, unit: 'unidad', pricePerKgCLP, avgWeightKg });
 
 const p = (
   id: string,
   name: string,
   category: string,
-  formats: Product['formats'],
+  formats: ProductFormat[],
   opts: Partial<Pick<Product, 'discontinued' | 'active' | 'aliases'>> = {},
 ): Product => ({
   id, name, category,
@@ -24,81 +33,226 @@ const p = (
 });
 
 export const products: Product[] = [
-  // Jamones cocidos y ahumados
-  // Single-word aliases like 'cocido' / 'ahumado' were pulling generic
-  // phrases (e.g. "gouda ahumado x 10") into the wrong product. Keep only
-  // the full two-word form.
-  p('jamon-cocido',           'Jamón cocido',            'jamones',   [SACHET_200, SACHET_500, SACHET_1KG, PIEZA, GRANEL], { aliases: ['jamon cocido'] }),
-  p('jamon-ahumado',          'Jamón ahumado',           'jamones',   [SACHET_200, SACHET_500, PIEZA, GRANEL], { aliases: ['jamon ahumado'] }),
-  p('lomo-kassler',           'Lomo Kassler',            'jamones',   [SACHET_200, SACHET_500, PIEZA, GRANEL], { aliases: ['kassler'] }),
-  p('pastrami-vacuno',        'Pastrami vacuno',         'pastramis', [SACHET_200, SACHET_500, PIEZA, GRANEL], { aliases: ['pastrami res'] }),
-  p('pastrami-cerdo',         'Pastrami cerdo',          'pastramis', [SACHET_200, SACHET_500, PIEZA, GRANEL]),
-  p('pastirma-vacuno',        'Pastirma de vacuno',      'pastramis', [PIEZA], { discontinued: true, active: false, aliases: ['pastirma'] }),
+  // -------------------- LONGANIZAS - VIENESAS AHUMADAS --------------------
+  p('butifarra', 'Butifarra', 'longanizas',
+    [sachet('sachet-4u-400g', 'Sachet 4 unidades (400 g)', 400, 10400),
+     granel(10400)]),
 
-  // Mortadelas
-  // 'pistacho' alone matched too eagerly; 'mortadela' is fine as it uniquely maps.
-  p('mortadela-pistacho',     'Mortadela pistacho',      'mortadelas', [SACHET_200, PIEZA, GRANEL], { aliases: ['mortadela'] }),
-  p('mortadela-clasica',      'Mortadela clásica',       'mortadelas', [SACHET_200, PIEZA, GRANEL]),
+  p('longaniza-chillan', 'Longaniza tipo Chillán', 'longanizas',
+    [sachet('sachet-4u-400g', 'Sachet 4 unidades (400 g)', 400, 10400),
+     granel(10400)],
+    { aliases: ['longaniza chillan', 'chillan'] }),
 
-  // Salames
-  p('salame-italiano',        'Salame italiano',         'salames',   [PIEZA, GRANEL], { aliases: ['italiano'] }),
-  p('salame-milano',          'Salame Milano',           'salames',   [PIEZA, GRANEL], { aliases: ['milano'] }),
-  p('salame-angus',           'Salame Angus',            'salames',   [PIEZA, GRANEL], { aliases: ['angus'] }),
-  p('salame-campesino',       'Salame campesino',        'salames',   [PIEZA, GRANEL]),
-  p('coppa',                  'Coppa',                   'salames',   [PIEZA, GRANEL]),
+  p('longaniza-polaca', 'Longaniza Polaca', 'longanizas',
+    [sachet('sachet-4u-400g', 'Sachet 4 unidades (400 g)', 400, 10400),
+     granel(10400)]),
 
-  // Chorizos y fuet
-  p('chorizo-espanol',        'Chorizo español',         'chorizos',  [SACHET_200, PIEZA, GRANEL], { aliases: ['chorizo'] }),
-  p('fuet-tradicional',       'Fuet tradicional',        'chorizos',  [PIEZA]),
-  p('fuet-cranberries',       'Fuet con cranberries',    'chorizos',  [PIEZA], { aliases: ['fuet arandanos'] }),
+  p('mix-longanizas', 'Mix de Longanizas', 'longanizas',
+    [sachet('sachet-4u-400g', 'Sachet 4 unidades (400 g)', 400, 10400),
+     granel(10400)]),
 
-  // Cabanossi
-  p('cabanossi-x3',           'Cabanossi x3',            'cabanossi', [{ formatId: 'sachet-x3', label: 'Sachet x3 unidades', unit: 'unidad', grams: 180 }], { aliases: ['cabanossi 3'] }),
-  p('cabanossi-x12',          'Cabanossi x12',           'cabanossi', [{ formatId: 'sachet-x12', label: 'Sachet x12 unidades', unit: 'unidad', grams: 720 }], { aliases: ['cabanossi 12'] }),
+  p('prieta', 'Prieta', 'longanizas',
+    [sachet('sachet-2u-275g', 'Sachet 2 unidades (275 g)', 275, 10400)]),
 
-  // Embutidos frescos
-  p('longaniza-chillan',      'Longaniza chillán',       'embutidos-frescos', [SACHET_500, SACHET_1KG, SACHET_5KG], { aliases: ['longaniza', 'chillan'] }),
-  p('longaniza-polaca',       'Longaniza polaca',        'embutidos-frescos', [SACHET_500, SACHET_1KG]),
-  p('butifarra',              'Butifarra',               'embutidos-frescos', [SACHET_500, SACHET_1KG]),
-  p('prieta',                 'Prieta',                  'embutidos-frescos', [SACHET_500, SACHET_1KG]),
-  p('chistorra',              'Chistorra',               'embutidos-frescos', [SACHET_500, SACHET_1KG]),
-  p('choricillo',             'Choricillo',              'embutidos-frescos', [SACHET_500, SACHET_1KG]),
+  p('vienesa-frankfurt', 'Vienesa Frankfurt', 'longanizas',
+    [sachet('sachet-5u-350g', 'Sachet 5 unidades (350 g)', 350, 10350)],
+    { aliases: ['vienesa'] }),
 
-  // Carnes curadas
-  p('brisket',                'Brisket ahumado',         'carnes-curadas', [PIEZA, GRANEL], { aliases: ['brisket ahumado'] }),
-  p('guanciale',              'Guanciale',               'carnes-curadas', [PIEZA, GRANEL]),
-  p('panceta-curada',         'Panceta curada',          'carnes-curadas', [PIEZA, GRANEL]),
-  p('bacon-ahumado',          'Bacon ahumado',           'carnes-curadas', [SACHET_200, SACHET_500, GRANEL], { aliases: ['tocino'] }),
+  p('chistorra', 'Chistorra Ahumada', 'longanizas',
+    [sachet('sachet-5u-350g', 'Sachet 5 unidades (350 g)', 350, 12000)]),
 
-  // Quesos ahumados
-  p('gouda-ahumado',          'Queso Gouda ahumado',     'quesos',    [SACHET_200, SACHET_500, PIEZA, GRANEL], { aliases: ['gouda'] }),
-  p('cabra-ahumado',          'Queso de cabra ahumado',  'quesos',    [PIEZA, GRANEL], { aliases: ['queso cabra'] }),
+  // -------------------- PRODUCTOS MADURADOS --------------------
+  p('bresaola', 'Bresaola', 'madurados',
+    [sachet('sachet-100g', 'Sachet 100 g', 100, 3000),
+     granel(30000),
+     pieza(1.75, 27370, 'Pieza entera (1,5–2 kg)')]),
 
-  // Tablas charcuteras
-  p('tabla-120',              'Tabla charcutera 120 g',  'tablas',    [{ formatId: 'tabla-120', label: 'Tabla 120 g', unit: 'unidad', grams: 120 }], { aliases: ['tabla 120'] }),
-  p('tabla-150',              'Tabla charcutera 150 g',  'tablas',    [{ formatId: 'tabla-150', label: 'Tabla 150 g', unit: 'unidad', grams: 150 }]),
-  p('tabla-200',              'Tabla charcutera 200 g',  'tablas',    [{ formatId: 'tabla-200', label: 'Tabla 200 g', unit: 'unidad', grams: 200 }]),
-  p('tabla-250',              'Tabla charcutera 250 g',  'tablas',    [{ formatId: 'tabla-250', label: 'Tabla 250 g', unit: 'unidad', grams: 250 }]),
+  p('cabanossi-polaco', 'Cabanossi Polaco', 'madurados',
+    [{ formatId: 'unidad-20g', label: 'Unidad 20 g', unit: 'unidad', grams: 20, priceCLP: 650 },
+     { formatId: 'caja-20u',   label: 'Caja 20 unidades', unit: 'unidad', grams: 400, priceCLP: 13000 }],
+    { aliases: ['cabanossi'] }),
 
-  // Untables
-  p('pate-campesino',         'Paté campesino',          'untables',  [POTE_150, POTE_250]),
-  p('pate-hongos',            'Paté de hongos',          'untables',  [POTE_150, POTE_250]),
-  p('rillette-cerdo',         'Rillette de cerdo',       'untables',  [POTE_150, POTE_250]),
-  p('mantequilla-tocino',     'Mantequilla de tocino',   'untables',  [POTE_150]),
+  p('coppa', 'Coppa', 'madurados',
+    [sachet('sachet-100g', 'Sachet 100 g', 100, 2480),
+     granel(24800),
+     pieza(1.75, 23800, 'Pieza entera (1,5–2 kg)')]),
 
-  // Charqui
-  p('charqui-vacuno',         'Charqui de vacuno',       'charqui',   [SACHET_200, GRANEL], { aliases: ['charqui'] }),
-  p('charqui-cerdo',          'Charqui de cerdo',        'charqui',   [SACHET_200, GRANEL]),
+  p('chorizo-espanol', 'Chorizo Español', 'madurados',
+    [sachet('sachet-100g', 'Sachet 100 g', 100, 1690),
+     granel(16900),
+     pieza(2.25, 15600, 'Pieza entera (2–2,5 kg)')],
+    { aliases: ['chorizo'] }),
 
-  // Otros
-  p('salchicha-parrillera',   'Salchicha parrillera',    'embutidos-frescos', [SACHET_500, SACHET_1KG]),
-  p('salchicha-viena',        'Salchicha viena',         'embutidos-frescos', [SACHET_500, SACHET_1KG]),
-  p('morcilla',               'Morcilla',                'embutidos-frescos', [SACHET_500, SACHET_1KG]),
-  p('speck',                  'Speck',                   'jamones',   [PIEZA, GRANEL]),
-  p('prosciutto',             'Prosciutto crudo',        'jamones',   [PIEZA, GRANEL]),
-  p('lardo',                  'Lardo curado',            'carnes-curadas', [PIEZA, GRANEL]),
-  p('cecina-chilena',         'Cecina chilena',          'carnes-curadas', [SACHET_200, GRANEL], { aliases: ['cecina'] }),
-  p('salame-picante',         'Salame picante',          'salames',   [PIEZA, GRANEL]),
-  p('sopressata',             'Sopressata',              'salames',   [PIEZA, GRANEL]),
-  p('nduja',                  '’Nduja',              'untables',  [POTE_150]),
+  p('fuet-espanol', 'Fuet Español', 'madurados',
+    [{ formatId: 'pieza-90g', label: 'Pieza 90 g', unit: 'unidad', grams: 90, priceCLP: 1700 }],
+    { aliases: ['fuet'] }),
+
+  p('fuet-cranberry', 'Fuet Cranberries', 'madurados',
+    [{ formatId: 'pieza-90g', label: 'Pieza 90 g', unit: 'unidad', grams: 90, priceCLP: 2350 }],
+    { aliases: ['fuet cranberries', 'fuet arandanos'] }),
+
+  p('guanciale', 'Guanciale Madurado', 'madurados',
+    [pieza(1.5, 22000, 'Pieza entera (1–2 kg)')]),
+
+  p('lomo-embuchado', 'Lomo Embuchado', 'madurados',
+    [sachet('sachet-100g', 'Sachet 100 g', 100, 1900),
+     granel(19000),
+     pieza(1.25, 18000, 'Pieza entera (1–1,5 kg)')]),
+
+  p('panceta-madurada', 'Panceta Madurada', 'madurados',
+    [sachet('sachet-100g', 'Sachet 100 g', 100, 2480),
+     granel(24800),
+     pieza(4.5, 23800, 'Pieza entera (4–5 kg)')]),
+
+  p('pastirma-cerdo', 'Pastirma de Cerdo', 'madurados',
+    [sachet('sachet-100g', 'Sachet 100 g', 100, 2480),
+     granel(24800),
+     pieza(1.75, 23800, 'Pieza entera (1,5–2 kg)')]),
+
+  p('pastirma-vacuno', 'Pastirma de Vacuno', 'madurados',
+    [sachet('sachet-100g', 'Sachet 100 g', 100, 3000),
+     granel(30000),
+     pieza(1.75, 27370, 'Pieza entera (1,5–2 kg)')]),
+
+  p('pepperoni-madurado', 'Pepperoni Madurado', 'madurados',
+    [sachet('sachet-100g', 'Sachet 100 g', 100, 1660),
+     granel(16600),
+     pieza(2.15, 15600, 'Pieza entera (2–2,3 kg)')],
+    { aliases: ['pepperoni'] }),
+
+  p('salame-milano', 'Salame Milano', 'madurados',
+    [sachet('sachet-100g', 'Sachet 100 g', 100, 1760),
+     granel(17600),
+     pieza(3, 16600, 'Pieza entera (2,5–3,5 kg)')],
+    { aliases: ['milano'] }),
+
+  p('salame-angus', 'Salame Angus', 'madurados',
+    [sachet('sachet-100g', 'Sachet 100 g', 100, 2066),
+     granel(20660),
+     pieza(2.25, 19660, 'Pieza entera (2–2,5 kg)')],
+    { aliases: ['angus'] }),
+
+  p('salame-italiano', 'Salame Italiano', 'madurados',
+    [sachet('sachet-100g', 'Sachet 100 g', 100, 1690),
+     granel(16600),
+     pieza(2.25, 15600, 'Pieza entera (2–2,5 kg)')],
+    { aliases: ['italiano'] }),
+
+  p('jamon-serrano', 'Jamón Serrano', 'madurados',
+    [sachet('sachet-500g', 'Sachet 500 g', 500, 15000),
+     granel(30000)]),
+
+  // -------------------- CHARQUI --------------------
+  p('charqui-vacuno', 'Charqui de Vacuno', 'charqui',
+    [sachet('sachet-30g', 'Sachet 30 g', 30, 2700),
+     granel(89100)],
+    { aliases: ['charqui'] }),
+
+  p('charqui-cerdo', 'Charqui de Cerdo', 'charqui',
+    [sachet('sachet-30g', 'Sachet 30 g', 30, 2100),
+     granel(60000)]),
+
+  // -------------------- PRODUCTOS COCIDOS --------------------
+  p('arrolado-huaso', 'Arrollado Huaso', 'cocidos',
+    [pieza(1.75, 12500, 'Pieza entera (1,5–2 kg)')],
+    { aliases: ['arrolado', 'arrollado'] }),
+
+  p('porchetta', 'Porchetta', 'cocidos',
+    [pieza(4.5, 23520, 'Pieza entera (4–5 kg, pedido mínimo 1 pieza)')]),
+
+  p('chicharron', 'Chicharrón', 'cocidos',
+    [{ formatId: 'granel-1kg', label: 'Granel 1 kg', unit: 'unidad', grams: 1000, priceCLP: 30000 }]),
+
+  p('chuleta-kassler', 'Chuleta Kassler', 'cocidos',
+    [{ formatId: 'sachet-2u', label: 'Sachet 2 unidades', unit: 'unidad', priceCLP: 9000 },
+     granel(8490)]),
+
+  p('jamon-cocido', 'Jamón Cocido Artesanal', 'cocidos',
+    [sachet('sachet-200g', 'Sachet 200 g', 200, 2500),
+     granel(12000),
+     pieza(4.5, 12000, 'Pieza entera (4–5 kg)')],
+    { aliases: ['jamon cocido'] }),
+
+  p('jamon-ahumado', 'Jamón de Pierna Ahumado Artesanal', 'cocidos',
+    [sachet('sachet-200g', 'Sachet 200 g', 200, 2600),
+     granel(12500),
+     pieza(4.5, 12500, 'Pieza entera (4–5 kg)')],
+    { aliases: ['jamon ahumado', 'jamon de pierna'] }),
+
+  p('gran-biscotto', 'Gran Biscotto', 'cocidos',
+    [sachet('sachet-200g', 'Sachet 200 g', 200, 3000),
+     granel(15000),
+     pieza(4.5, 14268, 'Pieza entera (4–5 kg)')]),
+
+  p('lomo-kassler', 'Lomo Kassler', 'cocidos',
+    [sachet('sachet-200g', 'Sachet 200 g', 200, 2600),
+     granel(13000),
+     pieza(1.75, 11650, 'Pieza entera (1,5–2 kg)')],
+    { aliases: ['kassler'] }),
+
+  p('lomo-kassler-medallon', 'Lomo Kassler Medallón', 'cocidos',
+    [{ formatId: 'caja-10u', label: 'Caja 10 unidades', unit: 'unidad', priceCLP: 8990 }]),
+
+  p('mortadela-pistacho', 'Mortadela con Pistacho', 'cocidos',
+    [sachet('sachet-200g', 'Sachet 200 g', 200, 2500),
+     granel(12500),
+     pieza(4, 11990, 'Pieza entera (4 kg)')],
+    { aliases: ['mortadela'] }),
+
+  p('pastrami-cerdo', 'Pastrami de Cerdo', 'cocidos',
+    [sachet('sachet-200g', 'Sachet 200 g', 200, 2500),
+     granel(12500),
+     pieza(1.75, 11890, 'Pieza entera (1,5–2 kg)')]),
+
+  p('pastrami-vacuno', 'Pastrami de Vacuno', 'cocidos',
+    [sachet('sachet-200g', 'Sachet 200 g', 200, 4200),
+     granel(21000),
+     pieza(2.25, 20500, 'Pieza entera (2–2,5 kg)')]),
+
+  p('panceta-ahumada', 'Panceta Ahumada', 'cocidos',
+    [sachet('sachet-200g', 'Sachet 200 g', 200, 3500),
+     granel(17500),
+     pieza(4.5, 17500, 'Pieza entera (4–5 kg)')]),
+
+  p('pastrami-americano', 'Pastrami Americano Tapapecho Angus', 'cocidos',
+    [pieza(3.5, 27700, 'Pieza entera (3–4 kg)')],
+    { aliases: ['tapapecho', 'pastrami americano', 'brisket'] }),
+
+  p('queso-cabra-ahumado', 'Queso de Cabra Ahumado', 'cocidos',
+    [pieza(4, 16730, 'Pieza entera (4 kg)')],
+    { aliases: ['queso cabra'] }),
+
+  p('queso-gouda-ahumado', 'Queso Gouda Ahumado', 'cocidos',
+    [sachet('sachet-200g', 'Sachet 200 g', 200, 3250),
+     granel(16250),
+     pieza(3.75, 16053, 'Pieza entera (3,5–4 kg)')],
+    { aliases: ['gouda', 'queso gouda'] }),
+
+  p('salmon-ahumado', 'Salmón Ahumado', 'cocidos',
+    [pieza(1, 40000, 'Pieza entera (1 kg)')]),
+
+  // -------------------- PRODUCTOS UNTABLES --------------------
+  p('pepperoni-untable', 'Pepperoni Untable', 'untables',
+    [{ formatId: 'frasco-110g', label: 'Frasco 110 g', unit: 'unidad', grams: 110, priceCLP: 19990 }]),
+
+  p('sobrasada-untable', 'Sobrasada Española Untable', 'untables',
+    [{ formatId: 'frasco-200g', label: 'Frasco 200 g', unit: 'unidad', grams: 200, priceCLP: 22500 }],
+    { aliases: ['sobrasada'] }),
+
+  p('tocino-aleman-untable', 'Tocino Alemán Ahumado Untable', 'untables',
+    [{ formatId: 'frasco-110g', label: 'Frasco 110 g', unit: 'unidad', grams: 110, priceCLP: 19990 }],
+    { aliases: ['tocino aleman'] }),
+
+  p('pate-campo', 'Paté de Campo', 'untables',
+    [{ formatId: 'unidad-125g', label: 'Unidad 125 g', unit: 'unidad', grams: 125, priceCLP: 12000 }],
+    { aliases: ['pate'] }),
+
+  // -------------------- TABLAS CHARCUTERAS --------------------
+  p('tabla-150', 'Tabla Charcutera 150 g', 'tablas',
+    [{ formatId: 'tabla-150', label: 'Tabla 150 g', unit: 'unidad', grams: 150, priceCLP: 2990 }],
+    { aliases: ['tabla 150'] }),
+
+  p('tabla-200', 'Tabla Charcutera 200 g', 'tablas',
+    [{ formatId: 'tabla-200', label: 'Tabla 200 g', unit: 'unidad', grams: 200, priceCLP: 4050 }],
+    { aliases: ['tabla 200'] }),
 ];

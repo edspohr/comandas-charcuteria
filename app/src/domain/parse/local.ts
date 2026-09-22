@@ -42,15 +42,21 @@ const QTY_PATTERNS: Array<{ re: RegExp; unit: Unit; formatHint?: string }> = [
 ];
 
 // Format hints — extra tokens that pin a specific format when the qty regex didn't already fix it.
+// Order matters: more specific tokens (250 g pote) come before the generic pote fallback.
 const FORMAT_HINTS: Array<{ tokens: RegExp; formatIdHint: string }> = [
-  { tokens: /\bgranel|\blaminado/i,   formatIdHint: 'granel-kg' },
-  { tokens: /\bpieza\s*entera|\bpieza/i, formatIdHint: 'pieza' },
-  { tokens: /\bx\s*12\b/i,            formatIdHint: 'sachet-x12' },
-  { tokens: /\bx\s*3\b/i,             formatIdHint: 'sachet-x3' },
-  { tokens: /\bpote\s*250/i,          formatIdHint: 'pote-250g' },
-  { tokens: /\bpote\s*150|\bpote/i,   formatIdHint: 'pote-150g' },
+  { tokens: /\bgranel|\blaminado/i,          formatIdHint: 'granel-kg' },
+  { tokens: /\bpieza\s*entera|\bpieza/i,     formatIdHint: 'pieza' },
+  { tokens: /\bx\s*12\b/i,                    formatIdHint: 'sachet-x12' },
+  { tokens: /\bx\s*3\b/i,                     formatIdHint: 'sachet-x3' },
+  { tokens: /\bpote[\s\w]*?250|250[\s\w]*?pote/i, formatIdHint: 'pote-250g' },
+  { tokens: /\bpote[\s\w]*?150|150[\s\w]*?pote/i, formatIdHint: 'pote-150g' },
+  { tokens: /\bpote/i,                        formatIdHint: 'pote-150g' },
 ];
 
+// Note keywords: extra hints ("laminado fino", "sin jugo") that describe HOW to
+// pack the line, not the product itself. Words that appear in a product name
+// (e.g. "pistacho" in "Mortadela pistacho") are filtered out below in
+// extractNotes so we don't leave notes like `notas: "pistacho"` on the mortadela.
 const NOTE_KEYWORDS = /\b(laminado\s+fino|sin\s+jugo|empaque\s+transparente|urgente|fino|grueso|entero|arandanos|cranberries|pistacho|picante)\b/gi;
 
 // Discard greetings, closings, thanks — anything without a digit or with < 6 chars.
@@ -90,14 +96,23 @@ function pickFormat(product: Product, raw: string, extractedUnit: Unit | undefin
   return product.formats[0];
 }
 
-function extractNotes(raw: string, qtyMatch?: string): string | undefined {
+function extractNotes(raw: string, qtyMatch: string | undefined, productName: string): string | undefined {
   const withoutQty = qtyMatch ? raw.replace(qtyMatch, ' ') : raw;
+  const productTokens = new Set(tokens(productName));
   const notes: string[] = [];
   const kw = withoutQty.match(NOTE_KEYWORDS);
-  if (kw) notes.push(...kw);
+  if (kw) {
+    for (const raw of kw) {
+      // Drop tokens that already appear in the product name; otherwise
+      // "Mortadela pistacho 1,5 kg" would leave notes="pistacho".
+      const parts = raw.toLowerCase().split(/\s+/);
+      if (parts.some((p) => productTokens.has(norm(p)))) continue;
+      notes.push(raw.toLowerCase());
+    }
+  }
   const paren = withoutQty.match(/\(([^)]+)\)/);
   if (paren) notes.push(paren[1].trim());
-  return notes.length ? [...new Set(notes.map((s) => s.toLowerCase()))].join(', ') : undefined;
+  return notes.length ? [...new Set(notes)].join(', ') : undefined;
 }
 
 function splitBlocks(text: string): string[] {
@@ -109,13 +124,15 @@ function splitBlocks(text: string): string[] {
 
 // Score how well a candidate needle (product name / alias) appears inside a line.
 // Rewards contiguous substring (best), token overlap, and prefix matches. Zero
-// when the needle's core tokens don't appear at all.
+// when the needle's core tokens don't appear at all. Needle length is a small
+// tiebreaker so multi-token needles beat single-token aliases at the same score
+// (Gouda ahumado > jamon ahumado on "gouda ahumado 200g").
 function scoreMatch(lineNorm: string, lineTokens: string[], needle: string, needleTokens: string[]): number {
   if (needleTokens.length === 0) return 0;
-  if (lineNorm.includes(needle)) return 1;
+  if (lineNorm.includes(needle)) return 1 + needleTokens.length * 0.01;
   const overlap = needleTokens.filter((t) => lineTokens.some((lt) => lt === t || lt.startsWith(t) || t.startsWith(lt))).length;
   const ratio = overlap / needleTokens.length;
-  return ratio >= 0.5 ? 0.4 + ratio * 0.5 : 0;
+  return ratio >= 0.5 ? 0.4 + ratio * 0.5 + needleTokens.length * 0.01 : 0;
 }
 
 interface NeedleEntry { productId: string; productName: string; needle: string; tokens: string[]; }
@@ -189,7 +206,7 @@ export function parseLocal(text: string, products: Product[]): ParsedLine[] {
     if (!prod) { results.push({ raw, status: 'not_found' }); continue; }
 
     const fmt = pickFormat(prod, raw, qtyInfo?.unit, qtyInfo?.formatHint);
-    const notes = extractNotes(raw, qtyInfo?.matchedText);
+    const notes = extractNotes(raw, qtyInfo?.matchedText, prod.name);
 
     // Grams → sachet-of-N-grams conversion when the format is a fixed sachet.
     let qty = qtyInfo?.qty;

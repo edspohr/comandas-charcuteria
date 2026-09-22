@@ -25,15 +25,19 @@ const p = (
 
 export const products: Product[] = [
   // Jamones cocidos y ahumados
-  p('jamon-cocido',           'Jamón cocido',            'jamones',   [SACHET_200, SACHET_500, SACHET_1KG, PIEZA, GRANEL], { aliases: ['cocido', 'jamon cocido'] }),
-  p('jamon-ahumado',          'Jamón ahumado',           'jamones',   [SACHET_200, SACHET_500, PIEZA, GRANEL], { aliases: ['ahumado', 'jamon ahumado'] }),
+  // Single-word aliases like 'cocido' / 'ahumado' were pulling generic
+  // phrases (e.g. "gouda ahumado x 10") into the wrong product. Keep only
+  // the full two-word form.
+  p('jamon-cocido',           'Jamón cocido',            'jamones',   [SACHET_200, SACHET_500, SACHET_1KG, PIEZA, GRANEL], { aliases: ['jamon cocido'] }),
+  p('jamon-ahumado',          'Jamón ahumado',           'jamones',   [SACHET_200, SACHET_500, PIEZA, GRANEL], { aliases: ['jamon ahumado'] }),
   p('lomo-kassler',           'Lomo Kassler',            'jamones',   [SACHET_200, SACHET_500, PIEZA, GRANEL], { aliases: ['kassler'] }),
   p('pastrami-vacuno',        'Pastrami vacuno',         'pastramis', [SACHET_200, SACHET_500, PIEZA, GRANEL], { aliases: ['pastrami res'] }),
   p('pastrami-cerdo',         'Pastrami cerdo',          'pastramis', [SACHET_200, SACHET_500, PIEZA, GRANEL]),
   p('pastirma-vacuno',        'Pastirma de vacuno',      'pastramis', [PIEZA], { discontinued: true, active: false, aliases: ['pastirma'] }),
 
   // Mortadelas
-  p('mortadela-pistacho',     'Mortadela pistacho',      'mortadelas', [SACHET_200, PIEZA, GRANEL], { aliases: ['mortadela', 'pistacho'] }),
+  // 'pistacho' alone matched too eagerly; 'mortadela' is fine as it uniquely maps.
+  p('mortadela-pistacho',     'Mortadela pistacho',      'mortadelas', [SACHET_200, PIEZA, GRANEL], { aliases: ['mortadela'] }),
   p('mortadela-clasica',      'Mortadela clásica',       'mortadelas', [SACHET_200, PIEZA, GRANEL]),
 
   // Salames

@@ -10,7 +10,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Client, Order, OrderLine, OrderStatus, StockDoc } from '@/domain/types';
+import type { Client, Order, OrderLine, OrderStatus, StockDoc, StockMovement } from '@/domain/types';
 import { stockDocId } from '@/domain/types';
 
 export interface DraftLine {
@@ -164,6 +164,149 @@ export async function createOrder(
     tx.set(doc(db, 'orders', orderId), order);
 
     return { orderId, status, parcialLines };
+  });
+}
+
+// ---------- Despacho queue ----------
+
+const DESPACHO_STATUSES: OrderStatus[] = ['confirmado', 'confirmado_parcial', 'en_armado', 'armado'];
+
+export function useDespachoQueue(): { orders: Order[]; loading: boolean } {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), where('status', 'in', DESPACHO_STATUSES));
+    const unsub = onSnapshot(q, (snap) => {
+      const list: Order[] = [];
+      snap.forEach((d) => list.push(d.data() as Order));
+      list.sort((a, b) => {
+        if (a.requestedDate !== b.requestedDate) return a.requestedDate.localeCompare(b.requestedDate);
+        return a.createdAt - b.createdAt;
+      });
+      setOrders(list);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  return { orders, loading };
+}
+
+export function useOrder(orderId: string | null): { order: Order | null; loading: boolean } {
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!orderId) { setOrder(null); setLoading(false); return; }
+    setLoading(true);
+    const unsub = onSnapshot(doc(db, 'orders', orderId), (snap) => {
+      setOrder(snap.exists() ? (snap.data() as Order) : null);
+      setLoading(false);
+    });
+    return unsub;
+  }, [orderId]);
+
+  return { order, loading };
+}
+
+// Assign self as packer + advance to en_armado if still confirmado(_parcial).
+// One transaction: reads current order, writes assignedPackerId + status + history.
+export async function assignPacker(orderId: string, packerUid: string): Promise<void> {
+  const orderRef = doc(db, 'orders', orderId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(orderRef);
+    if (!snap.exists()) throw new Error('Pedido no encontrado');
+    const order = snap.data() as Order;
+    if (order.assignedPackerId && order.assignedPackerId !== packerUid) {
+      throw new Error('Pedido ya asignado a otro armador');
+    }
+    const advance = order.status === 'confirmado' || order.status === 'confirmado_parcial';
+    const now = Date.now();
+    const newStatus: OrderStatus = advance ? 'en_armado' : order.status;
+    tx.update(orderRef, {
+      assignedPackerId: packerUid,
+      status: newStatus,
+      updatedAt: now,
+      statusHistory: advance
+        ? [...order.statusHistory, { status: 'en_armado', by: packerUid, at: now }]
+        : order.statusHistory,
+    });
+  });
+}
+
+export interface PackedLineInput {
+  productId: string;
+  formatId: string;
+  packedQty: number;
+  packedWeightKg?: number;
+}
+
+// Mark order as armado. Transaction:
+//   Reads:  order doc + one stock doc per line with reservedQty > 0
+//   Writes: stock.reserved -= reservedQty, stock.onHand -= packedQty
+//           per line, appends stockMovements type consumo, updates order
+export async function markArmado(
+  orderId: string,
+  packed: PackedLineInput[],
+  packerUid: string,
+): Promise<void> {
+  const orderRef = doc(db, 'orders', orderId);
+  await runTransaction(db, async (tx) => {
+    // ---- Reads
+    const orderSnap = await tx.get(orderRef);
+    if (!orderSnap.exists()) throw new Error('Pedido no encontrado');
+    const order = orderSnap.data() as Order;
+    if (order.status !== 'en_armado' && order.status !== 'confirmado' && order.status !== 'confirmado_parcial') {
+      throw new Error(`No se puede armar un pedido en estado ${order.status}`);
+    }
+
+    const stockReads: Array<{ ref: ReturnType<typeof doc>; prev: StockDoc | null; line: OrderLine }> = [];
+    for (const line of order.lines) {
+      if (line.reservedQty <= 0) { stockReads.push({ ref: doc(db, 'stock', stockDocId(line.productId, line.formatId)), prev: null, line }); continue; }
+      const ref = doc(db, 'stock', stockDocId(line.productId, line.formatId));
+      const snap = await tx.get(ref);
+      stockReads.push({ ref, prev: snap.exists() ? (snap.data() as StockDoc) : null, line });
+    }
+
+    // ---- Writes
+    const now = Date.now();
+    const packedMap = new Map(packed.map((p) => [`${p.productId}::${p.formatId}`, p]));
+    const enrichedLines: OrderLine[] = order.lines.map((line) => {
+      const key = `${line.productId}::${line.formatId}`;
+      const p = packedMap.get(key);
+      const packedQty = p?.packedQty ?? line.reservedQty;
+      return { ...line, packedQty, packedWeightKg: p?.packedWeightKg };
+    });
+
+    stockReads.forEach(({ ref, prev, line }) => {
+      if (line.reservedQty <= 0 || !prev) return;
+      const packedQty = packedMap.get(`${line.productId}::${line.formatId}`)?.packedQty ?? line.reservedQty;
+      tx.update(ref, {
+        reserved: Math.max(0, prev.reserved - line.reservedQty),
+        onHand: Math.max(0, prev.onHand - packedQty),
+      });
+      const mvRef = doc(collection(db, 'stockMovements'));
+      const mv: StockMovement = {
+        id: mvRef.id,
+        productId: line.productId,
+        formatId: line.formatId,
+        qty: packedQty,
+        type: 'consumo',
+        orderId,
+        by: packerUid,
+        at: now,
+      };
+      tx.set(mvRef, mv);
+    });
+
+    tx.update(orderRef, {
+      lines: enrichedLines,
+      status: 'armado',
+      assignedPackerId: order.assignedPackerId ?? packerUid,
+      updatedAt: now,
+      statusHistory: [...order.statusHistory, { status: 'armado', by: packerUid, at: now }],
+    });
   });
 }
 

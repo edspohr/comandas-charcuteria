@@ -251,7 +251,7 @@ export const weekOrders: Order[] = [
     line('chorizo-espanol', 'pieza', 6, 6),
   ]),
 
-  mk('PED-2026-0030', 'u-rafael', 'cafeteria-sofa', 22, 22, 10, 'recibido', [
+  mk('PED-2026-0030', 'u-rafael', 'cafeteria-sofa', 22, 22, 10, 'confirmado', [
     line('jamon-cocido', 'sachet-200g', 10, 10),
     line('mortadela-clasica', 'sachet-200g', 6, 6),
   ], { invoicingComplete: false, source: 'pasted', rawText: '10 sachets jamón cocido 200g y 6 mortadela clásica 200g' }),
@@ -260,7 +260,7 @@ export const weekOrders: Order[] = [
     line('longaniza-chillan', 'sachet-5kg', 4, 4, 0, 'Repos rápida sitios centro'),
   ]),
 
-  mk('PED-2026-0032', 'u-gabriela', 'yamba', 22, 22, 11, 'recibido', [
+  mk('PED-2026-0032', 'u-gabriela', 'yamba', 22, 22, 11, 'confirmado', [
     line('salame-picante', 'pieza', 6, 6),
     line('sopressata', 'pieza', 4, 4),
     line('nduja', 'pote-150g', 8, 8, 0, 'preguntar por acidez'),
@@ -271,7 +271,7 @@ export const weekOrders: Order[] = [
     line('mortadela-pistacho', 'granel-kg', 3, 3),
   ]),
 
-  mk('PED-2026-0034', 'u-tania', 'oven-chile', 22, 22, 12, 'recibido', [
+  mk('PED-2026-0034', 'u-tania', 'oven-chile', 22, 22, 12, 'confirmado', [
     line('cecina-chilena', 'granel-kg', 2, 2),
     line('charqui-vacuno', 'sachet-200g', 20, 20),
   ]),
@@ -282,7 +282,7 @@ export const weekOrders: Order[] = [
     line('mantequilla-tocino', 'pote-150g', 8, 8),
   ]),
 
-  mk('PED-2026-0036', 'u-lucy', 'hotel-costanera', 22, 22, 14, 'recibido', [
+  mk('PED-2026-0036', 'u-lucy', 'hotel-costanera', 22, 22, 14, 'confirmado', [
     line('jamon-cocido', 'sachet-1kg', 6, 6),
     line('lomo-kassler', 'granel-kg', 2, 2),
   ]),
@@ -298,7 +298,7 @@ export const weekOrders: Order[] = [
     line('gouda-ahumado', 'sachet-200g', 30, 30),
   ]),
 
-  mk('PED-2026-0039', 'u-gabriela', 'hotel-magnolia', 22, 22, 8, 'recibido', [
+  mk('PED-2026-0039', 'u-gabriela', 'hotel-magnolia', 22, 22, 8, 'confirmado', [
     line('jamon-cocido', 'sachet-500g', 8, 8),
     line('pastrami-cerdo', 'granel-kg', 2, 2, 0, 'lonjas medianas'),
   ]),

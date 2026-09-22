@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, it } from 'vitest';
 import {
   assertFails,
   assertSucceeds,
@@ -10,12 +10,15 @@ import {
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 
 // Firestore emulator must be running on 127.0.0.1:8080 for this suite.
-// Firestore + Auth emulators both require a Java runtime.
+// Firestore + Auth emulators both require a Java runtime. This suite
+// has never actually run on the dev machine — no JDK installed — so
+// consider it aspirational until it runs on a CI host with Java.
 //
-// Coverage — three critical cases from the spec:
+// Coverage — three critical cases from the spec (each with its positive
+// counterpart bundled into the same test):
 //   1. Vendedor cannot edit orders belonging to another vendedor.
-//   2. Vendedor cannot change status past their allowed transitions.
-//   3. Despacho cannot set invoiceRef.
+//   2. Vendedor cannot skip states (en_armado forbidden), but CAN anular.
+//   3. Despacho cannot set invoiceRef, but CAN marcar armado.
 
 const PROJECT = 'comandas-charcuteria-demo';
 
@@ -83,14 +86,6 @@ describe('firestore rules', () => {
     await assertFails(updateDoc(doc(alice, 'orders', 'PED-A-2'), { status: 'en_armado' }));
     // Sanity: anular on the same order IS allowed.
     await assertSucceeds(updateDoc(doc(alice, 'orders', 'PED-A-2'), { status: 'anulado' }));
-  });
-
-  it('vendedor CAN anular a propio pedido en pre-invoice state', async () => {
-    await env.clearFirestore();
-    await seedUser('u-alice', 'vendedor');
-    await seedOrder('PED-A-anular', 'u-alice');   // status defaults to confirmado
-    const alice = env.authenticatedContext('u-alice').firestore();
-    await assertSucceeds(updateDoc(doc(alice, 'orders', 'PED-A-anular'), { status: 'anulado' }));
   });
 
   it('despacho cannot set invoiceRef', async () => {

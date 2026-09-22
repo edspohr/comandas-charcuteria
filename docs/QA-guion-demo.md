@@ -224,3 +224,50 @@ Re-corrí el guión completo **contra la URL en vivo** (bundle `index-Dk-e-T1l.j
 **37. `.gitignore` tiene un comentario huérfano** (líneas 4-5: "keep hand-written .d.ts… nothing to ignore here now") que no describe ninguna regla. Borrar.
 
 **38. Menor:** Sincronizar ahora incluye también pedidos `entregado` (cualquiera con `invoiceRef`); el texto de la sección dice "facturados/despachados". Ajustar texto o filtro.
+
+---
+
+## Segundo pase de fixes — cerrado en commits 30908b2 (A), f3500a4 (B), e571947 (C) y el commit de bloque D
+
+**Bloque A — antes de la demo**
+- **#31** Service worker en modo `prompt` (`app/vite.config.ts`) + nuevo `UpdateToast` en `App.tsx` que muestra "Nueva versión — Recargar" cuando el SW encola un update. Nota operativa agregada al README. **Verificado:** `npm run build` produce `sw.js` con `skipWaiting: false` implícito y el flag `needRefresh` se levanta al reiniciar el service worker.
+- **#32** Guión reordenado en `README.md`: 4 (split) → 5 (Yuri produce) → 6 (Edu arma), con nota explícita "no se puede armar hasta que Producción cubra las líneas pendientes". **Verificado:** cada paso pide exactamente la acción que la app permite en ese momento.
+- **#33** Banner de `DetalleArmado.tsx:120` ahora dice *"Producción debe registrar el producto pendiente antes de armar"*.
+- **#36** Callbacks de error en todos los `onSnapshot`: `useMyOrders`, `useDespachoQueue`, `useOrdersByStatuses`, `useOrder`, `useLastOrderForClient`, `useProduccionData`, `useProducts`, `useClients`, `useAllStock`. Cada uno expone `{ ..., loading, error }` y las rutas consumen `error` mostrando un nuevo `ErrorBanner`. **Verificado:** `tsc --noEmit` limpio; recorrí las llamadas manualmente contra `git grep onSnapshot`.
+- **#16** Helper `describeFirestoreError(err)` en `app/src/lib/errors.ts` que traduce códigos Firestore (`permission-denied`, `failed-precondition`, `unavailable`, `unauthenticated`, `aborted`, `resource-exhausted`, `deadline-exceeded`…) a mensajes es-CL. Aplicado en 6 catches (NuevoPedido, DetallePedido, DetalleArmado, Produccion, Facturacion, Catalogo); los `throw new Error("mensaje en es-CL")` propios pasan sin cambios. Detalle sigue yendo a `console.error`.
+
+**Bloque B — UX del wizard y navegación**
+- **#11 + #17** `CATEGORY_LABEL` movido a `app/src/domain/categories.ts` con `categoryOrder(slug)`. NuevoPedido ordena el picker por ese orden (Jamones → Charqui) y Catálogo muestra la etiqueta en vez del slug.
+- **#28** "Repetir último pedido" ahora también aparece al inicio del paso 2 con `PED-ID · dd-mm · N líneas` cuando hay último pedido y el draft está vacío.
+- **#18** Paso Confirmar muestra bloques separados: **Cliente** (fantasyName + razón social + RUT), **Entrega** (fecha + modalidad + dirección/horario). Facturación incompleta destacada aparte.
+- **#12 + #13** `AppShell` reordena la nav por rol (ítems primary del rol primero) y hace `scrollIntoView` del activo en cambio de ruta. `items.length > 1` removido: despacho y producción muestran su única pestaña por consistencia.
+- **#14** Cola de despacho: `armado` sacado de `DESPACHO_STATUSES` (vive en Facturación). Orden secundario pone accionables primero. Toast verde al volver de "Marcar armado" con `location.state.armadoOk` que se auto-limpia a 4.5 s.
+- **#30** `DetallePedido` muestra por línea `reservedQty` (emerald, si difiere de qty) y `pendingProductionQty` (brass) además del empacado; el header ya listaba modalidad + horario.
+- **#19** Facturar ahora abre `ConfirmInvoiceDialog` con cliente y # de líneas antes de emitir; matches Despachar/Entregar.
+
+**Bloque C — parser**
+- **#34** `parseLocal`:
+  - Aliases genéricos removidos de `scripts/data/products.ts`: `ahumado`, `cocido`, `pistacho`. Los aliases de dos palabras (`jamon cocido`, `jamon ahumado`, `mortadela`) se quedan.
+  - `FORMAT_HINTS` del formato pote acepta el número no adyacente (`pote ... 250` o `250 ... pote`) y solo cae al pote-150g cuando no hay cifra específica.
+  - `extractNotes` filtra tokens que ya están en el nombre del producto → "mortadela pistacho 1,5 kg" no deja `notes: pistacho`.
+  - `scoreMatch` usa la longitud del needle como tiebreaker → en empates el nombre completo gana al alias corto.
+  - `scripts/verify-parser.ts` extendido a 10 casos + integración del SAMPLE del README. **Verificado:** `npx tsx scripts/verify-parser.ts` → 10/10 individuales, 4/4 usables del sample.
+- La seed se re-ejecutó contra el proyecto real para reflejar los aliases actualizados.
+
+**Bloque D — higiene y reglas**
+- **#35** `tests/rules/firestore.rules.test.ts` deduplicado: el positivo de anular ahora vive en el mismo test que la negativa (línea 85). Comentario del archivo actualizado: los tests **no se ejecutaron** en esta máquina (sin JDK) y deben correrse en CI con Java antes de darlos por cubiertos.
+- **#25** `firestore.rules`:
+  - `counters/orders-YYYY`: escritura solo vendedor/admin/superAdmin (los que pueden crear pedidos).
+  - `counters/bsale-YYYY`: escritura solo admin/superAdmin (los que facturan).
+  - `stock`: vendedor puede update solo si `onHand` no cambia (deja mover `reserved` desde `createOrder`/`anular`); despacho/producción/admin pueden mover ambos campos. Invariantes `onHand >= 0` y `reserved >= 0` mantenidas. Regla desplegada en producción.
+- **#21** Nuevo hook `useSettings()` (`app/src/data/settings.ts`) escucha `settings/app`. NuevoPedido y PegarPedido pasan `settings.cutoffHour` a `defaultRequestedDate` en vez del `15` hardcodeado. `cutoff.ts` calcula la hora actual en `America/Santiago` (no en el TZ del navegador).
+- **#29** `scripts/data/orders-week.ts`: los 5 pedidos que estaban en `recibido` ahora se siembran como `confirmado`. La app no genera `recibido` por su cuenta y ninguna pantalla lo avanzaba.
+- **#26** `NEXT_STATUS` eliminado de `app/src/domain/types.ts`. `aria-label` agregado a las tarjetas de rol del Login ("Ingresar como Rafael, Vendedor") y a las tarjetas de cliente del paso 1 ("Elegir cliente Magnolia").
+- **#37** Comentario huérfano de `.gitignore` (líneas 4-5) borrado.
+- **#38** Texto de la sección Sincronizar en `Panel.tsx` ajustado: *"Simulado. Muestra los payloads que se enviarían para los pedidos con documento emitido."*
+- **#23** `transferToWizard` de `PegarPedido` ahora chequea si hay un draft con líneas y pide confirmación antes de reemplazarlo. El typo "Ustd" ya se había arreglado en el pase anterior.
+
+**No hecho en este pase** (fuera del alcance solicitado):
+- `mapear código → mensaje` para la sección catalogo del `Panel.tsx` cuando `Sincronizar Bsale` genera una excepción — hoy toma solo el happy path.
+- Historial de `stockMovements` en Catálogo (mencionado en #9 paso 10 del README anterior) sigue sin vista; el ajuste queda registrado pero no se puede ver desde la UI.
+- Tests de reglas (necesitan JDK). El archivo está actualizado y limpio de duplicados pero no corrió.

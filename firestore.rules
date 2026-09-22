@@ -37,20 +37,47 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
-    // -------- Counters (order-id + Bsale doc-number generators)
-    // Any authenticated caller can bump these inside their transactions.
+    // -------- Counters
+    // orders-YYYY is bumped by createOrder → any role that can create orders.
+    // bsale-YYYY is bumped by facturarOrder → admin/superAdmin only.
+    // Read is allowed to any authenticated user so the transaction preview
+    // step doesn't need extra permissions.
     match /counters/{id} {
-      allow read, write: if isAuth();
+      allow read: if isAuth();
+      // orders-YYYY: any authenticated user with an order-creating role.
+      allow write: if id.matches('orders-.*') && (isVendedor() || isAdminOrSup());
+      // bsale-YYYY: only invoice-creating roles.
+      allow write: if id.matches('bsale-.*') && isAdminOrSup();
     }
 
     // -------- Stock (mutated only by transactions in code)
-    // The rules just gate authentication + protect impossible values.
-    // The business logic (delta on reserved / onHand) lives in code.
+    // - Vendedor can touch reserved only (createOrder / anular releases). onHand
+    //   must NOT change.
+    // - Despacho consumes on markArmado (both fields move).
+    // - Producción bumps onHand on Registrar producción (and reserved when
+    //   FIFO absorbs pending).
+    // - Admin/SuperAdmin: any change (ajuste con motivo).
+    // Rules always enforce non-negative onHand and reserved.
     match /stock/{id} {
       allow read: if isAuth();
-      allow create, update: if isAuth()
+
+      allow create: if isAdminOrSup()
         && request.resource.data.onHand >= 0
         && request.resource.data.reserved >= 0;
+
+      allow update: if isAuth()
+        && request.resource.data.onHand >= 0
+        && request.resource.data.reserved >= 0
+        && (
+          isAdminOrSup()
+          // Vendedor: cannot move onHand.
+          || (isVendedor() && request.resource.data.onHand == resource.data.onHand)
+          // Despacho + Producción: any onHand/reserved delta consistent with a
+          // consumo/produccion transaction. The invariants above still apply.
+          || isDespacho()
+          || isProduccion()
+        );
+
       allow delete: if isAdminOrSup();
     }
 

@@ -4,8 +4,9 @@ import Button from '@/components/ui/Button';
 import { useCurrentUser } from '@/data/auth';
 import { useProducts } from '@/data/products';
 import { parseLocal, type ParsedLine, type MatchStatus } from '@/domain/parse/local';
-import { saveDraft } from '@/lib/draft';
+import { loadDraft, saveDraft } from '@/lib/draft';
 import { defaultRequestedDate } from '@/domain/cutoff';
+import { useSettings } from '@/data/settings';
 import { formatQty } from '@/lib/format';
 import type { Product } from '@/domain/types';
 
@@ -39,6 +40,7 @@ export default function PegarPedido() {
   const uid = current!.appUser.uid;
   const navigate = useNavigate();
   const { products, loading } = useProducts();
+  const { settings } = useSettings();
   const [text, setText] = useState('');
   const [parsed, setParsed] = useState<ParsedLine[] | null>(null);
 
@@ -100,6 +102,12 @@ export default function PegarPedido() {
   function transferToWizard() {
     const usable = (parsed ?? []).filter((l) => l.productId && l.formatId && l.unit && l.qty && l.qty > 0);
     if (usable.length === 0) return;
+    // If there's already a draft with lines, warn before overwriting.
+    const existing = loadDraft<WizardDraft>(uid);
+    if (existing && existing.lines.length > 0) {
+      const proceed = confirm(`Hay un borrador con ${existing.lines.length} línea${existing.lines.length === 1 ? '' : 's'}. Reemplazarlo con estas ${usable.length}?`);
+      if (!proceed) return;
+    }
     const draft: WizardDraft = {
       clientId: null,
       lines: usable.map((l) => ({
@@ -111,7 +119,7 @@ export default function PegarPedido() {
         qty: l.qty!,
         notes: l.notes,
       })),
-      requestedDate: defaultRequestedDate(15),
+      requestedDate: defaultRequestedDate(settings.cutoffHour),
       deliveryMode: 'despacho',
       deliveryAddress: '',
       receivingHours: '',

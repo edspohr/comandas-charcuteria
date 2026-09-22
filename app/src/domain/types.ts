@@ -155,12 +155,3 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   anulado: 'Anulado',
 };
 
-export const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus[]>> = {
-  recibido: ['confirmado', 'confirmado_parcial', 'anulado'],
-  confirmado: ['en_armado', 'anulado'],
-  confirmado_parcial: ['confirmado', 'en_armado', 'anulado'],
-  en_armado: ['armado', 'anulado'],
-  armado: ['facturado', 'anulado'],
-  facturado: ['despachado'],
-  despachado: ['entregado'],
-};

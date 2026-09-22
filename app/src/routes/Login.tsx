@@ -91,6 +91,7 @@ function RoleGroup({
               type="button"
               onClick={() => onPick(u)}
               disabled={pending !== null}
+              aria-label={`Ingresar como ${u.displayName}, ${ROLE_LABEL[u.role]}`}
               className="group card p-3 text-left transition hover:border-brass-500 hover:shadow-lift active:scale-[0.98] disabled:opacity-50"
             >
               <div className="font-semibold text-charcoal-700 text-sm">{u.displayName}</div>

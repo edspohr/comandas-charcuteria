@@ -8,6 +8,7 @@ import { useClients, searchClients } from '@/data/clients';
 import { useProducts } from '@/data/products';
 import { useAllStock, availableFor, semaphore } from '@/data/stock';
 import { createOrder, useLastOrderForClient, type DraftLine } from '@/data/orders';
+import { useSettings } from '@/data/settings';
 import { clearDraft, loadDraft, saveDraft } from '@/lib/draft';
 import { defaultRequestedDate, minRequestedDate } from '@/domain/cutoff';
 import { formatDateLong, formatDateShort, formatQty } from '@/lib/format';
@@ -25,29 +26,32 @@ interface Draft {
   step: number;
 }
 
-const emptyDraft = (): Draft => ({
-  clientId: null,
-  lines: [],
-  requestedDate: defaultRequestedDate(15),
-  deliveryMode: 'despacho',
-  deliveryAddress: '',
-  receivingHours: '',
-  step: 1,
-});
+function emptyDraft(cutoffHour: number): Draft {
+  return {
+    clientId: null,
+    lines: [],
+    requestedDate: defaultRequestedDate(cutoffHour),
+    deliveryMode: 'despacho',
+    deliveryAddress: '',
+    receivingHours: '',
+    step: 1,
+  };
+}
 
 export default function NuevoPedido() {
   const { current } = useCurrentUser();
   const navigate = useNavigate();
   const uid = current!.appUser.uid;
+  const { settings } = useSettings();
 
   const [draft, setDraft] = useState<Draft>(() => {
     const loaded = loadDraft<Draft>(uid);
-    if (!loaded) return emptyDraft();
+    if (!loaded) return emptyDraft(settings.cutoffHour);
     // Drafts persisted from a previous day would open with a requestedDate
     // that's now in the past; snap it forward to the current default.
     const min = minRequestedDate();
     if (loaded.requestedDate < min) {
-      return { ...loaded, requestedDate: defaultRequestedDate(15) };
+      return { ...loaded, requestedDate: defaultRequestedDate(settings.cutoffHour) };
     }
     return loaded;
   });
@@ -102,7 +106,7 @@ export default function NuevoPedido() {
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Nuevo pedido</h1>
         </div>
         <button
-          onClick={() => { if (confirm('¿Descartar borrador?')) { clearDraft(uid); setDraft(emptyDraft()); } }}
+          onClick={() => { if (confirm('¿Descartar borrador?')) { clearDraft(uid); setDraft(emptyDraft(settings.cutoffHour)); } }}
           className="text-[11px] uppercase tracking-display text-charcoal-300 hover:text-charcoal-700"
         >
           Descartar
@@ -259,6 +263,7 @@ function StepCliente({
           <li key={c.id}>
             <button
               onClick={() => onSelect(c)}
+              aria-label={`Elegir cliente ${c.fantasyName ?? c.name}`}
               className={
                 'w-full text-left card p-3.5 transition hover:border-brass-500 hover:shadow-lift ' +
                 (c.id === selectedId ? 'border-brass-500 shadow-lift' : '')

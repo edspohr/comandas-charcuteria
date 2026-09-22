@@ -242,7 +242,7 @@ export default function Panel() {
               <p className="eyebrow">Solo Super Administrador</p>
               <h3 className="text-base font-semibold text-charcoal-900 tracking-display uppercase mt-0.5">Sincronizar con Bsale</h3>
               <p className="text-xs text-charcoal-300 mt-1">
-                Simulado. Muestra los payloads que se enviarían para pedidos facturados/despachados.
+                Simulado. Muestra los payloads que se enviarían para los pedidos con documento emitido.
               </p>
             </div>
             <Button onClick={syncBsale} disabled={syncing}>

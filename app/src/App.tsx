@@ -1,6 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Login from './routes/Login';
-import Placeholder from './routes/Placeholder';
 import NuevoPedido from './routes/vendedor/NuevoPedido';
 import MisPedidos from './routes/vendedor/MisPedidos';
 import DetallePedido from './routes/vendedor/DetallePedido';
@@ -10,6 +9,8 @@ import DetalleArmado from './routes/despacho/DetalleArmado';
 import Produccion from './routes/produccion/Produccion';
 import Facturacion from './routes/admin/Facturacion';
 import Panel from './routes/admin/Panel';
+import Catalogo from './routes/admin/Catalogo';
+import Usuarios from './routes/admin/Usuarios';
 import AppShell from './components/AppShell';
 import RouteGuard from './components/RouteGuard';
 import { useCurrentUser, ROLE_HOME } from './data/auth';
@@ -130,7 +131,7 @@ export default function App() {
           element={
             <RouteGuard current={current} allow={['admin', 'superAdmin']}>
               <AppShell current={current!}>
-                <Placeholder title="Catálogo y clientes" hint="Llega en el hito 11." />
+                <Catalogo />
               </AppShell>
             </RouteGuard>
           }
@@ -140,7 +141,7 @@ export default function App() {
           element={
             <RouteGuard current={current} allow={['superAdmin']}>
               <AppShell current={current!}>
-                <Placeholder title="Usuarios" hint="Solo Super Administrador. Llega en el hito 11." />
+                <Usuarios />
               </AppShell>
             </RouteGuard>
           }

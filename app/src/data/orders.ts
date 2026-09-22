@@ -310,6 +310,106 @@ export async function markArmado(
   });
 }
 
+// ---------- Facturación / despacho / entrega ----------
+
+export interface FacturarResult {
+  invoiceRef: string;
+  payload: unknown;
+}
+
+// Assigns a mock Bsale doc number and transitions armado → facturado.
+// Kept as a plain function (not a transaction) because MockBsaleClient
+// runs its own transaction on the counter and we don't have concurrent
+// state to protect on the order itself beyond the version we already
+// have. If two admins click Facturar at once, the second observes the
+// invoiceRef and short-circuits.
+export async function facturarOrder(
+  orderId: string,
+  by: string,
+  createDocument: (order: Order) => Promise<{ docNumber: string; payload: unknown }>,
+): Promise<FacturarResult> {
+  const orderRef = doc(db, 'orders', orderId);
+  const preview = await import('firebase/firestore').then((m) => m.getDoc(orderRef));
+  if (!preview.exists()) throw new Error('Pedido no encontrado');
+  const order = preview.data() as Order;
+  if (order.invoiceRef) return { invoiceRef: order.invoiceRef, payload: null };
+  if (order.status !== 'armado') throw new Error(`No se puede facturar un pedido en estado ${order.status}`);
+
+  const { docNumber, payload } = await createDocument(order);
+  const now = Date.now();
+  const { updateDoc } = await import('firebase/firestore');
+  await updateDoc(orderRef, {
+    status: 'facturado',
+    invoiceRef: docNumber,
+    updatedAt: now,
+    statusHistory: [...order.statusHistory, { status: 'facturado', by, at: now, note: docNumber }],
+  });
+  return { invoiceRef: docNumber, payload };
+}
+
+export async function despacharOrder(
+  orderId: string,
+  by: string,
+  deliveredBy: string,
+  note?: string,
+): Promise<void> {
+  const orderRef = doc(db, 'orders', orderId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(orderRef);
+    if (!snap.exists()) throw new Error('Pedido no encontrado');
+    const order = snap.data() as Order;
+    if (order.status !== 'facturado') throw new Error(`No se puede despachar un pedido en estado ${order.status}`);
+    const now = Date.now();
+    tx.update(orderRef, {
+      status: 'despachado',
+      deliveredBy,
+      deliveryProof: note ? { note } : undefined,
+      updatedAt: now,
+      statusHistory: [...order.statusHistory, { status: 'despachado', by, at: now, note: deliveredBy }],
+    });
+  });
+}
+
+export async function entregarOrder(orderId: string, by: string, note?: string): Promise<void> {
+  const orderRef = doc(db, 'orders', orderId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(orderRef);
+    if (!snap.exists()) throw new Error('Pedido no encontrado');
+    const order = snap.data() as Order;
+    if (order.status !== 'despachado') throw new Error(`No se puede marcar entregado en estado ${order.status}`);
+    const now = Date.now();
+    const proof = note ? { note } : (order.deliveryProof ?? undefined);
+    tx.update(orderRef, {
+      status: 'entregado',
+      deliveryProof: proof,
+      updatedAt: now,
+      statusHistory: [...order.statusHistory, { status: 'entregado', by, at: now, note }],
+    });
+  });
+}
+
+export function useOrdersByStatuses(statuses: OrderStatus[]): { orders: Order[]; loading: boolean } {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  // Serialize array into stable key to keep the effect deps sane.
+  const key = statuses.slice().sort().join(',');
+
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), where('status', 'in', statuses));
+    const unsub = onSnapshot(q, (snap) => {
+      const list: Order[] = [];
+      snap.forEach((d) => list.push(d.data() as Order));
+      list.sort((a, b) => a.requestedDate.localeCompare(b.requestedDate) || a.createdAt - b.createdAt);
+      setOrders(list);
+      setLoading(false);
+    });
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  return { orders, loading };
+}
+
 export function useLastOrderForClient(vendedorUid: string, clientId: string | null): Order | null {
   const [order, setOrder] = useState<Order | null>(null);
 

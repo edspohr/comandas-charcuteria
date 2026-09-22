@@ -7,6 +7,7 @@ import { ajustarStock, availableFor, useAllStock } from '@/data/stock';
 import { formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 import ErrorBanner from '@/components/ui/ErrorBanner';
+import { categoryLabel } from '@/domain/categories';
 import type { Product, ProductFormat, Client } from '@/domain/types';
 
 type Tab = 'productos' | 'clientes';
@@ -84,7 +85,7 @@ function ProductosTab() {
                     <span className="text-[10px] uppercase tracking-display bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded">Inactivo</span>
                   )}
                 </div>
-                <p className="text-xs text-charcoal-300 mt-0.5">{p.category} · {p.formats.length} formato{p.formats.length === 1 ? '' : 's'}</p>
+                <p className="text-xs text-charcoal-300 mt-0.5">{categoryLabel(p.category)} · {p.formats.length} formato{p.formats.length === 1 ? '' : 's'}</p>
               </div>
               <span className="text-charcoal-300 text-sm group-open:rotate-90 transition-transform">›</span>
             </summary>

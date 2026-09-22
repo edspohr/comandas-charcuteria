@@ -76,7 +76,7 @@ export default function DetalleArmado() {
         }),
         uid,
       );
-      navigate('/despacho/cola');
+      navigate('/despacho/cola', { state: { armadoOk: order.id } });
     } catch (e) {
       setError(describeFirestoreError(e));
       setSubmitting(false);

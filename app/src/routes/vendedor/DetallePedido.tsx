@@ -71,10 +71,15 @@ export default function DetallePedido() {
                   {l.notes && <p className="text-xs text-charcoal-500 mt-1 italic">{l.notes}</p>}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="eyebrow">Cantidad</p>
+                  <p className="eyebrow">Vendido</p>
                   <p className="font-semibold text-charcoal-700 mt-0.5">{formatQty(l.qty, l.unit)}</p>
+                  {l.reservedQty !== l.qty && l.reservedQty > 0 && (
+                    <p className="text-[10px] uppercase tracking-display text-emerald-700 mt-1">
+                      Reservado {formatQty(l.reservedQty, l.unit)}
+                    </p>
+                  )}
                   {l.pendingProductionQty > 0 && (
-                    <p className="text-[10px] uppercase tracking-display text-brass-700 mt-1">
+                    <p className="text-[10px] uppercase tracking-display text-brass-700 mt-0.5">
                       {formatQty(l.pendingProductionQty, l.unit)} a producción
                     </p>
                   )}

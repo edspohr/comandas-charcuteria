@@ -37,6 +37,7 @@ export default function Facturacion() {
   const [message, setMessage] = useState<{ orderId: string; text: string } | null>(null);
   const [dispatchModal, setDispatchModal] = useState<Order | null>(null);
   const [deliverModal, setDeliverModal] = useState<Order | null>(null);
+  const [confirmInvoice, setConfirmInvoice] = useState<Order | null>(null);
   const [payloadModal, setPayloadModal] = useState<{ docNumber: string; payload: unknown; orderId: string } | null>(null);
 
   const incompleteInvoicing = useMemo(() => orders.filter((o) => !o.invoicingComplete), [orders]);
@@ -135,7 +136,7 @@ export default function Facturacion() {
                 </div>
                 <div className="shrink-0">
                   {tab === 'facturar' && (
-                    <Button size="md" onClick={() => factura(o)} disabled={busyId === o.id}>
+                    <Button size="md" onClick={() => setConfirmInvoice(o)} disabled={busyId === o.id}>
                       {busyId === o.id ? '…' : 'Facturar'}
                     </Button>
                   )}
@@ -184,7 +185,48 @@ export default function Facturacion() {
           onClose={() => setDeliverModal(null)}
         />
       )}
+
+      {confirmInvoice && (
+        <ConfirmInvoiceDialog
+          order={confirmInvoice}
+          busy={busyId === confirmInvoice.id}
+          onCancel={() => setConfirmInvoice(null)}
+          onConfirm={async () => {
+            const o = confirmInvoice;
+            setConfirmInvoice(null);
+            await factura(o);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function ConfirmInvoiceDialog({ order, busy, onCancel, onConfirm }: { order: Order; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <ModalShell title="Facturar pedido" eyebrow={order.id} onClose={onCancel}>
+      <div className="space-y-4">
+        <div>
+          <p className="text-sm text-charcoal-700">
+            Se emitirá el documento (mock Bsale) para <span className="font-semibold">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</span> con las {order.lines.length} línea{order.lines.length === 1 ? '' : 's'} armada{order.lines.length === 1 ? '' : 's'}.
+          </p>
+          <p className="text-xs text-charcoal-500 mt-2">
+            La operación no se puede deshacer desde la app — el número queda asignado al pedido.
+          </p>
+        </div>
+        {!order.invoicingComplete && (
+          <div className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 p-2.5 text-xs">
+            Datos de facturación del cliente incompletos. Se emitirá igual y queda marcado.
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={onCancel} disabled={busy} className="flex-1">Cancelar</Button>
+          <Button onClick={onConfirm} disabled={busy} className="flex-1">
+            {busy ? '…' : 'Facturar'}
+          </Button>
+        </div>
+      </div>
+    </ModalShell>
   );
 }
 

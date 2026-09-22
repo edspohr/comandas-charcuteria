@@ -170,7 +170,10 @@ export async function createOrder(
 
 // ---------- Despacho queue ----------
 
-const DESPACHO_STATUSES: OrderStatus[] = ['confirmado', 'confirmado_parcial', 'en_armado', 'armado'];
+// `armado` lives in Facturación (waiting for admin to invoice); showing it in
+// despacho would only add noise for the packer. The queue keeps everything up
+// to en_armado so despacho can still see what they're currently working on.
+const DESPACHO_STATUSES: OrderStatus[] = ['confirmado', 'confirmado_parcial', 'en_armado'];
 
 export function useDespachoQueue(): { orders: Order[]; loading: boolean; error: string | null } {
   const [orders, setOrders] = useState<Order[]>([]);

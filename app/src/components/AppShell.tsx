@@ -1,25 +1,45 @@
+import { useEffect, useMemo, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ROLE_LABEL, signOut, type CurrentUser } from '@/data/auth';
 import Logo from '@/components/ui/Logo';
 import type { Role } from '@/domain/types';
 
-interface NavItem { to: string; label: string; roles: Role[]; }
+interface NavItem { to: string; label: string; primaryFor?: Role[]; roles: Role[]; }
 
+// `primaryFor` lists the roles where this item is that user's "own" work
+// (the wizard for a vendedor, the queue for despacho, etc.). The shell
+// puts those first in the nav so they're immediately reachable on mobile,
+// with the shared admin/reporting items after.
 const NAV: NavItem[] = [
-  { to: '/vendedor/nuevo',    label: 'Nuevo pedido',     roles: ['vendedor', 'admin', 'superAdmin'] },
-  { to: '/vendedor/pegar',    label: 'Pegar pedido',     roles: ['vendedor', 'admin', 'superAdmin'] },
-  { to: '/vendedor/mis',      label: 'Mis pedidos',      roles: ['vendedor', 'admin', 'superAdmin'] },
-  { to: '/despacho/cola',     label: 'Cola de despacho', roles: ['despacho', 'admin', 'superAdmin'] },
-  { to: '/produccion',        label: 'Producción',       roles: ['produccion', 'admin', 'superAdmin'] },
-  { to: '/admin/facturacion', label: 'Facturación',      roles: ['admin', 'superAdmin'] },
-  { to: '/admin/panel',       label: 'Panel',            roles: ['admin', 'superAdmin'] },
-  { to: '/admin/catalogo',    label: 'Catálogo',         roles: ['admin', 'superAdmin'] },
-  { to: '/admin/usuarios',    label: 'Usuarios',         roles: ['superAdmin'] },
+  { to: '/vendedor/nuevo',    label: 'Nuevo pedido',     roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor'] },
+  { to: '/vendedor/pegar',    label: 'Pegar pedido',     roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor'] },
+  { to: '/vendedor/mis',      label: 'Mis pedidos',      roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor'] },
+  { to: '/despacho/cola',     label: 'Cola de despacho', roles: ['despacho', 'admin', 'superAdmin'], primaryFor: ['despacho'] },
+  { to: '/produccion',        label: 'Producción',       roles: ['produccion', 'admin', 'superAdmin'], primaryFor: ['produccion'] },
+  { to: '/admin/facturacion', label: 'Facturación',      roles: ['admin', 'superAdmin'], primaryFor: ['admin', 'superAdmin'] },
+  { to: '/admin/panel',       label: 'Panel',            roles: ['admin', 'superAdmin'], primaryFor: ['admin', 'superAdmin'] },
+  { to: '/admin/catalogo',    label: 'Catálogo',         roles: ['admin', 'superAdmin'], primaryFor: ['admin', 'superAdmin'] },
+  { to: '/admin/usuarios',    label: 'Usuarios',         roles: ['superAdmin'], primaryFor: ['superAdmin'] },
 ];
 
 export default function AppShell({ current, children }: { current: CurrentUser; children: React.ReactNode }) {
   const { pathname } = useLocation();
-  const items = NAV.filter((n) => n.roles.includes(current.appUser.role));
+  const role = current.appUser.role;
+
+  const items = useMemo(() => {
+    const visible = NAV.filter((n) => n.roles.includes(role));
+    // Primary items (owned by this role) first, then the rest, preserving
+    // NAV order within each group.
+    return [
+      ...visible.filter((n) => n.primaryFor?.includes(role)),
+      ...visible.filter((n) => !n.primaryFor?.includes(role)),
+    ];
+  }, [role]);
+
+  const activeRef = useRef<HTMLAnchorElement | null>(null);
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-cream-50 flex flex-col">
@@ -32,7 +52,7 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
           <div className="flex items-center gap-3">
             <div className="text-right leading-tight hidden sm:block">
               <div className="text-sm font-medium">{current.appUser.displayName}</div>
-              <div className="text-[10px] text-cream-100/70 uppercase tracking-display">{ROLE_LABEL[current.appUser.role]}</div>
+              <div className="text-[10px] text-cream-100/70 uppercase tracking-display">{ROLE_LABEL[role]}</div>
             </div>
             <button
               onClick={signOut}
@@ -42,7 +62,12 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
             </button>
           </div>
         </div>
-        {items.length > 1 && (
+        {/*
+          The nav shows even when only one item is visible (despacho and
+          produccion) so those roles still get a consistent header + label,
+          not just a lonely brand mark.
+        */}
+        {items.length > 0 && (
           <nav className="border-t border-cream-100/10">
             <div className="max-w-5xl mx-auto px-2 overflow-x-auto">
               <ul className="flex gap-0 py-0">
@@ -52,6 +77,7 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
                     <li key={item.to}>
                       <Link
                         to={item.to}
+                        ref={active ? activeRef : undefined}
                         className={
                           'inline-block px-3.5 py-2.5 text-[11px] uppercase tracking-display whitespace-nowrap border-b-2 transition ' +
                           (active

@@ -10,8 +10,9 @@ import { useAllStock, availableFor, semaphore } from '@/data/stock';
 import { createOrder, useLastOrderForClient, type DraftLine } from '@/data/orders';
 import { clearDraft, loadDraft, saveDraft } from '@/lib/draft';
 import { defaultRequestedDate, minRequestedDate } from '@/domain/cutoff';
-import { formatDateLong, formatQty } from '@/lib/format';
+import { formatDateLong, formatDateShort, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
+import { categoryLabel, categoryOrder } from '@/domain/categories';
 import type { Client, Product, ProductFormat, StockDoc } from '@/domain/types';
 
 interface Draft {
@@ -136,6 +137,14 @@ export default function NuevoPedido() {
           onLines={(lines) => update('lines', lines)}
           onNext={() => goto(3)}
           onBack={() => goto(1)}
+          lastOrder={lastOrder}
+          onRepeat={lastOrder ? () => {
+            update('lines', lastOrder.lines.map((l) => ({
+              productId: l.productId, productName: l.productName,
+              formatId: l.formatId, formatLabel: l.formatLabel,
+              unit: l.unit, qty: l.qty, notes: l.notes,
+            })));
+          } : undefined}
         />
       )}
 
@@ -278,7 +287,7 @@ function StepCliente({
 // ---------- Step 2: Productos ----------
 
 function StepProductos({
-  products, stock, lines, onLines, onNext, onBack,
+  products, stock, lines, onLines, onNext, onBack, lastOrder, onRepeat,
 }: {
   products: Product[];
   stock: Map<string, StockDoc>;
@@ -286,9 +295,12 @@ function StepProductos({
   onLines: (lines: DraftLine[]) => void;
   onNext: () => void;
   onBack: () => void;
+  lastOrder: import('@/domain/types').Order | null;
+  onRepeat?: () => void;
 }) {
   const [openProductId, setOpenProductId] = useState<string | null>(null);
   const active = products.filter((p) => p.active && !p.discontinued);
+  const showRepeat = !!(lastOrder && onRepeat && lines.length === 0);
 
   function addOrUpdate(product: Product, format: ProductFormat, qty: number, notes?: string) {
     const idx = lines.findIndex((l) => l.productId === product.id && l.formatId === format.formatId);
@@ -310,9 +322,23 @@ function StepProductos({
 
   return (
     <section className="space-y-5">
+      {showRepeat && lastOrder && (
+        <button
+          type="button"
+          onClick={onRepeat}
+          className="w-full card p-3 border-brass-300 bg-brass-50 hover:bg-brass-100 text-left"
+        >
+          <p className="eyebrow">Repetir último pedido</p>
+          <p className="text-sm font-semibold text-charcoal-900 mt-0.5">
+            <span className="font-mono">{lastOrder.id}</span> · {formatDateShort(lastOrder.requestedDate)} · {lastOrder.lines.length} {lastOrder.lines.length === 1 ? 'línea' : 'líneas'}
+          </p>
+        </button>
+      )}
+
       <ProductGrid products={active} lines={lines} openId={openProductId} onOpen={setOpenProductId} />
 
       <SelectedLines lines={lines} onRemove={(l) => onLines(lines.filter((x) => !(x.productId === l.productId && x.formatId === l.formatId)))} />
+
 
       <div className="flex gap-2 pt-2 sticky bottom-0 bg-cream-50 py-3 border-t border-charcoal-100">
         <Button variant="secondary" onClick={onBack} className="flex-1">Volver</Button>
@@ -337,21 +363,6 @@ function StepProductos({
   );
 }
 
-const CATEGORY_LABEL: Record<string, string> = {
-  'jamones': 'Jamones',
-  'salames': 'Salames',
-  'chorizos': 'Chorizos y fuet',
-  'cabanossi': 'Cabanossi',
-  'embutidos-frescos': 'Embutidos frescos',
-  'mortadelas': 'Mortadelas',
-  'pastramis': 'Pastramis',
-  'carnes-curadas': 'Carnes curadas',
-  'quesos': 'Quesos',
-  'tablas': 'Tablas charcuteras',
-  'untables': 'Untables y patés',
-  'charqui': 'Charqui',
-};
-
 function ProductGrid({ products, lines, openId, onOpen }: { products: Product[]; lines: DraftLine[]; openId: string | null; onOpen: (id: string) => void }) {
   const byCat = useMemo(() => {
     const m = new Map<string, Product[]>();
@@ -359,14 +370,17 @@ function ProductGrid({ products, lines, openId, onOpen }: { products: Product[];
       const list = m.get(p.category) ?? [];
       list.push(p); m.set(p.category, list);
     }
-    return m;
+    // Sort categories by the canonical CATEGORY_LABEL order — the map
+    // insertion order would otherwise depend on which product loaded first.
+    const entries = [...m.entries()].sort(([a], [b]) => categoryOrder(a) - categoryOrder(b));
+    return new Map(entries);
   }, [products]);
 
   return (
     <div className="space-y-4">
       {[...byCat.entries()].map(([cat, list]) => (
         <div key={cat}>
-          <p className="eyebrow mb-2 px-0.5">{CATEGORY_LABEL[cat] ?? cat}</p>
+          <p className="eyebrow mb-2 px-0.5">{categoryLabel(cat)}</p>
           <div className="flex flex-wrap gap-1.5">
             {list.map((p) => {
               const has = lines.some((l) => l.productId === p.id);
@@ -587,17 +601,35 @@ function StepConfirmar({
 
   return (
     <section className="space-y-4">
-      <div className="card p-4">
-        <p className="eyebrow">Cliente</p>
-        <p className="font-semibold text-charcoal-900 mt-1">{client.fantasyName ?? client.name}</p>
-        <p className="text-xs text-charcoal-300 mt-0.5">
-          {client.rut ?? 'Sin RUT'} · {draft.deliveryMode === 'retiro' ? 'Retiro' : (draft.deliveryAddress || client.address)}
-        </p>
-        <p className="text-xs text-charcoal-300 mt-1.5 first-letter:uppercase">
-          Solicitado para {formatDateLong(draft.requestedDate)}
-        </p>
+      <div className="card p-4 space-y-2">
+        <div>
+          <p className="eyebrow">Cliente</p>
+          <p className="font-semibold text-charcoal-900 mt-1">{client.fantasyName ?? client.name}</p>
+          {client.fantasyName && client.name !== client.fantasyName && (
+            <p className="text-xs text-charcoal-300 mt-0.5">Razón social: {client.name}</p>
+          )}
+          <p className="text-xs text-charcoal-300 mt-0.5">{client.rut ?? 'Sin RUT'}</p>
+        </div>
+
+        <div className="border-t border-charcoal-100 pt-2">
+          <p className="eyebrow">Entrega</p>
+          <p className="text-sm text-charcoal-700 mt-1 first-letter:uppercase">
+            {formatDateLong(draft.requestedDate)}
+          </p>
+          <p className="text-xs text-charcoal-500 mt-0.5">
+            {draft.deliveryMode === 'retiro'
+              ? 'Retiro en tienda'
+              : `Despacho · ${draft.deliveryAddress || client.address || 'sin dirección'}`}
+          </p>
+          {(draft.receivingHours || client.receivingHours) && (
+            <p className="text-xs text-charcoal-500 mt-0.5">
+              Horario · {draft.receivingHours || client.receivingHours}
+            </p>
+          )}
+        </div>
+
         {!client.invoicingComplete && (
-          <p className="mt-3 text-xs text-brass-700 bg-brass-50 border border-brass-300 rounded px-2 py-1.5">
+          <p className="text-xs text-brass-700 bg-brass-50 border border-brass-300 rounded px-2 py-1.5">
             Datos de facturación incompletos — se creará y quedará marcado.
           </p>
         )}

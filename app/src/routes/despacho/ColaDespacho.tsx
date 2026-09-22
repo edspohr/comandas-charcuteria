@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCurrentUser } from '@/data/auth';
 import { useDespachoQueue } from '@/data/orders';
 import { formatDateShort, formatQty, todayInSantiago, addDaysIso } from '@/lib/format';
@@ -22,16 +22,37 @@ export default function ColaDespacho() {
   const [day, setDay] = useState<DayFilter>('todos');
   const [owner, setOwner] = useState<OwnerFilter>('todos');
 
+  const location = useLocation();
+  const navigate = useNavigate();
+  const flashArmado = (location.state as null | { armadoOk?: string })?.armadoOk;
+  useEffect(() => {
+    if (!flashArmado) return;
+    const t = setTimeout(() => navigate(location.pathname, { replace: true, state: null }), 4500);
+    return () => clearTimeout(t);
+  }, [flashArmado, navigate, location.pathname]);
+
   const today = todayInSantiago();
   const tomorrow = addDaysIso(today, 1);
 
   const filtered = useMemo(() => {
-    return orders.filter((o) => {
+    const rows = orders.filter((o) => {
       if (day === 'hoy'    && o.requestedDate !== today) return false;
       if (day === 'manana' && o.requestedDate !== tomorrow) return false;
       if (owner === 'mias' && o.assignedPackerId !== uid) return false;
       if (owner === 'sin_asignar' && !!o.assignedPackerId) return false;
       return true;
+    });
+    // Actionable first (confirmado + en_armado without pending), then the
+    // rest, keeping the useDespachoQueue tiebreaker (requestedDate + createdAt).
+    const isActionable = (o: Order) => {
+      const anyPending = o.lines.some((l) => l.pendingProductionQty > 0);
+      return !anyPending && (o.status === 'confirmado' || o.status === 'confirmado_parcial' || o.status === 'en_armado');
+    };
+    return rows.sort((a, b) => {
+      const aa = isActionable(a) ? 0 : 1;
+      const bb = isActionable(b) ? 0 : 1;
+      if (aa !== bb) return aa - bb;
+      return 0;
     });
   }, [orders, day, owner, today, tomorrow, uid]);
 
@@ -41,6 +62,12 @@ export default function ColaDespacho() {
         <p className="eyebrow">Despacho</p>
         <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Cola de despacho</h1>
       </header>
+
+      {flashArmado && (
+        <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-4">
+          Pedido <span className="font-mono">{flashArmado}</span> marcado como <strong>armado</strong>.
+        </div>
+      )}
 
       <section className="mb-4 flex flex-col gap-2">
         <FilterRow label="Fecha">

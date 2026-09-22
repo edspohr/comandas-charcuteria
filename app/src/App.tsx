@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Login from './routes/Login';
 import Placeholder from './routes/Placeholder';
 import NuevoPedido from './routes/vendedor/NuevoPedido';
+import MisPedidos from './routes/vendedor/MisPedidos';
+import DetallePedido from './routes/vendedor/DetallePedido';
 import ColaDespacho from './routes/despacho/ColaDespacho';
 import DetalleArmado from './routes/despacho/DetalleArmado';
 import Produccion from './routes/produccion/Produccion';
@@ -47,7 +49,17 @@ export default function App() {
           element={
             <RouteGuard current={current} allow={['vendedor', 'admin', 'superAdmin']}>
               <AppShell current={current!}>
-                <Placeholder title="Mis pedidos" hint="Llega en el hito 9." />
+                <MisPedidos />
+              </AppShell>
+            </RouteGuard>
+          }
+        />
+        <Route
+          path="/vendedor/mis/:orderId"
+          element={
+            <RouteGuard current={current} allow={['vendedor', 'admin', 'superAdmin']}>
+              <AppShell current={current!}>
+                <DetallePedido />
               </AppShell>
             </RouteGuard>
           }

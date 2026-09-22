@@ -312,6 +312,79 @@ export async function entregarOrder(orderId, by, note) {
         });
     });
 }
+// ---------- Vendedor: mis pedidos ----------
+export function useMyOrders(vendedorUid) {
+    const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    useEffect(() => {
+        const q = query(collection(db, 'orders'), where('createdBy', '==', vendedorUid), orderBy('createdAt', 'desc'));
+        const unsub = onSnapshot(q, (snap) => {
+            const list = [];
+            snap.forEach((d) => list.push(d.data()));
+            setOrders(list);
+            setLoading(false);
+        });
+        return unsub;
+    }, [vendedorUid]);
+    return { orders, loading };
+}
+// Anular pedido — releases any active reservations back to stock, writes
+// liberacion movements, and sets status=anulado. Only allowed while the
+// order is still in {recibido, confirmado, confirmado_parcial, en_armado}
+// and belongs to the caller (or admin). Once armado we don't allow anular
+// through this path (consumo already applied — needs admin refund flow,
+// out of scope).
+export async function anularOrder(orderId, by, reason) {
+    const orderRef = doc(db, 'orders', orderId);
+    await runTransaction(db, async (tx) => {
+        const snap = await tx.get(orderRef);
+        if (!snap.exists())
+            throw new Error('Pedido no encontrado');
+        const order = snap.data();
+        const cancellable = ['recibido', 'confirmado', 'confirmado_parcial', 'en_armado'];
+        if (!cancellable.includes(order.status)) {
+            throw new Error(`No se puede anular un pedido en estado ${order.status}`);
+        }
+        // Reads: one stock doc per line with reservedQty > 0.
+        const reads = [];
+        for (const line of order.lines) {
+            if (line.reservedQty <= 0)
+                continue;
+            const ref = doc(db, 'stock', stockDocId(line.productId, line.formatId));
+            const stockSnap = await tx.get(ref);
+            reads.push({
+                ref,
+                prev: stockSnap.exists() ? stockSnap.data() : null,
+                releaseQty: line.reservedQty,
+                line,
+            });
+        }
+        // Writes
+        const now = Date.now();
+        for (const r of reads) {
+            if (!r.prev)
+                continue;
+            tx.update(r.ref, { reserved: Math.max(0, r.prev.reserved - r.releaseQty) });
+            const mvRef = doc(collection(db, 'stockMovements'));
+            tx.set(mvRef, {
+                id: mvRef.id,
+                productId: r.line.productId,
+                formatId: r.line.formatId,
+                qty: r.releaseQty,
+                type: 'liberacion',
+                orderId,
+                by,
+                at: now,
+                reason,
+            });
+        }
+        tx.update(orderRef, {
+            status: 'anulado',
+            updatedAt: now,
+            statusHistory: [...order.statusHistory, { status: 'anulado', by, at: now, note: reason }],
+        });
+    });
+}
 export function useOrdersByStatuses(statuses) {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);

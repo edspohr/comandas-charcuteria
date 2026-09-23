@@ -21,46 +21,32 @@ Todos los usuarios comparten la contraseña **`demo1234`** en el ambiente de dem
 
 | Perfil | Puede | Usuarios |
 |---|---|---|
-| Vendedor | Crear pedidos, ver stock, ver sus pedidos, anular propios | Rafael, Ramiro, Gabriela, Juan, Tania, Elizabeth, Lucy |
-| Despacho | Tomar pedidos, ingresar pesos reales, marcar armado | Edu, Morena |
-| Producción | Ver demanda + registrar producción (reasigna FIFO) | Yuri |
-| Administración | Facturar, despachar, entregar, catálogo/clientes, panel | Miguel |
-| Super Administración | Todo lo anterior + usuarios + sincronizar Bsale | Ciro, Luis |
+| Vendedor | Crear pedidos (wizard o pegando WhatsApp), alta rápida de clientes, ver el tablero con sus pedidos, anular propios | Rafael, Ramiro, Gabriela, Juan, Tania, Elizabeth, Lucy |
+| Despacho | Tablero: tomar pedidos, ingresar pesos reales, marcar armado; sincronizar stock con Bsale | Edu, Morena |
+| Producción | Ver demanda pendiente vs. stock Bsale (solo lectura) y sincronizar | Yuri |
+| Administración | Tablero completo: vincular documento Bsale, despachar, entregar; Panel de dueños; catálogo/clientes | Miguel |
+| Super Administración | Todo lo anterior + usuarios + **Consola Bsale (simulada)** | Ciro, Luis |
 
 ---
 
-## Guión de demo (≈10 min)
+## Guión de demo (≈12 min)
 
-Para mostrar el flujo completo en la URL en vivo. Recomiendo dos ventanas de incógnito lado a lado.
+Para mostrar el flujo completo en la URL en vivo. Recomiendo dos ventanas de incógnito lado a lado. Todo el mundo aterriza en el **Tablero** (kanban); cada rol ve las mismas tarjetas y solo puede mover las suyas.
 
-1. **Login** — Muestra las tarjetas de rol y el sello LC. Entrá como **Rafael** (vendedor).
+1. **Login** — Tarjetas de rol y sello LC. Entrá como **Rafael** (vendedor). Aterriza en el Tablero con el filtro **Míos** activo.
 2. **Nuevo pedido** — Wizard 4 pasos:
-   - Cliente: buscá "Magnolia" y tocá la tarjeta **Magnolia** (razón social *Hotel Magnolia*).
-   - Productos: agregá 3 líneas mixtas (jamón cocido en sachet 200 g, mortadela pistacho en granel, queso gouda ahumado en sachet 200 g). El picker de formatos abre como bottom-sheet, muestra **el precio por formato** debajo del label y un **subtotal en vivo** mientras se mueve el stepper.
-   - Entrega: dejá la fecha por defecto (mañana), despacho.
-   - Confirmar → Enviar. Se ve el **total estimado** destacado. Flash en Mis pedidos con `PED-2026-XXXX` y el monto.
-3. **Pegar pedido (opcional)** — Volvé a Nuevo pedido → **Pegar pedido**. Cargá el ejemplo, "Interpretar" (por defecto va a **Gemini 2.5 Flash** via Firebase AI Logic; si falla, fallback local). Un chip en el header dice qué motor corrió. Revisá y "Continuar en el wizard".
-4. **Split a producción** — Elegí un cliente y pedí `20 kg` de **Longaniza chillán** en granel (hay 8 kg disponibles). Ves el aviso "12 kg a producción" en Confirmar. Este pedido queda `confirmado_parcial` — todavía **no** se puede armar hasta que producción cubra las líneas pendientes.
-5. **Cambiá a Yuri (producción)** — Ves la card **Longaniza chillán · Granel laminado (kg)** en "Con demanda pendiente".
-   - Tocá la card para ver los pedidos que dependen; Registrar producción abre pre-seleccionado el producto+formato.
-   - Ingresá una cantidad ≥ pendiente y "Registrar". El pedido parcial se promueve a `confirmado` y aparece en el aviso "Pedidos promovidos".
-6. **Cambiá a Edu (despacho)** — Nueva ventana incógnito.
-   - Cola: aplicá el filtro **Sin asignar**. Ves los pedidos listos para armar — el del paso 2 y el del paso 4 (que ya se promovió tras el paso 5).
-   - Tomá uno → estado `en_armado`.
-   - En una línea `Granel laminado (kg)` bajá el stepper *Empacado* respecto al vendido para simular la merma (p. ej. 3 kg vendidos → 2,5 kg empacados). El **subtotal se recalcula en vivo**. Para líneas `pieza` (Pastrami Americano, Bresaola, Coppa) también podés ingresar `Peso real (kg)` — la factura se ajusta a ese peso × precio/kg.
-   - "Marcar armado". Repetí para el otro pedido si querés ver dos facturas en el paso 7.
-7. **Cambiá a Miguel (admin)** — Facturación:
-   - Cards muestran total CLP por pedido.
-   - Tab **Por facturar**: `Facturar` → confirmación → modal muestra `FA-000XXX` **+ payload JSON con `netUnitValue` calculado** (subtotal / 1,19 / cantidad).
-   - Tab **Por despachar**: `Despachar` con courier + nota.
-   - Tab **Por entregar**: `Marcar entregado`.
-8. **Panel** — Métricas valorizadas:
-   - **Ventas facturadas** con ticket promedio.
-   - Chart **Ventas por vendedor (CLP)**.
-   - Chart **Top 8 productos por venta**.
-   - Lista de deltas empacado/vendido (el granel del paso 5 aparece con delta negativo).
-9. **Cambiá a Ciro (super admin)** — Aparece la sección **Sincronizar con Bsale** al fondo del Panel + nav item **Usuarios**. Tocá Sincronizar para ver el batch de payloads.
-10. **Catálogo → Ajustar stock** — Elegí un producto, expandí un formato, tocá **Ajustar**, cambiá la cantidad con un motivo → la disponibilidad se actualiza en vivo. El movimiento `ajuste` queda registrado como bitácora en Firestore (no hay vista de historial en esta versión).
+   - Cliente: buscá "Magnolia" y tocá la tarjeta. Los datos vienen de **Bsale** (razón social, RUT, dirección). Si escribís un nombre que no existe aparece **Crear cliente**: alta rápida con lo mínimo; el cliente se crea en Bsale y queda marcado *pendiente de revisión* si falta algo para facturar.
+   - Productos: agregá 3 líneas mixtas (jamón cocido en sachet 200 g, mortadela pistacho en granel, queso gouda ahumado en sachet 200 g). El picker abre como bottom-sheet con precio y subtotal en vivo. El semáforo usa el stock que reporta Bsale menos las reservas de la app.
+   - Entrega: fecha por defecto (mañana o pasado según el corte de las 15:00), despacho.
+   - Confirmar → Enviar. Volvés al Tablero con la tarjeta nueva en **Pendiente**.
+3. **Pegar pedido** — Tocá **Cliente nuevo** para cargar el ejemplo de Café Botánico, "Interpretar". Además de las líneas, la app detecta al cliente (nombre, RUT, teléfono, dirección, horario) y ofrece **Crear cliente con estos datos**. Con Gemini activo el bloque `client` lo devuelve el modelo; si no, lo extrae el parser determinista. "Continuar con Café Botánico" salta directo a Productos.
+4. **Split a producción** — Elegí un cliente y pedí `20 kg` de **Longaniza chillán** en granel (hay 18 kg disponibles según Bsale). Ves "12 kg a producción" en Confirmar. La tarjeta queda en Pendiente con la etiqueta **Espera stock** y nadie puede armarla todavía.
+5. **Cambiá a Ciro (super admin) → Bsale** — La *Consola Bsale (simulada)* hace lo que en la vida real pasa dentro de Bsale. En **Recepción de producción** cargá 20 kg de Longaniza chillán granel y tocá **Cargar y sincronizar**: la app trae el stock nuevo, reasigna FIFO y promueve el pedido parcial a `confirmado`. Yuri ve lo mismo en **Producción**, ahora solo lectura.
+6. **Cambiá a Edu (despacho)** — Tablero, filtro **Sin asignar**. Tocá **Tomar** en la tarjeta (o arrastrala a *En armado* en desktop). Abrí el detalle, bajá el stepper *Empacado* de una línea granel (3 kg → 2,5 kg) y **Marcar armado**. La tarjeta pasa a **Por facturar**; si pasan más de 4 h sin documento se pone ámbar.
+7. **Cambiá a Miguel (admin)** — En **Por facturar** tocá **Vincular doc.** La venta se emite en el POS de Bsale; el diálogo lista los documentos sin vincular (primero los que traen el pedido como referencia). Para la demo tocá **Simular emisión en POS**: emite la factura en el mock con las cantidades empacadas y la vincula. Se libera la reserva y la tarjeta pasa a **Por despachar**. Después **Despachar** (courier + nota) y **Entregar**.
+8. **Stock comprometido** — Con Ciro, en Consola Bsale → **Venta en mostrador**, vendé por boleta un producto que la app tenga reservado y tocá **Emitir y sincronizar**. Las tarjetas que dependen de ese stock se ponen **rojas** ("Stock comprometido"): es la señal de que la tienda vendió lo que el pedido tenía apartado.
+9. **Panel de dueños** — Cinco pestañas con rango 7/30/90 días vs. período anterior y **Exportar CSV** en cada tabla: **Ventas** (serie diaria, por vendedor, categoría, cliente, producto), **Fuerza de ventas** (cartera por vendedor: activos, en riesgo, inactivos, nuevos, anulados), **Operación** (tiempos por etapa, entregas a tiempo, backlog, carga por armador), **Stock** (cobertura en días, quiebres, comprometido, merma) y **Clientes** (salud, frecuencia, concentración, pendientes de revisión).
+10. **Catálogo** — Productos con el stock según Bsale (solo lectura: los ajustes se hacen en Bsale) y la ficha de clientes.
 
 ---
 
@@ -69,16 +55,25 @@ Para mostrar el flujo completo en la URL en vivo. Recomiendo dos ventanas de inc
 - **App:** Vite + React + TypeScript + Tailwind (Montserrat, paleta charcoal/crema/oro apagado inspirada en la web del cliente).
 - **Backend:** Firebase (Firestore + Auth + Hosting; Firebase AI Logic con Vertex AI para el parseo IA).
 - **Catálogo:** 48 productos transcritos del pricelist oficial de agosto + catálogo de fotos. Cada `ProductFormat` lleva `priceCLP` (sachet/unidad) o `pricePerKgCLP` + `avgWeightKg` (granel / pieza). Los pedidos guardan `subtotalCLP` por línea y `totalCLP` en snapshot.
-- **Parser IA:** Gemini 2.5 Flash via Firebase AI Logic (`@firebase/ai`, backend `VertexAIBackend` region `us-central1`). Un manifest compacto del catálogo se inyecta como contexto y un JSON schema estructurado obliga a devolver IDs exactos. Timeout 8 s → si falla, el parser determinista (Fuse.js + regex) toma el relevo automáticamente.
-- **Modelo de stock:** colección `stock/{productId__formatId}` con `{ onHand, reserved }` mutada solo en transacciones. `stockMovements` es bitácora append-only para auditoría — nunca se agrega en cliente.
-- **Transacciones que tocan stock:**
-  - `createOrder` — reserva + creación de pedido + contador `PED-YYYY-NNNN` en una sola transacción.
-  - `markArmado` (despacho) — libera reserva, decrementa `onHand` por `packedQty`, escribe consumo.
-  - `registrarProduccion` (producción) — sube `onHand` y reasigna FIFO a pedidos parciales.
-  - `anularOrder` (vendedor/admin) — libera reservas.
-  - `ajustarStock` (admin) — ajuste absoluto con motivo obligatorio.
-- **Adaptador Bsale:** `BsaleClient` + `MockBsaleClient`. El botón *Sincronizar* en el Panel muestra el payload que se enviaría.
-- **PWA:** instalable, service worker cachea el shell, drafts del wizard viven en `localStorage` (funciona offline).
+- **Parser IA:** Gemini 2.5 Flash via Firebase AI Logic. Devuelve líneas con IDs exactos del catálogo **y un bloque `client`** con lo que el mensaje revela del cliente. Timeout 8 s → fallback al parser determinista (Fuse.js + regex) y al extractor de RUT/teléfono/dirección.
+
+### Bsale es la fuente de la verdad
+
+La fábrica carga la producción terminada en Bsale y las ventas se emiten en los puntos de venta de Bsale. La app **no escribe stock ni documentos en Bsale**; lo lee y mantiene espejos locales:
+
+| Colección | Qué es | Quién la escribe |
+|---|---|---|
+| `stock/{productId__formatId}` | Espejo: `onHand` = lo que reportó Bsale para la variante, `reserved` = reservas de pedidos abiertos (Bsale no conoce reservas), `syncedAt` | `syncFromBsale` (onHand), transacciones de pedido (reserved) |
+| `clients/{id}` | Espejo del maestro de clientes de Bsale + campos propios (`ownerUid` vendedor responsable, modalidad, horario, notas, `needsReview`) | `syncFromBsale`, alta rápida |
+| `stockMovements` | Bitácora append-only: `reserva`, `liberacion`, `sync_bsale`, `venta_bsale` | transacciones |
+
+Disponible = `onHand − reserved`. Si Bsale reporta menos de lo reservado (vendieron en mostrador lo apartado), los pedidos afectados se marcan **stock comprometido**.
+
+- **Sincronización** (`syncFromBsale`, botón en Tablero/Producción y automática al abrir el tablero si pasaron > 5 min): trae stock y clientes, sobrescribe los espejos, reasigna FIFO el stock nuevo a los pedidos parciales y promueve a `confirmado` los que quedan cubiertos.
+- **Transacciones de pedido:** `createOrder` (reserva + `PED-YYYY-NNNN`), `assignPacker`, `markArmado` (solo pesos y subtotales; no toca stock), `vincularDocumento` (libera reserva, pre-aplica la venta al espejo, guarda `invoiceRef` + `bsaleDocumentId`), `despacharOrder`, `entregarOrder`, `anularOrder` (libera reserva).
+- **Adaptador Bsale:** `BsaleClient` con la forma de la API real (variantes por SKU, oficinas, `GET/POST /v1/clients.json`, `GET /v1/documents.json`, `GET /v1/stocks.json`). `MockBsaleClient` lee un "lado Bsale" simulado en Firestore (`bsaleMock/*`, `bsaleClients`, `bsaleDocuments`, `bsaleReceptions`); `mockAdmin.ts` simula la recepción de producción y la emisión en POS (Consola Bsale). Cambiar al cliente real = mismo interfaz, token en una Cloud Function.
+- **Tablero kanban:** `/tablero` para todos los roles. Columnas Pendiente · En armado · Por facturar · Por despachar · Cerrado; acción siguiente por rol en la tarjeta; drag & drop en desktop; colores por umbrales configurables en `settings/app.kanban` (rojo: atrasado o stock comprometido; ámbar: vence hoy, sin asignar > 2 h, armado sin documento > 4 h, despachado sin entrega > 24 h).
+- **PWA:** instalable, service worker con aviso de nueva versión, drafts del wizard en `localStorage`.
 
 ---
 
@@ -147,16 +142,17 @@ El plan Blaze está habilitado en `comandas-charcuteria`. La función `parseOrde
 comandas-charcuteria/
 ├── app/                            React + Vite + Tailwind
 │   ├── src/
-│   │   ├── domain/                 tipos, cutoff, parser local
-│   │   ├── data/                   hooks Firestore, transacciones
-│   │   ├── integrations/bsale/     BsaleClient + MockBsaleClient
-│   │   ├── components/ui/          Button, Stepper, Semaphore, Logo, StatusPill
+│   │   ├── domain/                 tipos, cutoff, kanban (columnas/colores), analytics, parse/ (local, gemini, client)
+│   │   ├── data/                   hooks Firestore, transacciones, sync Bsale
+│   │   ├── integrations/bsale/     BsaleClient, MockBsaleClient, mockAdmin (Consola)
+│   │   ├── components/             ui/, orders/OrderDialogs, clients/NuevoClienteDialog
 │   │   ├── routes/
-│   │   │   ├── vendedor/           NuevoPedido, PegarPedido, MisPedidos, DetallePedido
-│   │   │   ├── despacho/           ColaDespacho, DetalleArmado
-│   │   │   ├── produccion/         Produccion
-│   │   │   └── admin/              Facturacion, Panel, Catalogo, Usuarios
-│   │   └── lib/                    format, draft (localStorage)
+│   │   │   ├── Tablero.tsx         kanban para todos los roles
+│   │   │   ├── vendedor/           NuevoPedido, PegarPedido, DetallePedido
+│   │   │   ├── despacho/           DetalleArmado
+│   │   │   ├── produccion/         Produccion (solo lectura)
+│   │   │   └── admin/              Panel, Catalogo, Usuarios, Bsale (consola simulada)
+│   │   └── lib/                    format, pricing, rut, csv, draft (localStorage)
 │   └── public/icons/               PWA icons (SVG)
 ├── functions/                      Firebase Function `parseOrder` (stub)
 ├── scripts/                        seed + verify
@@ -174,21 +170,23 @@ comandas-charcuteria/
 **Incluido:**
 - 5 perfiles con permisos por rol y reglas Firestore.
 - Wizard de creación de pedidos móvil-primero con reserva transaccional y split a producción.
-- Parser de pedidos pegados (fallback determinista + hueco listo para Claude).
-- Cola de despacho con pesos reales y transacción de consumo.
-- Registrar producción con reasignación FIFO y promoción automática de pedidos parciales.
-- Facturación/despacho/entrega con MockBsaleClient (payload JSON visible).
-- Panel de dueños con métricas + charts + Sincronizar Bsale para superAdmin.
-- Catálogo/clientes read-only + ajuste de stock con motivo (auditoría).
+- Parser de pedidos pegados (Gemini + fallback determinista) que también detecta al cliente.
+- Alta rápida de cliente (wizard y parser) creada en Bsale y espejada localmente.
+- Tablero kanban por etapas con acciones por rol, drag & drop y colores por umbral.
+- Stock y clientes como espejo de Bsale con sincronización y reasignación FIFO automática.
+- Vincular documento Bsale (emitido en POS) → despacho → entrega, con atajo de simulación.
+- Consola Bsale simulada (recepción de producción, venta en mostrador, documentos).
+- Panel de dueños: ventas, fuerza de ventas, operación, stock y clientes, con exportación CSV.
 - PWA instalable con drafts offline en `localStorage`.
 
 **Fuera de alcance:**
-- Precios, márgenes, pagos.
-- API real de Bsale (solo interfaz + mock).
+- Márgenes, pagos, cobranza.
+- API real de Bsale (solo interfaz + mock; el token existe pero la integración queda para después de la demo).
+- CRM externo (HubSpot): se evaluó y se pospone hasta lograr adopción; el modelo de cliente ya trae `hubspotCompanyId` para el conector futuro.
 - Fotos como prueba de entrega (por ahora sólo texto).
 - Notificaciones push.
 - Multi-idioma (todo en es-CL formal).
-- Rules tests más allá de los 3 críticos.
+- Rules tests más allá de los 3 críticos (y siguen sin poder correr en máquinas sin JDK).
 
 ---
 

@@ -1,324 +1,332 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts';
+import { Link } from 'react-router-dom';
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/data/firebase';
 import Button from '@/components/ui/Button';
-import { useCurrentUser } from '@/data/auth';
+import { useProducts } from '@/data/products';
+import { useClients } from '@/data/clients';
+import { useAllStock, useSyncState } from '@/data/stock';
 import { demoUsers } from '@/data/demo-users';
-import { addDaysIso, todayInSantiago } from '@/lib/format';
+import { categoryLabel } from '@/domain/categories';
+import {
+  anulados, backlog, byCategory, byClient, byPacker, byProduct, byVendedor, clientRows, gramsMap, inRange, leadTimes,
+  pareto, pctDelta, rangeFor, salesForce, salesTotals, seriesByDay, serviceLevel, stockRows,
+  type ClientHealth, type RangeKey,
+} from '@/domain/analytics';
+import { downloadCsv } from '@/lib/csv';
+import { formatDateShort, formatQty } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
-import { bsale } from '@/integrations/bsale/MockBsaleClient';
-import type { Order, OrderLine } from '@/domain/types';
+import type { Order } from '@/domain/types';
 
-const VENDEDOR_NAME: Record<string, string> = Object.fromEntries(
-  demoUsers.filter((u) => u.role === 'vendedor').map((u) => [u.uid, u.displayName]),
-);
+const NAME: Record<string, string> = Object.fromEntries(demoUsers.map((u) => [u.uid, u.displayName]));
+const nameOf = (uid: string) => NAME[uid] ?? uid;
+const VENDEDORES = demoUsers.filter((u) => u.role === 'vendedor').map((u) => ({ uid: u.uid, name: u.displayName }));
 
-// Convert a line's qty to a comparable kg number when possible.
-// For kg-unit lines, qty is already in kg. For sachet formats we use grams
-// metadata if present; otherwise 0 (we skip it in kg totals).
-function toKg(line: OrderLine, gramsByFormat: Map<string, number | undefined>): number {
-  if (line.unit === 'kg') return line.qty;
-  const g = gramsByFormat.get(`${line.productId}::${line.formatId}`);
-  if (g == null) return 0;
-  return (g * line.qty) / 1000;
-}
+type Tab = 'ventas' | 'fuerza' | 'operacion' | 'stock' | 'clientes';
+const TABS: Array<[Tab, string]> = [['ventas', 'Ventas'], ['fuerza', 'Fuerza de ventas'], ['operacion', 'Operación'], ['stock', 'Stock'], ['clientes', 'Clientes']];
 
-function packedKg(line: OrderLine, gramsByFormat: Map<string, number | undefined>): number {
-  if (line.packedWeightKg != null) return line.packedWeightKg;
-  const packed = line.packedQty ?? 0;
-  if (line.unit === 'kg') return packed;
-  const g = gramsByFormat.get(`${line.productId}::${line.formatId}`);
-  if (g == null) return 0;
-  return (g * packed) / 1000;
-}
-
-type Range = '7' | '30' | 'all';
+const GOLD = '#a8834a'; const WOOD = '#4d3b28'; const WOOD_LIGHT = '#b39776';
+const TOOLTIP = { borderRadius: 8, border: '1px solid #e5e2dd', fontSize: 12 };
+const kFmt = (v: number) => `$${Math.round(v / 1000)}k`;
+const h = (v: number | null) => (v == null ? '—' : v < 1 ? `${Math.round(v * 60)} min` : v < 48 ? `${v.toFixed(1)} h` : `${(v / 24).toFixed(1)} d`);
+const pct = (v: number | null) => (v == null ? '—' : `${v.toFixed(0)}%`);
 
 export default function Panel() {
-  const { current } = useCurrentUser();
-  const isSuperAdmin = current!.appUser.role === 'superAdmin';
-  const [range, setRange] = useState<Range>('7');
+  const [tab, setTab] = useState<Tab>('ventas');
+  const [rangeKey, setRangeKey] = useState<RangeKey>('30');
   const [orders, setOrders] = useState<Order[]>([]);
-  const [gramsByFormat, setGramsByFormat] = useState<Map<string, number | undefined>>(new Map());
+  const { products } = useProducts();
+  const { clients } = useClients();
+  const { stock } = useAllStock();
+  const sync = useSyncState();
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'orders'), (snap) => {
-      const list: Order[] = [];
-      snap.forEach((d) => list.push(d.data() as Order));
-      setOrders(list);
+      const list: Order[] = []; snap.forEach((d) => list.push(d.data() as Order)); setOrders(list);
     });
     return unsub;
   }, []);
 
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'products'), (snap) => {
-      const m = new Map<string, number | undefined>();
-      snap.forEach((d) => {
-        const p = d.data() as { id: string; formats: { formatId: string; grams?: number }[] };
-        for (const f of p.formats) m.set(`${p.id}::${f.formatId}`, f.grams);
-      });
-      setGramsByFormat(m);
-    });
-    return unsub;
-  }, []);
+  const grams = useMemo(() => gramsMap(products), [products]);
+  const { current, previous } = useMemo(() => rangeFor(rangeKey), [rangeKey]);
+  const cur = useMemo(() => orders.filter((o) => inRange(o, current)), [orders, current]);
+  const prev = useMemo(() => orders.filter((o) => inRange(o, previous)), [orders, previous]);
 
-  const fromDate = useMemo(() => {
-    if (range === 'all') return '2020-01-01';
-    return addDaysIso(todayInSantiago(), -(range === '7' ? 7 : 30));
-  }, [range]);
+  const totals = useMemo(() => salesTotals(cur, grams), [cur, grams]);
+  const prevTotals = useMemo(() => salesTotals(prev, grams), [prev, grams]);
+  const series = useMemo(() => seriesByDay(cur, current, grams), [cur, current, grams]);
+  const vend = useMemo(() => byVendedor(cur, grams, nameOf), [cur, grams]);
+  const cli = useMemo(() => byClient(cur, grams), [cur, grams]);
+  const prod = useMemo(() => byProduct(cur, products, grams), [cur, products, grams]);
+  const cats = useMemo(() => byCategory(prod, categoryLabel), [prod]);
+  const lt = useMemo(() => leadTimes(cur), [cur]);
+  const svc = useMemo(() => serviceLevel(orders), [orders]);
+  const bl = useMemo(() => backlog(orders), [orders]);
+  const packers = useMemo(() => byPacker(cur, grams, nameOf), [cur, grams]);
+  const anul = useMemo(() => anulados(cur, nameOf), [cur]);
+  const stRows = useMemo(() => stockRows(products, stock, orders, grams), [products, stock, orders, grams]);
+  const cRows = useMemo(() => clientRows(clients, orders, current, nameOf), [clients, orders, current]);
+  const par = useMemo(() => pareto(cRows), [cRows]);
+  const force = useMemo(() => salesForce(cur, cRows, grams, nameOf, VENDEDORES), [cur, cRows, grams]);
 
-  const filtered = useMemo(() => orders.filter((o) => o.requestedDate >= fromDate), [orders, fromDate]);
-
-  const metrics = useMemo(() => {
-    let totalOrders = 0;
-    let anuladas = 0;
-    let incompleteInvoicing = 0;
-    let pendingProductionLines = 0;
-    let deltaLines: Array<{ orderId: string; productName: string; formatLabel: string; sold: number; packed: number }> = [];
-    let byVendedor = new Map<string, { orders: number; kg: number; clp: number }>();
-    let byProduct = new Map<string, { name: string; kg: number; clp: number }>();
-    let totalRevenueCLP = 0;
-    let invoicedOrdersCount = 0;
-
-    for (const o of filtered) {
-      totalOrders++;
-      if (o.status === 'anulado') anuladas++;
-      if (!o.invoicingComplete) incompleteInvoicing++;
-      const vName = VENDEDOR_NAME[o.createdBy] ?? o.createdBy;
-      const v = byVendedor.get(vName) ?? { orders: 0, kg: 0, clp: 0 };
-      v.orders++;
-      let orderKg = 0;
-      const isInvoiced = ['facturado', 'despachado', 'entregado'].includes(o.status);
-      if (isInvoiced && o.totalCLP != null) {
-        totalRevenueCLP += o.totalCLP;
-        invoicedOrdersCount++;
-      }
-      if (o.status !== 'anulado' && o.totalCLP != null) v.clp += o.totalCLP;
-      for (const l of o.lines) {
-        if (l.pendingProductionQty > 0) {
-          pendingProductionLines++;
-        }
-        const kg = toKg(l, gramsByFormat);
-        orderKg += kg;
-        const pByKey = byProduct.get(l.productId) ?? { name: l.productName, kg: 0, clp: 0 };
-        pByKey.kg += kg;
-        pByKey.clp += l.subtotalCLP ?? 0;
-        byProduct.set(l.productId, pByKey);
-        // Delta packed vs reserved — reserved is what despacho committed to
-        // deliver in this run (pending-production quantities stay outside).
-        // Comparing against `qty` would show a phantom -12 delta on every
-        // confirmado_parcial we ever armed after Registrar Producción.
-        if (l.packedQty != null && l.reservedQty > 0) {
-          const kgReserved = l.unit === 'kg'
-            ? l.reservedQty
-            : (gramsByFormat.get(`${l.productId}::${l.formatId}`) ?? 0) * l.reservedQty / 1000;
-          const pk = packedKg(l, gramsByFormat);
-          if (kgReserved > 0 && Math.abs(pk - kgReserved) >= 0.1) {
-            deltaLines.push({
-              orderId: o.id,
-              productName: l.productName,
-              formatLabel: l.formatLabel,
-              sold: kgReserved,
-              packed: pk,
-            });
-          }
-        }
-      }
-      v.kg += orderKg;
-      byVendedor.set(vName, v);
-    }
-
-    const vendedorArr = [...byVendedor.entries()]
-      .map(([name, v]) => ({ name, orders: v.orders, kg: Number(v.kg.toFixed(1)), clp: Math.round(v.clp) }))
-      .sort((a, b) => b.clp - a.clp);
-
-    const productArr = [...byProduct.values()]
-      .map((p) => ({ name: p.name, kg: Number(p.kg.toFixed(1)), clp: Math.round(p.clp) }))
-      .filter((p) => p.clp > 0)
-      .sort((a, b) => b.clp - a.clp)
-      .slice(0, 8);
-
-    deltaLines.sort((a, b) => Math.abs(b.sold - b.packed) - Math.abs(a.sold - a.packed));
-    const deltaCount = deltaLines.length;
-    const deltaTop = deltaLines.slice(0, 5);
-
-    const avgTicketCLP = invoicedOrdersCount > 0 ? totalRevenueCLP / invoicedOrdersCount : 0;
-
-    return { totalOrders, anuladas, incompleteInvoicing, pendingProductionLines, deltaCount, deltaLines: deltaTop, vendedorArr, productArr, totalRevenueCLP, avgTicketCLP };
-  }, [filtered, gramsByFormat]);
-
-  const [syncModal, setSyncModal] = useState<null | { payload: unknown }>(null);
-
-  const [syncing, setSyncing] = useState(false);
-  async function syncBsale() {
-    if (syncing) return;
-    setSyncing(true);
-    try {
-      // Preview only: build payloads with each order's existing invoiceRef.
-      // Does NOT call createDocument, so no invoice numbers are consumed.
-      const invoiced = orders.filter((o) => !!o.invoiceRef).slice(0, 20);
-      const payloads = invoiced.map((o) => ({
-        docNumber: o.invoiceRef!,
-        order: o.id,
-        payload: bsale.buildPayload(o),
-      }));
-      setSyncModal({ payload: payloads });
-    } finally {
-      setSyncing(false);
-    }
-  }
+  const rangeLabel = rangeKey === 'all' ? 'todo el historial' : `últimos ${rangeKey} días`;
+  const prevLabel = rangeKey === 'all' ? '' : `vs. ${rangeKey} días anteriores`;
 
   return (
     <div>
-      <header className="mb-6 flex items-end justify-between gap-3 flex-wrap">
+      <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <p className="eyebrow">Administración</p>
+          <p className="eyebrow">Gerencia</p>
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Panel de dueños</h1>
+          <p className="text-xs text-charcoal-300 mt-1">Pedidos por fecha solicitada · {rangeLabel} {prevLabel}{sync?.at ? ` · stock Bsale ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}` : ''}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <RangeChip range="7"   current={range} setRange={setRange}>7 días</RangeChip>
-          <RangeChip range="30"  current={range} setRange={setRange}>30 días</RangeChip>
-          <RangeChip range="all" current={range} setRange={setRange}>Todo</RangeChip>
+        <div className="flex items-center gap-1.5">
+          {(['7', '30', '90', 'all'] as RangeKey[]).map((k) => (
+            <button key={k} onClick={() => setRangeKey(k)} className={'rounded-md px-3 py-1.5 text-xs uppercase tracking-display font-medium border transition ' + (rangeKey === k ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-500 hover:border-charcoal-300')}>
+              {k === 'all' ? 'Todo' : `${k} días`}
+            </button>
+          ))}
         </div>
       </header>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <MetricCard label="Pedidos" value={metrics.totalOrders} sublabel={metrics.anuladas > 0 ? `${metrics.anuladas} anulados` : undefined} />
-        <MetricCard label="Ventas facturadas" value={formatCLP(metrics.totalRevenueCLP)} sublabel={metrics.avgTicketCLP > 0 ? `Ticket ~${formatCLP(metrics.avgTicketCLP)}` : undefined} />
-        <MetricCard label="Facturación incompleta" value={metrics.incompleteInvoicing} tone={metrics.incompleteInvoicing > 0 ? 'warn' : 'ok'} />
-        <MetricCard label="Delta empacado/vendido" value={metrics.deltaCount} sublabel="líneas con diferencia" />
-      </div>
+      <nav className="mb-5 flex gap-1 border-b border-charcoal-100 overflow-x-auto">
+        {TABS.map(([t, label]) => (
+          <button key={t} onClick={() => setTab(t)} className={'px-4 py-2.5 text-xs uppercase tracking-display font-medium border-b-2 transition -mb-px whitespace-nowrap ' + (t === tab ? 'border-brass-500 text-charcoal-900' : 'border-transparent text-charcoal-300 hover:text-charcoal-500')}>{label}</button>
+        ))}
+      </nav>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <ChartCard title="Ventas por vendedor (CLP)">
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={metrics.vendedorArr} margin={{ top: 8, right: 8, left: 0, bottom: 24 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e2dd" vertical={false} />
-              <XAxis dataKey="name" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} interval={0} angle={-25} textAnchor="end" dy={4} />
-              <YAxis stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${Math.round((v as number) / 1000)}k`} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5e2dd', fontSize: 12 }} formatter={(v) => [formatCLP(v as number), 'Ventas']} />
-              <Bar dataKey="clp" radius={[3, 3, 0, 0]}>
-                {metrics.vendedorArr.map((_, i) => <Cell key={i} fill={i === 0 ? '#a8834a' : '#4d3b28'} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-        <ChartCard title="Top productos por venta (top 8)">
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={metrics.productArr} layout="vertical" margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e2dd" horizontal={false} />
-              <XAxis type="number" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${Math.round((v as number) / 1000)}k`} />
-              <YAxis dataKey="name" type="category" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} width={140} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5e2dd', fontSize: 12 }} formatter={(v) => [formatCLP(v as number), 'Ventas']} />
-              <Bar dataKey="clp" fill="#7a5f42" radius={[0, 3, 3, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </div>
+      {tab === 'ventas' && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Metric label="Ventas facturadas" value={formatCLP(totals.revenue)} delta={pctDelta(totals.revenue, prevTotals.revenue)} sub={`${totals.invoicedOrders} pedidos con documento`} />
+            <Metric label="Pedidos" value={totals.orders} delta={pctDelta(totals.orders, prevTotals.orders)} sub={totals.anulados ? `${totals.anulados} anulados` : undefined} />
+            <Metric label="Ticket promedio" value={formatCLP(totals.ticket)} delta={pctDelta(totals.ticket, prevTotals.ticket)} />
+            <Metric label="Kilos" value={`${totals.kg.toFixed(0)} kg`} delta={pctDelta(totals.kg, prevTotals.kg)} />
+          </div>
 
-      {metrics.deltaLines.length > 0 && (
-        <section className="mb-6">
-          <p className="eyebrow mb-2">Diferencia peso empacado vs vendido</p>
-          <div className="card divide-y divide-charcoal-100">
-            {metrics.deltaLines.map((d) => {
-              const diff = d.packed - d.sold;
-              return (
-                <div key={`${d.orderId}-${d.productName}`} className="flex items-center justify-between gap-3 p-3 text-sm">
-                  <div className="min-w-0">
-                    <div className="text-charcoal-700 font-medium truncate">{d.productName}</div>
-                    <div className="text-xs text-charcoal-300 truncate">
-                      <span className="font-mono">{d.orderId}</span> · {d.formatLabel}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-xs text-charcoal-300">Vendido {d.sold.toFixed(1)} kg</div>
-                    <div className={'text-sm font-semibold ' + (diff < 0 ? 'text-red-700' : 'text-brass-700')}>
-                      Empacado {d.packed.toFixed(1)} kg
-                      <span className="ml-2 text-[10px] uppercase tracking-display">
-                        ({diff > 0 ? '+' : ''}{diff.toFixed(1)})
-                      </span>
-                    </div>
-                  </div>
+          <Card title="Ventas por día" action={<Export name="ventas-por-dia" rows={series} cols={[['date', 'Fecha'], ['orders', 'Pedidos'], ['revenue', 'Ventas CLP'], ['kg', 'Kg']]} />}>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={series} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e2dd" vertical={false} />
+                <XAxis dataKey="label" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => kFmt(v as number)} />
+                <Tooltip contentStyle={TOOLTIP} formatter={(v, n) => [n === 'revenue' ? formatCLP(v as number) : v, n === 'revenue' ? 'Ventas' : n === 'orders' ? 'Pedidos' : 'Kg']} />
+                <Line type="monotone" dataKey="revenue" stroke={GOLD} strokeWidth={2} dot={{ r: 2 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card title="Ventas por vendedor" action={<Export name="ventas-por-vendedor" rows={vend} cols={[['name', 'Vendedor'], ['orders', 'Pedidos'], ['revenue', 'Ventas CLP'], ['ticket', 'Ticket'], ['kg', 'Kg']]} />}>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={vend} margin={{ top: 8, right: 8, left: 0, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e2dd" vertical={false} />
+                  <XAxis dataKey="name" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} interval={0} angle={-25} textAnchor="end" dy={4} />
+                  <YAxis stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => kFmt(v as number)} />
+                  <Tooltip contentStyle={TOOLTIP} formatter={(v) => [formatCLP(v as number), 'Ventas']} />
+                  <Bar dataKey="revenue" radius={[3, 3, 0, 0]}>{vend.map((_, i) => <Cell key={i} fill={i === 0 ? GOLD : WOOD} />)}</Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+            <Card title="Ventas por categoría" action={<Export name="ventas-por-categoria" rows={cats} cols={[['name', 'Categoría'], ['revenue', 'Ventas CLP'], ['kg', 'Kg'], ['orders', 'Pedidos']]} />}>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={cats} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e2dd" horizontal={false} />
+                  <XAxis type="number" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => kFmt(v as number)} />
+                  <YAxis dataKey="name" type="category" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} width={150} />
+                  <Tooltip contentStyle={TOOLTIP} formatter={(v) => [formatCLP(v as number), 'Ventas']} />
+                  <Bar dataKey="revenue" fill={WOOD_LIGHT} radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Table title="Top clientes" rows={cli.slice(0, 10)} export={{ name: 'ventas-por-cliente', rows: cli }}
+              cols={[['name', 'Cliente'], ['orders', 'Pedidos'], ['revenue', 'Ventas', (v) => formatCLP(v as number)], ['ticket', 'Ticket', (v) => formatCLP(v as number)]]} />
+            <Table title="Top productos" rows={prod.slice(0, 12)} export={{ name: 'ventas-por-producto', rows: prod }}
+              cols={[['name', 'Producto'], ['kg', 'Kg', (v) => (v as number).toFixed(1)], ['units', 'Unid.'], ['revenue', 'Ventas', (v) => formatCLP(v as number)]]} />
+          </div>
+        </div>
+      )}
+
+      {tab === 'fuerza' && (
+        <div className="space-y-5">
+          <p className="text-xs text-charcoal-500 max-w-3xl">Ventas del período por vendedor y estado de su cartera (clientes con vendedor responsable). Activo = pidió en los últimos 14 días · En riesgo = 15–30 días · Inactivo = más de 30 días sin pedir.</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {force.map((v) => (
+              <div key={v.key} className="card p-4">
+                <div className="flex items-baseline justify-between">
+                  <p className="font-semibold text-charcoal-900">{v.name}</p>
+                  <p className="text-sm font-semibold text-charcoal-900">{formatCLP(v.revenue)}</p>
                 </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {isSuperAdmin && (
-        <section className="mt-8 pt-6 border-t border-charcoal-100">
-          <div className="card p-4 flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <p className="eyebrow">Solo Super Administrador</p>
-              <h3 className="text-base font-semibold text-charcoal-900 tracking-display uppercase mt-0.5">Sincronizar con Bsale</h3>
-              <p className="text-xs text-charcoal-300 mt-1">
-                Simulado. Muestra los payloads que se enviarían para los pedidos con documento emitido.
-              </p>
-            </div>
-            <Button onClick={syncBsale} disabled={syncing}>
-              {syncing ? 'Preparando…' : 'Sincronizar'}
-            </Button>
-          </div>
-        </section>
-      )}
-
-      {syncModal && (
-        <div className="fixed inset-0 z-20 bg-charcoal-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="w-full max-w-2xl bg-cream-50 rounded-t-xl sm:rounded-xl shadow-lift p-5 max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="eyebrow">Simulado</p>
-                <h2 className="text-lg font-semibold text-charcoal-900 tracking-display uppercase mt-0.5">Payload Bsale</h2>
+                <p className="text-[11px] text-charcoal-300 uppercase tracking-display mt-0.5">{v.orders} pedidos · ticket {formatCLP(v.ticket)} · {v.kg.toFixed(0)} kg</p>
+                <div className="grid grid-cols-4 gap-1 mt-3 text-center">
+                  <Mini label="Cartera" value={v.cartera} />
+                  <Mini label="Activos" value={v.activos} tone="ok" />
+                  <Mini label="Riesgo" value={v.enRiesgo} tone={v.enRiesgo ? 'warn' : undefined} />
+                  <Mini label="Inactivos" value={v.inactivos} tone={v.inactivos ? 'bad' : undefined} />
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1 text-[10px] uppercase tracking-display">
+                  {v.nuevos > 0 && <span className="rounded px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200">{v.nuevos} nuevo{v.nuevos === 1 ? '' : 's'}</span>}
+                  {v.anulados > 0 && <span className="rounded px-1.5 py-0.5 bg-red-50 text-red-700 border border-red-200">{v.anulados} anulado{v.anulados === 1 ? '' : 's'}</span>}
+                  {v.parciales > 0 && <span className="rounded px-1.5 py-0.5 bg-brass-50 text-brass-700 border border-brass-300">{v.parciales} esperando stock</span>}
+                  {v.avgDaysSince != null && <span className="rounded px-1.5 py-0.5 bg-charcoal-50 text-charcoal-500 border border-charcoal-100">último pedido hace ~{Math.round(v.avgDaysSince)} d</span>}
+                </div>
               </div>
-              <button onClick={() => setSyncModal(null)} className="text-charcoal-300 hover:text-charcoal-700 text-xl w-8 h-8 flex items-center justify-center">×</button>
-            </div>
-            <pre className="rounded-md bg-charcoal-900 text-cream-100 text-[11px] leading-relaxed p-3 overflow-auto flex-1">
-{JSON.stringify(syncModal.payload, null, 2)}
-            </pre>
+            ))}
           </div>
+          <Table title="Detalle por vendedor" rows={force} export={{ name: 'fuerza-de-ventas', rows: force }}
+            cols={[['name', 'Vendedor'], ['orders', 'Pedidos'], ['revenue', 'Ventas', (v) => formatCLP(v as number)], ['ticket', 'Ticket', (v) => formatCLP(v as number)], ['cartera', 'Cartera'], ['activos', 'Activos'], ['enRiesgo', 'Riesgo'], ['inactivos', 'Inactivos'], ['nuevos', 'Nuevos'], ['anulados', 'Anulados']]} />
+          <Table title="Clientes en riesgo o inactivos (por vendedor)" rows={cRows.filter((c) => c.health === 'en_riesgo' || c.health === 'inactivo').sort((a, b) => (a.owner.localeCompare(b.owner)) || (b.daysSince ?? 0) - (a.daysSince ?? 0))} export={{ name: 'clientes-en-riesgo', rows: cRows.filter((c) => c.health !== 'activo') }}
+            cols={[['owner', 'Vendedor'], ['name', 'Cliente'], ['daysSince', 'Días sin pedir'], ['avgIntervalDays', 'Frecuencia (d)', (v) => v == null ? '—' : Math.round(v as number)], ['health', 'Estado', (v) => HEALTH[v as ClientHealth]]]} />
+        </div>
+      )}
+
+      {tab === 'operacion' && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Metric label="Entregas a tiempo" value={pct(svc.onTimePct)} sub={`${svc.delivered} entregados · ${svc.late} tarde`} tone={svc.onTimePct != null && svc.onTimePct < 90 ? 'warn' : undefined} />
+            <Metric label="Atrasados hoy" value={svc.lateNow} sub={`${svc.openNow} abiertos`} tone={svc.lateNow ? 'bad' : undefined} />
+            <Metric label="Ciclo total" value={h(lt.total)} sub={`recibido → entregado · n=${lt.n}`} />
+            <Metric label="Anulados" value={anul.length} sub={anul.length ? formatCLP(anul.reduce((s, a) => s + a.revenue, 0)) : undefined} tone={anul.length ? 'warn' : undefined} />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card title="Tiempo promedio por etapa">
+              <ul className="divide-y divide-charcoal-100 text-sm">
+                {([['Captura → tomado', lt.captura], ['Armado', lt.armado], ['Armado → documento', lt.documento], ['Documento → despacho', lt.despacho], ['Despacho → entrega', lt.entrega]] as Array<[string, number | null]>).map(([l, v]) => (
+                  <li key={l} className="py-2 flex justify-between"><span className="text-charcoal-500">{l}</span><span className="font-semibold text-charcoal-900">{h(v)}</span></li>
+                ))}
+              </ul>
+            </Card>
+            <Card title="Backlog por etapa (hoy)" action={<Export name="backlog" rows={bl} cols={[['label', 'Etapa'], ['count', 'Pedidos'], ['revenue', 'CLP']]} />}>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={bl} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e2dd" vertical={false} />
+                  <XAxis dataKey="label" stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#8b8177" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip contentStyle={TOOLTIP} formatter={(v, n) => [n === 'count' ? v : formatCLP(v as number), n === 'count' ? 'Pedidos' : 'CLP']} />
+                  <Bar dataKey="count" fill={WOOD} radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Table title="Carga por armador" rows={packers} export={{ name: 'armadores', rows: packers }}
+              cols={[['name', 'Armador'], ['enArmado', 'En armado'], ['armados', 'Armados'], ['kg', 'Kg', (v) => (v as number).toFixed(0)], ['avgHours', 'Tiempo prom.', (v) => h(v as number | null)]]} />
+            <Table title="Pedidos anulados" rows={anul} export={{ name: 'anulados', rows: anul }}
+              cols={[['id', 'Pedido'], ['client', 'Cliente'], ['vendedor', 'Vendedor'], ['reason', 'Motivo'], ['revenue', 'CLP', (v) => formatCLP(v as number)]]} />
+          </div>
+        </div>
+      )}
+
+      {tab === 'stock' && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Metric label="Quiebres" value={stRows.filter((r) => r.pending > 0).length} sub="formatos con pedidos esperando" tone={stRows.some((r) => r.pending > 0) ? 'warn' : undefined} />
+            <Metric label="Cobertura < 3 días" value={stRows.filter((r) => r.coverageDays != null && r.coverageDays < 3).length} sub="con demanda en 30 días" />
+            <Metric label="Stock comprometido" value={stRows.filter((r) => r.available < 0).length} sub="Bsale por debajo de reservas" tone={stRows.some((r) => r.available < 0) ? 'bad' : undefined} />
+            <Metric label="Merma (30 d)" value={`${stRows.reduce((s, r) => s + Math.max(0, r.mermaKg), 0).toFixed(1)} kg`} sub="vendido − empacado" />
+          </div>
+          <Table title="Cobertura por formato (demanda promedio de los últimos 30 días)" rows={stRows.filter((r) => r.pending > 0 || r.avgDaily > 0 || r.reserved > 0).slice(0, 40)} export={{ name: 'stock-cobertura', rows: stRows }}
+            cols={[['product', 'Producto'], ['format', 'Formato'], ['onHand', 'Bsale', (v, r) => formatQty(v as number, r.unit as 'kg')], ['reserved', 'Reserv.', (v, r) => formatQty(v as number, r.unit as 'kg')], ['available', 'Disp.', (v, r) => formatQty(v as number, r.unit as 'kg')], ['avgDaily', 'Dem./día', (v) => (v as number).toFixed(1)], ['coverageDays', 'Cobertura', (v) => v == null ? '—' : `${Math.round(v as number)} d`], ['pending', 'A producir', (v) => (v as number) > 0 ? String(v) : '']]}
+            rowTone={(r) => r.available < 0 ? 'bad' : r.pending > 0 ? 'warn' : undefined} />
+          <Table title="Merma por formato" rows={stRows.filter((r) => Math.abs(r.mermaKg) >= 0.05).sort((a, b) => b.mermaKg - a.mermaKg)} export={{ name: 'merma', rows: stRows.filter((r) => r.mermaKg !== 0) }}
+            cols={[['product', 'Producto'], ['format', 'Formato'], ['mermaKg', 'Δ kg (vendido − empacado)', (v) => `${(v as number) > 0 ? '−' : '+'}${Math.abs(v as number).toFixed(2)} kg`]]} />
+        </div>
+      )}
+
+      {tab === 'clientes' && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Metric label="Clientes activos" value={cRows.filter((c) => c.health === 'activo' || c.health === 'nuevo').length} sub={`de ${cRows.length}`} />
+            <Metric label="Nuevos en el período" value={cRows.filter((c) => c.health === 'nuevo').length} />
+            <Metric label="En riesgo / inactivos" value={`${cRows.filter((c) => c.health === 'en_riesgo').length} / ${cRows.filter((c) => c.health === 'inactivo').length}`} tone={cRows.some((c) => c.health === 'inactivo') ? 'warn' : undefined} />
+            <Metric label="Concentración" value={pct(par.topShare)} sub={`top ${par.topCount} clientes`} />
+          </div>
+          {cRows.some((c) => c.needsReview || !c.invoicingComplete) && (
+            <div className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 p-3 text-sm">
+              {cRows.filter((c) => c.needsReview).length} cliente{cRows.filter((c) => c.needsReview).length === 1 ? '' : 's'} creado{cRows.filter((c) => c.needsReview).length === 1 ? '' : 's'} desde el wizard pendiente{cRows.filter((c) => c.needsReview).length === 1 ? '' : 's'} de revisión · {cRows.filter((c) => !c.invoicingComplete).length} con facturación incompleta. <Link to="/admin/catalogo" className="underline">Completar en Catálogo → Clientes</Link>.
+            </div>
+          )}
+          <Table title="Cartera" rows={cRows} export={{ name: 'clientes', rows: cRows }}
+            cols={[['name', 'Cliente'], ['owner', 'Vendedor'], ['orders', 'Pedidos'], ['revenue', 'Ventas', (v) => formatCLP(v as number)], ['ticket', 'Ticket', (v) => formatCLP(v as number)], ['lastDate', 'Último', (v) => v ? formatDateShort(v as string) : '—'], ['avgIntervalDays', 'Cada', (v) => v == null ? '—' : `${Math.round(v as number)} d`], ['health', 'Estado', (v) => HEALTH[v as ClientHealth]]]}
+            rowTone={(r) => r.health === 'inactivo' ? 'bad' : r.health === 'en_riesgo' ? 'warn' : undefined} />
         </div>
       )}
     </div>
   );
 }
 
-function MetricCard({ label, value, sublabel, tone }: { label: string; value: number | string; sublabel?: string; tone?: 'ok' | 'warn' }) {
+const HEALTH: Record<ClientHealth, string> = { nuevo: 'Nuevo', activo: 'Activo', en_riesgo: 'En riesgo', inactivo: 'Inactivo', sin_pedidos: 'Sin pedidos' };
+
+function Metric({ label, value, sub, delta, tone }: { label: string; value: number | string; sub?: string; delta?: number | null; tone?: 'warn' | 'bad' }) {
   return (
-    <div className={'card p-4 ' + (tone === 'warn' ? 'border-brass-300' : '')}>
+    <div className={'card p-4 ' + (tone === 'warn' ? 'border-brass-300' : tone === 'bad' ? 'border-red-200' : '')}>
       <p className="eyebrow">{label}</p>
-      <p className={'text-3xl font-semibold mt-1 tracking-display ' + (tone === 'warn' ? 'text-brass-700' : 'text-charcoal-900')}>
-        {value}
+      <p className={'text-2xl font-semibold mt-1 tracking-display ' + (tone === 'warn' ? 'text-brass-700' : tone === 'bad' ? 'text-red-700' : 'text-charcoal-900')}>{value}</p>
+      <p className="text-[11px] text-charcoal-300 mt-1 uppercase tracking-display flex items-center gap-2">
+        {delta != null && <span className={delta >= 0 ? 'text-emerald-700' : 'text-red-700'}>{delta >= 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(0)}%</span>}
+        {sub}
       </p>
-      {sublabel && <p className="text-[11px] text-charcoal-300 mt-1 uppercase tracking-display">{sublabel}</p>}
     </div>
   );
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function Mini({ label, value, tone }: { label: string; value: number; tone?: 'ok' | 'warn' | 'bad' }) {
+  return (
+    <div className="rounded-md bg-cream-100/60 py-1.5">
+      <p className={'text-base font-semibold ' + (tone === 'ok' ? 'text-emerald-700' : tone === 'warn' ? 'text-brass-700' : tone === 'bad' ? 'text-red-700' : 'text-charcoal-900')}>{value}</p>
+      <p className="text-[9px] uppercase tracking-display text-charcoal-300">{label}</p>
+    </div>
+  );
+}
+
+function Card({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="card p-4">
-      <p className="eyebrow mb-3">{title}</p>
+      <div className="flex items-center justify-between mb-3"><p className="eyebrow">{title}</p>{action}</div>
       {children}
     </div>
   );
 }
 
-function RangeChip({ range, current, setRange, children }: { range: Range; current: Range; setRange: (r: Range) => void; children: React.ReactNode }) {
-  const active = range === current;
+function Export({ name, rows, cols }: { name: string; rows: Array<object>; cols: Array<[string, string]> }) {
   return (
-    <button
-      onClick={() => setRange(range)}
-      className={
-        'rounded-md px-3 py-1.5 text-xs uppercase tracking-display font-medium border transition ' +
-        (active
-          ? 'bg-charcoal-900 border-charcoal-900 text-cream-50'
-          : 'bg-white border-charcoal-200 text-charcoal-500 hover:border-charcoal-300')
-      }
-    >
-      {children}
-    </button>
+    <Button size="sm" variant="ghost" className="!py-1 !px-2 text-[11px]" onClick={() => downloadCsv(name, rows, cols.map(([key, label]) => ({ key, label })))} disabled={rows.length === 0}>
+      Exportar CSV
+    </Button>
   );
 }
 
+type Col = [string, string, ((v: unknown, row: Record<string, unknown>) => React.ReactNode)?];
+const rec = (r: object) => r as Record<string, unknown>;
+
+function Table<T extends object>({ title, rows, cols, export: exp, rowTone }: { title: string; rows: T[]; cols: Col[]; export?: { name: string; rows: Array<object> }; rowTone?: (r: T) => 'warn' | 'bad' | undefined }) {
+  return (
+    <Card title={title} action={exp ? <Export name={exp.name} rows={exp.rows} cols={cols.map(([k, l]) => [k, l])} /> : undefined}>
+      {rows.length === 0 ? <p className="text-xs text-charcoal-300">Sin datos en el período.</p> : (
+        <div className="overflow-x-auto -mx-4 px-4">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-display text-charcoal-300 border-b border-charcoal-100">
+                {cols.map(([k, l], i) => <th key={k} className={'py-1.5 pr-3 font-semibold ' + (i > 0 ? 'text-right' : '')}>{l}</th>)}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-charcoal-100/70">
+              {rows.map((r, ri) => {
+                const tone = rowTone?.(r);
+                return (
+                  <tr key={ri} className={tone === 'bad' ? 'bg-red-50/40' : tone === 'warn' ? 'bg-brass-50/40' : ''}>
+                    {cols.map(([k, , fmt], i) => <td key={k} className={'py-1.5 pr-3 ' + (i > 0 ? 'text-right tabular-nums text-charcoal-700' : 'text-charcoal-900 font-medium')}>{fmt ? fmt(rec(r)[k], rec(r)) : String(rec(r)[k] ?? '')}</td>)}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}

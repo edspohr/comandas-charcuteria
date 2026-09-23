@@ -5,6 +5,7 @@ import { describeFirestoreError } from '@/lib/errors';
 import { stockDocId, type Order, type StockDoc, type StockMovement } from '@/domain/types';
 import { bsale } from '@/integrations/bsale/MockBsaleClient';
 import { absorbPendingForKey } from './produccion';
+import { syncClientsFromBsale } from './clients';
 
 // Loads the whole stock mirror once (~100 docs, one per product+format).
 export function useAllStock(): { stock: Map<string, StockDoc>; loading: boolean; error: string | null } {
@@ -65,6 +66,7 @@ export function semaphore(available: number, qty: number): Semaphore {
 export interface SyncSummary {
   at: number;
   by: string;
+  clientsUpdated?: number; // client mirror docs written
   updated: number;        // stock docs whose onHand changed
   promoted: string[];     // orders promoted confirmado_parcial → confirmado
   absorbed: number;       // pending units re-assigned to reservations
@@ -84,7 +86,7 @@ export function useSyncState(): SyncState | null {
   return state;
 }
 
-// Pull stock from Bsale and overwrite the mirror's onHand. Then, for every
+// Pull stock (and the client master) from Bsale and overwrite the mirrors. Then, for every
 // sku that now has room, absorb pending production FIFO (promoting orders
 // whose lines are fully covered). Bsale is the source of truth: the app never
 // pushes stock the other way.
@@ -161,7 +163,11 @@ export async function syncStockFromBsale(by: string, officeId?: number): Promise
     if (l && r.quantity < l.reserved) compromised.push(sku);
   }
 
-  const summary: SyncSummary = { at: now, by, updated: changed.length, promoted, absorbed, compromised };
+  // 4. Client master.
+  let clientsUpdated = 0;
+  try { clientsUpdated = (await syncClientsFromBsale()).updated; } catch (e) { console.warn('[sync] clientes', e); }
+
+  const summary: SyncSummary = { at: now, by, clientsUpdated, updated: changed.length, promoted, absorbed, compromised };
   // Best-effort: the summary is informational (header timestamp); a rules
   // denial here must not fail the sync itself.
   try {
@@ -170,3 +176,6 @@ export async function syncStockFromBsale(by: string, officeId?: number): Promise
   } catch (e) { console.warn('[sync] no se pudo guardar el resumen', e); }
   return summary;
 }
+
+// Alias — the sync covers stock + clients now.
+export const syncFromBsale = syncStockFromBsale;

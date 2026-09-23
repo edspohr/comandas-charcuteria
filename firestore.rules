@@ -28,7 +28,9 @@ service cloud.firestore {
       // marcado needsReview; administración lo completa después.
       allow create: if isAdminOrSup()
         || (isVendedor() && request.resource.data.createdBy == request.auth.uid);
-      allow update, delete: if isAdminOrSup();
+      // sync mirrors Bsale into clients/*: any role that can run the sync.
+      allow update: if isAdminOrSup() || isDespacho() || isProduccion();
+      allow delete: if isAdminOrSup();
     }
 
     match /settings/{doc} {
@@ -47,6 +49,14 @@ service cloud.firestore {
       allow read:   if isAuth();
       allow create: if isAdminOrSup();
       // linking a document to an order only sets linkedOrderId
+      allow update: if isAdminOrSup();
+      allow delete: if isSuperAdmin();
+    }
+    // Client master in Bsale. Alta rápida = POST /v1/clients.json, so
+    // vendedores may create; edits happen in Bsale (admin here for the demo).
+    match /bsaleClients/{id} {
+      allow read:   if isAuth();
+      allow create: if isVendedor() || isAdminOrSup();
       allow update: if isAdminOrSup();
       allow delete: if isSuperAdmin();
     }

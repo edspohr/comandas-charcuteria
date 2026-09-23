@@ -47,7 +47,30 @@ export interface BsaleReception {
   by: string;
 }
 
-export interface BsaleCustomer { id: string; rut?: string; name: string; }
+// GET /v1/clients.json — Bsale is the master for client data.
+export interface BsaleCustomer {
+  id: string;
+  rut?: string;
+  name: string;          // razón social (companyName) or persona
+  fantasyName?: string;  // "activity"/alias in Bsale, nombre comercial para nosotros
+  giro?: string;
+  address?: string;
+  city?: string;
+  phone?: string;
+  email?: string;
+  updatedAt?: number;
+}
+
+export interface BsaleCustomerInput {
+  name: string;
+  fantasyName?: string;
+  rut?: string;
+  giro?: string;
+  address?: string;
+  city?: string;
+  phone?: string;
+  email?: string;
+}
 
 export interface BsaleClient {
   // GET /v1/stocks.json?officeid=… — one row per variant.
@@ -55,7 +78,10 @@ export interface BsaleClient {
   // GET /v1/documents.json?emissiondate=… — documents emitted at the POS.
   getDocuments(params?: { sinceMs?: number; unlinkedOnly?: boolean; limit?: number }): Promise<BsaleDocument[]>;
   getDocument(id: string): Promise<BsaleDocument | null>;
-  getCustomers(): Promise<BsaleCustomer[]>;
+  // GET /v1/clients.json (paginated) — full client list for the mirror.
+  getClients(): Promise<BsaleCustomer[]>;
+  // POST /v1/clients.json — alta rápida desde la app crea el cliente en Bsale.
+  createClient(input: BsaleCustomerInput): Promise<BsaleCustomer>;
   // Pure — the payload a real integration would POST to /v1/documents.json.
   // Kept so stakeholders can see the contract from the app.
   buildPayload(order: Order, invoiceRef?: string): unknown;

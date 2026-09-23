@@ -247,7 +247,7 @@ function StepCliente({
   return (
     <section className="space-y-4">
       <div>
-        <label className="eyebrow block mb-1.5">Buscar cliente</label>
+        <label className="eyebrow block mb-1.5">Buscar cliente <span className="normal-case tracking-normal font-normal text-charcoal-300">· datos desde Bsale</span></label>
         <input
           autoFocus
           value={q}

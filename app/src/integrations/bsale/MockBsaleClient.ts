@@ -1,8 +1,8 @@
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, where } from 'firebase/firestore';
 import { db } from '@/data/firebase';
 import type { Order } from '@/domain/types';
 import type {
-  BsaleClient, BsaleCustomer, BsaleDocument, BsaleVariantStock,
+  BsaleClient, BsaleCustomer, BsaleCustomerInput, BsaleDocument, BsaleVariantStock,
 } from './BsaleClient';
 
 // MockBsaleClient — plays the role of the Bsale API using a small "Bsale
@@ -11,6 +11,7 @@ import type {
 //   bsaleMock/counters     { factura, boleta }
 //   bsaleDocuments/{id}    documents emitted at the (simulated) POS
 //   bsaleReceptions/{id}   production received into Bsale
+//   bsaleClients/{id}      the client master (what /v1/clients.json returns)
 // The simulated POS / factory actions live in ./mockAdmin.ts (Consola Bsale).
 // Swapping this class for the real client = same interface, token in a Cloud
 // Function, no UI changes.
@@ -48,14 +49,18 @@ export class MockBsaleClient implements BsaleClient {
     return snap.exists() ? (snap.data() as BsaleDocument) : null;
   }
 
-  async getCustomers(): Promise<BsaleCustomer[]> {
-    const snap = await getDocs(collection(db, 'clients'));
+  async getClients(): Promise<BsaleCustomer[]> {
+    const snap = await getDocs(collection(db, 'bsaleClients'));
     const out: BsaleCustomer[] = [];
-    snap.forEach((d) => {
-      const c = d.data() as { id: string; name: string; rut?: string };
-      out.push({ id: c.id, name: c.name, rut: c.rut });
-    });
+    snap.forEach((d) => out.push(d.data() as BsaleCustomer));
     return out;
+  }
+
+  async createClient(input: BsaleCustomerInput): Promise<BsaleCustomer> {
+    const ref = doc(collection(db, 'bsaleClients'));
+    const created: BsaleCustomer = { id: ref.id, ...input, updatedAt: Date.now() };
+    await setDoc(ref, created);
+    return created;
   }
 
   // netUnitValue matches how the real Bsale API expects it: neto (sin IVA)

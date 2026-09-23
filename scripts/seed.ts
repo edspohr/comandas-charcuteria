@@ -84,7 +84,7 @@ db.settings({ ignoreUndefinedProperties: true });
 
 async function wipeFirestore() {
   // Note: `counters` is included so a re-seed resets both orders-YYYY and bsale-YYYY.
-  const collections = ['products', 'clients', 'orders', 'stock', 'stockMovements', 'users', 'settings', 'counters', 'bsaleMock', 'bsaleDocuments', 'bsaleReceptions'];
+  const collections = ['products', 'clients', 'orders', 'stock', 'stockMovements', 'users', 'settings', 'counters', 'bsaleMock', 'bsaleDocuments', 'bsaleReceptions', 'bsaleClients'];
   for (const name of collections) {
     const snap = await db.collection(name).get();
     let batch = db.batch();
@@ -128,7 +128,12 @@ async function seedCatalog() {
     const counts = new Map<string, number>();
     for (const o of weekOrders) if (o.clientId === cli.id) counts.set(o.createdBy, (counts.get(o.createdBy) ?? 0) + 1);
     const ownerUid = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-    batch.set(db.collection('clients').doc(cli.id), { ...cli, source: 'seed', ownerUid });
+    // Bsale side (master) + local mirror with the app-only fields.
+    batch.set(db.collection('bsaleClients').doc(cli.id), {
+      id: cli.id, name: cli.name, fantasyName: cli.fantasyName, rut: cli.rut, giro: cli.giro,
+      address: cli.address, phone: cli.contactPhone, email: cli.email, updatedAt: Date.now(),
+    });
+    batch.set(db.collection('clients').doc(cli.id), { ...cli, source: 'seed', ownerUid, bsaleClientId: cli.id, bsaleSyncedAt: Date.now() });
   }
   batch.set(db.collection('settings').doc('app'), {
     cutoffHour: 15,

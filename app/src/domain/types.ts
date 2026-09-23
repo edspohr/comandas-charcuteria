@@ -96,6 +96,11 @@ export interface Client {
   // Vendedor responsable de la cuenta (cartera). Drives the sales-force
   // supervision block in the dashboard.
   ownerUid?: string;
+  // Bsale is the master for client data: this doc is a mirror refreshed by
+  // syncFromBsale. App-only fields (ownerUid, deliveryMode, receivingHours,
+  // notes, isInternalShop) survive the sync.
+  bsaleClientId?: string;
+  bsaleSyncedAt?: number;
   // Future CRM link (HubSpot Company). The app only caches a copy.
   hubspotCompanyId?: string;
 }

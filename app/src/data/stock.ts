@@ -75,8 +75,9 @@ export interface SyncSummary {
 
 export interface SyncState extends SyncSummary { running?: boolean; }
 
-export function useSyncState(): SyncState | null {
-  const [state, setState] = useState<SyncState | null>(null);
+// undefined = still loading, null = never synced.
+export function useSyncState(): SyncState | null | undefined {
+  const [state, setState] = useState<SyncState | null | undefined>(undefined);
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'bsaleSync'), (snap) => {
       setState(snap.exists() ? (snap.data() as SyncState) : null);

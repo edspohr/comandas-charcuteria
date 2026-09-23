@@ -33,7 +33,9 @@ const shiftIso = (iso: string) => {
   const d = new Date(Date.parse(iso) + SHIFT_DAYS * DAY_MS);
   return d.toISOString().slice(0, 10);
 };
-const shiftMs = (ms: number) => ms + SHIFT_DAYS * DAY_MS;
+// Timestamps never land in the future: an order "captured" after the seed's
+// anchor day is clamped to now, so histories read naturally on the tablero.
+const shiftMs = (ms: number) => Math.min(ms + SHIFT_DAYS * DAY_MS, Date.now());
 function shiftOrder(o: Order): Order {
   return {
     ...o,

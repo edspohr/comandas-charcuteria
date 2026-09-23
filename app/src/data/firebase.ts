@@ -2,6 +2,7 @@ import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+import { initializeAppCheck, ReCaptchaV3Provider, type AppCheck } from 'firebase/app-check';
 
 const useEmulators = import.meta.env.VITE_USE_EMULATORS === 'true';
 
@@ -13,6 +14,25 @@ const config: FirebaseOptions = {
 };
 
 export const app = initializeApp(config);
+
+// App Check is mandatory for Firebase AI Logic (Gemini): the project refuses
+// AI calls until enforcement is on and every request carries an App Check
+// token. reCAPTCHA v3 site key comes from the console (App Check → Apps).
+// Without a key we simply don't initialize it (Firestore/Auth keep working;
+// only the AI features fall back to the local parser).
+//   - VITE_RECAPTCHA_SITE_KEY: reCAPTCHA v3 site key registered in App Check.
+//   - VITE_APPCHECK_DEBUG=true: local dev — prints a debug token in the console
+//     once; register it in App Check → Apps → Manage debug tokens.
+export let appCheck: AppCheck | null = null;
+const recaptchaKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
+if (typeof window !== 'undefined' && recaptchaKey) {
+  if (import.meta.env.VITE_APPCHECK_DEBUG === 'true' || import.meta.env.DEV) {
+    (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean | string }).FIREBASE_APPCHECK_DEBUG_TOKEN =
+      (import.meta.env.VITE_APPCHECK_DEBUG_TOKEN as string | undefined) || true;
+  }
+  appCheck = initializeAppCheck(app, { provider: new ReCaptchaV3Provider(recaptchaKey), isTokenAutoRefreshEnabled: true });
+}
+
 export const auth = getAuth(app);
 // Real Firestore rejects undefined field values (createOrder sends optional
 // notes / rawText / clientSnapshot.rut as undefined for some inputs).

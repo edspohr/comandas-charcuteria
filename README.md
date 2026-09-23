@@ -193,29 +193,20 @@ comandas-charcuteria/
 
 ## Habilitar Gemini (una sola vez)
 
-El cliente `@firebase/ai` v2 usa **Firebase AI Logic** como proxy hacia Vertex AI: el browser habla con `firebasevertexai.googleapis.com` (auth por Firebase Auth), esa API llama a Vertex AI del lado del servidor. Hay que habilitar las tres:
+Firebase AI Logic (`@firebase/ai`) llama a Gemini a través de `firebasevertexai.googleapis.com` con la API key web del proyecto **y un token de App Check**. Si falta cualquiera de las dos cosas, la app cae al parser determinista y muestra el aviso amarillo "Se usó el intérprete local".
 
-```bash
-gcloud services enable \
-  firebasevertexai.googleapis.com \
-  aiplatform.googleapis.com \
-  firebaseml.googleapis.com \
-  --project=comandas-charcuteria
-```
+1. **APIs** (ya habilitadas en el proyecto): `firebasevertexai.googleapis.com`, `aiplatform.googleapis.com`, `firebaseml.googleapis.com`.
+   ```bash
+   gcloud services enable firebasevertexai.googleapis.com aiplatform.googleapis.com --project comandas-charcuteria
+   ```
+2. **App Check** (obligatorio: sin enforcement el proyecto responde `403 Firebase AI Logic has been deactivated… you must enforce Firebase App Check`):
+   - Consola Firebase → *App Check* → *Apps* → registrar la app web `comandas-charcuteria` con **reCAPTCHA v3** (crea la clave en <https://www.google.com/recaptcha/admin> con el dominio `comandas-charcuteria.web.app` y `localhost`). Copiar la **site key**.
+   - Poner `VITE_RECAPTCHA_SITE_KEY=<site key>` en `app/.env.production` (y en `.env.local` para desarrollo).
+   - Consola Firebase → *App Check* → *APIs* → **Firebase AI Logic → Enforce**.
+   - Desarrollo local: `VITE_APPCHECK_DEBUG=true` imprime un debug token en la consola del navegador; registrarlo en *App Check → Apps → ⋮ → Manage debug tokens*.
+3. `npm run deploy`. Verificar en Pedido IA que el chip diga **· Gemini** y no aparezca el aviso amarillo. La consola del navegador loguea `[parse] Gemini failed…` con la causa exacta cuando falla.
 
-O desde la consola: **Firebase Console → Build → AI Logic** → aceptar el bootstrap (activa las tres). Verificar en **Vertex AI → Model Garden** que `gemini-2.5-flash` esté disponible en `us-central1`.
-
-**Sin `firebasevertexai.googleapis.com` habilitada, todas las llamadas del cliente `@firebase/ai` fallan y la app cae al parser local en silencio.** Fue justo el estado del proyecto hasta 23-09-2026: `aiplatform` y `firebaseml` estaban activas pero faltaba `firebasevertexai`. Si el chip del intérprete dice *"parser local"* en vez de *"Gemini"* y arriba aparece el banner amarillo *"Se usó el intérprete local"*, revisar la consola del browser en Pedido IA: un `[parse] Gemini failed…` con `403` o `SERVICE_DISABLED` es esta causa.
-
-**Costo.** Pricing público de Vertex AI para `gemini-2.5-flash` en Sep-2026: USD 0.075 / 1 M tokens de input, USD 0.30 / 1 M tokens de output. Cada llamada del parser envía ~4 K tokens (catálogo + mensaje) y recibe ~500. Con 30 pedidos/día ⇒ ~3.6 M tokens/mes de input y 450 K de output ⇒ **~USD 0.40/mes**, dentro de cualquier cuota razonable.
-
-**Verificación local.** `scripts/verify-gemini.ts` prueba el endpoint end-to-end contra la SA `firebase-adminsdk-fbsvc@…`:
-```bash
-GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npx tsx scripts/verify-gemini.ts
-```
-Requiere `roles/aiplatform.user` en esa SA (el script imprime el comando para otorgarlo si falla con 403). El browser no necesita ese rol — Firebase AI Logic autentica con la cuenta Firebase Auth del usuario.
-
-Si la llamada a Gemini falla por cualquier motivo, la app cae al parser determinista automáticamente y muestra un banner amarillo *"Se usó el intérprete local"* para que el vendedor sepa que la línea puede ser menos precisa.
+Costo aproximado al volumen del cliente (≈ 5 M tokens/mes, gemini-2.5-flash): USD 1–2/mes; entra en la cuota gratuita de Vertex AI.
 
 ## Activar Bsale real (post-demo)
 

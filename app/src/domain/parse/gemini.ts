@@ -13,7 +13,10 @@ const REGION = 'us-central1';
 const MODEL_NAME = 'gemini-2.5-flash';
 // The client can time out fast: if the SDK hasn't returned in this window we
 // fall back to the local deterministic parser so the demo never stalls.
-const TIMEOUT_MS = 8000;
+// Safety net only: with thinking off, structured parses take ~2-5 s.
+// Measured 2026-09-23 with thinking ON: 16.5 s (2.3k thought tokens) → the old
+// 8 s timeout fired on every cold call and the UI fell back to the local parser.
+const TIMEOUT_MS = 25000;
 
 interface GeminiParsed {
   lines: Array<{
@@ -85,6 +88,9 @@ function getModel() {
       responseMimeType: 'application/json',
       responseSchema,
       temperature: 0.1,
+      // Structured extraction against a closed catalog does not benefit from
+      // gemini-2.5-flash's thinking phase, and it multiplied latency (16 s).
+      thinkingConfig: { thinkingBudget: 0 },
     },
     systemInstruction: [
       'Sos un asistente que interpreta pedidos escritos en español chileno para una charcutería artesanal en Santiago (La Charcutería Artesanal / Cecinas Marcosi). Convertís texto libre de WhatsApp en líneas estructuradas usando SOLO productos y formatos del catálogo que se te pasa.',

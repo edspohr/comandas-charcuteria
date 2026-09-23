@@ -179,9 +179,9 @@ export default function PegarPedido() {
   return (
     <div className="max-w-2xl mx-auto">
       <header className="mb-6">
-        <p className="eyebrow">Vendedor</p>
-        <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Pegar pedido</h1>
-        <p className="text-xs text-charcoal-300 mt-1">Pegue el mensaje del cliente. Interpretamos productos, formatos y cantidades. Usted revisa antes de continuar.</p>
+        <p className="eyebrow">Vendedor · pedido + cliente en un paso</p>
+        <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Pedido IA</h1>
+        <p className="text-xs text-charcoal-300 mt-1">Pegá el mensaje del cliente tal como llegó por WhatsApp. La IA identifica <strong className="text-charcoal-500">el pedido</strong> (productos, formatos, cantidades) y <strong className="text-charcoal-500">al cliente</strong>: si ya existe lo reconoce por nombre, RUT o teléfono; si es nuevo, propone crearlo con los datos del mensaje. Vos revisás antes de continuar.</p>
       </header>
 
       <div className="card p-4 mb-4">
@@ -192,12 +192,15 @@ export default function PegarPedido() {
           placeholder="Pegue aquí el mensaje del cliente…"
           className="field h-auto py-3 text-sm resize-y"
         />
-        <div className="flex items-center gap-2 mt-3">
+        <div className="flex items-center gap-2 mt-3 flex-wrap">
           <Button onClick={interpret} disabled={loading || busy || text.trim().length < 3} className="flex-1">
-            {busy ? 'Interpretando…' : 'Interpretar'}
+            {busy ? 'Interpretando…' : 'Interpretar con IA'}
           </Button>
-          <Button variant="secondary" onClick={() => useSample('existente')} disabled={busy}>Ejemplo</Button>
-          <Button variant="ghost" onClick={() => useSample('nuevo')} disabled={busy}>Cliente nuevo</Button>
+        </div>
+        <div className="mt-2 flex items-center gap-2 flex-wrap text-[11px] text-charcoal-300">
+          <span className="uppercase tracking-display">Probar con un ejemplo:</span>
+          <button onClick={() => useSample('existente')} disabled={busy} className="rounded-md border border-dashed border-charcoal-200 px-2 py-1 hover:border-brass-500 hover:text-charcoal-700">Pedido de cliente conocido</button>
+          <button onClick={() => useSample('nuevo')} disabled={busy} className="rounded-md border border-dashed border-charcoal-200 px-2 py-1 hover:border-brass-500 hover:text-charcoal-700">Pedido de cliente nuevo</button>
         </div>
       </div>
 

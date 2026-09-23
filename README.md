@@ -21,9 +21,9 @@ Todos los usuarios comparten la contraseña **`demo1234`** en el ambiente de dem
 
 | Perfil | Puede | Usuarios |
 |---|---|---|
-| Vendedor | Crear pedidos (wizard o pegando WhatsApp), alta rápida de clientes, ver el tablero con sus pedidos, anular propios | Rafael, Ramiro, Gabriela, Juan, Tania, Elizabeth, Lucy |
+| Vendedor | Crear pedidos (wizard o **Pedido IA** desde WhatsApp), alta rápida de clientes, ver el tablero con sus pedidos, anular propios | Rafael, Ramiro, Gabriela, Juan, Tania, Elizabeth, Lucy |
 | Despacho | Tablero: tomar pedidos, ingresar pesos reales, marcar armado; sincronizar stock con Bsale | Edu, Morena |
-| Producción | Ver demanda pendiente vs. stock Bsale (solo lectura) y sincronizar | Yuri |
+| Producción | Tabla de demanda pendiente vs. stock Bsale, sincronizar, y **Producción IA** (pegar el reporte de la fábrica → carga en Bsale) | Yuri |
 | Administración | Tablero completo: vincular documento Bsale, despachar, entregar; Panel de dueños; catálogo/clientes | Miguel |
 | Super Administración | Todo lo anterior + usuarios + **Consola Bsale (simulada)** | Ciro, Luis |
 
@@ -39,9 +39,9 @@ Para mostrar el flujo completo en la URL en vivo. Recomiendo dos ventanas de inc
    - Productos: agregá 3 líneas mixtas (jamón cocido en sachet 200 g, mortadela pistacho en granel, queso gouda ahumado en sachet 200 g). El picker abre como bottom-sheet con precio y subtotal en vivo. El semáforo usa el stock que reporta Bsale menos las reservas de la app.
    - Entrega: fecha por defecto (mañana o pasado según el corte de las 15:00), despacho.
    - Confirmar → Enviar. Volvés al Tablero con la tarjeta nueva en **Pendiente**.
-3. **Pegar pedido** — Tocá **Cliente nuevo** para cargar el ejemplo de Café Botánico, "Interpretar". Además de las líneas, la app detecta al cliente (nombre, RUT, teléfono, dirección, horario) y ofrece **Crear cliente con estos datos**. Con Gemini activo el bloque `client` lo devuelve el modelo; si no, lo extrae el parser determinista. "Continuar con Café Botánico" salta directo a Productos.
+3. **Pedido IA** — Tocá **Pedido de cliente nuevo** para cargar el ejemplo de Café Botánico, "Interpretar con IA". Además de las líneas, la app detecta al cliente (nombre, RUT, teléfono, dirección, horario) y ofrece **Crear cliente con estos datos**. Con Gemini activo el bloque `client` lo devuelve el modelo; si no, lo extrae el parser determinista. "Continuar con Café Botánico" salta directo a Productos.
 4. **Split a producción** — Elegí un cliente y pedí `20 kg` de **Longaniza chillán** en granel (hay 18 kg disponibles según Bsale). Ves "12 kg a producción" en Confirmar. La tarjeta queda en Pendiente con la etiqueta **Espera stock** y nadie puede armarla todavía.
-5. **Cambiá a Ciro (super admin) → Bsale** — La *Consola Bsale (simulada)* hace lo que en la vida real pasa dentro de Bsale. En **Recepción de producción** cargá 20 kg de Longaniza chillán granel y tocá **Cargar y sincronizar**: la app trae el stock nuevo, reasigna FIFO y promueve el pedido parcial a `confirmado`. Yuri ve lo mismo en **Producción**, ahora solo lectura.
+5. **Cambiá a Ciro (super admin) → Bsale** — La *Consola Bsale (simulada)* hace lo que en la vida real pasa dentro de Bsale. En **Recepción de producción** cargá 20 kg de Longaniza chillán granel y tocá **Cargar y sincronizar**: la app trae el stock nuevo, reasigna FIFO y promueve el pedido parcial a `confirmado`. Yuri ve lo mismo en **Producción** (tabla de demanda vs. stock). Alternativa sin salir de su pantalla: pestaña **Producción IA**, pegá el reporte de la fábrica (hay un ejemplo), "Interpretar con IA", confirmá → la recepción se registra en Bsale y se sincroniza.
 6. **Cambiá a Edu (despacho)** — Tablero, filtro **Sin asignar**. Tocá **Tomar** en la tarjeta (o arrastrala a *En armado* en desktop). Abrí el detalle, bajá el stepper *Empacado* de una línea granel (3 kg → 2,5 kg) y **Marcar armado**. La tarjeta pasa a **Por facturar**; si pasan más de 4 h sin documento se pone ámbar.
 7. **Cambiá a Miguel (admin)** — En **Por facturar** tocá **Vincular doc.** La venta se emite en el POS de Bsale; el diálogo lista los documentos sin vincular (primero los que traen el pedido como referencia). Para la demo tocá **Simular emisión en POS**: emite la factura en el mock con las cantidades empacadas y la vincula. Se libera la reserva y la tarjeta pasa a **Por despachar**. Después **Despachar** (courier + nota) y **Entregar**.
 8. **Stock comprometido** — Con Ciro, en Consola Bsale → **Venta en mostrador**, vendé por boleta un producto que la app tenga reservado y tocá **Emitir y sincronizar**. Las tarjetas que dependen de ese stock se ponen **rojas** ("Stock comprometido"): es la señal de que la tienda vendió lo que el pedido tenía apartado.
@@ -146,12 +146,12 @@ comandas-charcuteria/
 │   │   ├── domain/                 tipos, cutoff, kanban (columnas/colores), analytics, parse/ (local, gemini, client)
 │   │   ├── data/                   hooks Firestore, transacciones, sync Bsale
 │   │   ├── integrations/bsale/     BsaleClient, MockBsaleClient, mockAdmin (Consola)
-│   │   ├── components/             ui/, orders/OrderDialogs, clients/NuevoClienteDialog
+│   │   ├── components/             ui/ (DataTable…), orders/OrderDialogs, clients/
 │   │   ├── routes/
 │   │   │   ├── Tablero.tsx         kanban para todos los roles
-│   │   │   ├── vendedor/           NuevoPedido, PegarPedido, DetallePedido
+│   │   │   ├── vendedor/           NuevoPedido, PegarPedido (Pedido IA), DetallePedido
 │   │   │   ├── despacho/           DetalleArmado
-│   │   │   ├── produccion/         Produccion (solo lectura)
+│   │   │   ├── produccion/         Produccion (tabla demanda + Producción IA)
 │   │   │   └── admin/              Panel, Catalogo, Usuarios, Bsale (consola simulada)
 │   │   └── lib/                    format, pricing, rut, csv, draft (localStorage)
 │   └── public/icons/               PWA icons (SVG)

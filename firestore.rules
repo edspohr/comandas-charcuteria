@@ -43,7 +43,9 @@ service cloud.firestore {
     // In production these collections disappear: the app reads Bsale's API.
     match /bsaleMock/{doc} {
       allow read:  if isAuth();
-      allow write: if isAdminOrSup();
+      // Producción IA registra recepciones (POST /v1/stocks/receptions.json
+      // en la API real) → producción también escribe el stock simulado.
+      allow write: if isAdminOrSup() || isProduccion();
     }
     match /bsaleDocuments/{id} {
       allow read:   if isAuth();
@@ -62,7 +64,7 @@ service cloud.firestore {
     }
     match /bsaleReceptions/{id} {
       allow read:   if isAuth();
-      allow create: if isAdminOrSup();
+      allow create: if isAdminOrSup() || isProduccion();
       allow update, delete: if false;
     }
 

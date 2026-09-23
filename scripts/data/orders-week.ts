@@ -55,8 +55,11 @@ const line = (
 
 const DAY = (dayOfMonth: number) => `2026-09-${String(dayOfMonth).padStart(2, '0')}`;
 
+// Hours may overflow past 24 when the synthetic history stacks transitions
+// on a late-created order; roll them into the next day instead of producing
+// an invalid date (NaN), which used to break lead-time and activity metrics.
 const asTs = (dayOfMonth: number, hour: number, min: number) =>
-  Date.parse(`2026-09-${String(dayOfMonth).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}:00-03:00`);
+  Date.parse(`2026-09-${String(dayOfMonth).padStart(2, '0')}T00:00:00-03:00`) + (hour * 60 + min) * 60 * 1000;
 
 const mk = (
   id: string,

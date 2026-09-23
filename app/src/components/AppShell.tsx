@@ -13,7 +13,7 @@ interface NavItem { to: string; label: string; primaryFor?: Role[]; roles: Role[
 const NAV: NavItem[] = [
   { to: '/tablero',           label: 'Tablero',          roles: ['vendedor', 'despacho', 'produccion', 'admin', 'superAdmin'], primaryFor: ['despacho', 'admin', 'superAdmin'] },
   { to: '/vendedor/nuevo',    label: 'Nuevo pedido',     roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor'] },
-  { to: '/vendedor/pegar',    label: 'Pegar pedido',     roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor'] },
+  { to: '/vendedor/pegar',    label: 'Pedido IA',     roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor'] },
   { to: '/clientes',          label: 'Clientes',         roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor', 'admin', 'superAdmin'] },
   { to: '/produccion',        label: 'Producción',       roles: ['produccion', 'admin', 'superAdmin'], primaryFor: ['produccion'] },
   { to: '/admin/panel',       label: 'Panel',            roles: ['admin', 'superAdmin'], primaryFor: ['admin', 'superAdmin'] },

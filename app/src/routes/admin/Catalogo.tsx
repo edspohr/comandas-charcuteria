@@ -1,194 +1,129 @@
 import { useMemo, useState } from 'react';
-import { useClients } from '@/data/clients';
+import { Link } from 'react-router-dom';
+import ErrorBanner from '@/components/ui/ErrorBanner';
+import DataTable, { Pill } from '@/components/ui/DataTable';
 import { useProducts } from '@/data/products';
 import { availableFor, useAllStock, useStockMovements, useSyncState } from '@/data/stock';
-import { Link } from 'react-router-dom';
+import { categoryLabel, categoryOrder } from '@/domain/categories';
 import { formatQty } from '@/lib/format';
-import ErrorBanner from '@/components/ui/ErrorBanner';
-import { categoryLabel } from '@/domain/categories';
-import type { Client } from '@/domain/types';
+import { formatCLP, unitPriceLabel } from '@/lib/pricing';
+import type { Product, ProductFormat, StockDoc } from '@/domain/types';
 
-type Tab = 'productos' | 'clientes';
+const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 const MOV_LABEL: Record<string, string> = {
   reserva: 'Reserva', liberacion: 'Liberación', consumo: 'Consumo', produccion: 'Producción', ajuste: 'Ajuste',
   traslado_tienda: 'Traslado', sync_bsale: 'Sync Bsale', venta_bsale: 'Venta Bsale',
 };
 
-const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');
-
-export default function Catalogo() {
-  const [tab, setTab] = useState<Tab>('productos');
-
-  return (
-    <div>
-      <header className="mb-6">
-        <p className="eyebrow">Administración</p>
-        <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Catálogo</h1>
-      </header>
-
-      <nav className="mb-4 flex gap-1 border-b border-charcoal-100">
-        {(['productos', 'clientes'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={
-              'px-4 py-2.5 text-xs uppercase tracking-display font-medium border-b-2 transition -mb-px ' +
-              (t === tab
-                ? 'border-brass-500 text-charcoal-900'
-                : 'border-transparent text-charcoal-300 hover:text-charcoal-500 hover:border-charcoal-200')
-            }
-          >
-            {t === 'productos' ? 'Productos' : 'Clientes'}
-          </button>
-        ))}
-      </nav>
-
-      {tab === 'productos' ? <ProductosTab /> : <ClientesTab />}
-    </div>
-  );
+interface FormatRow {
+  key: string;
+  product: Product;
+  format: ProductFormat;
+  first: boolean;         // first format of its product → show the product name
+  stock: StockDoc | undefined;
+  available: number;
 }
 
-function ProductosTab() {
+// One row per product+format so a single scroll shows price, Bsale stock,
+// reservations and availability for the whole catalog. Row click → bitácora.
+export default function Catalogo() {
   const { products, loading, error: productsError } = useProducts();
   const { stock, error: stockError } = useAllStock();
   const sync = useSyncState();
   const error = productsError ?? stockError;
   const [q, setQ] = useState('');
-  const [movKey, setMovKey] = useState<string | null>(null);
-  const [movProduct, movFormat] = movKey ? movKey.split('::') : [null, null];
-  const movements = useStockMovements(movProduct, movFormat);
+  const [onlyIssues, setOnlyIssues] = useState(false);
 
-  const filtered = useMemo(() => {
-    if (!q.trim()) return products;
-    const query = norm(q);
-    return products.filter((p) => norm(p.name).includes(query) || (p.aliases ?? []).some((a) => norm(a).includes(query)));
-  }, [products, q]);
+  const rows = useMemo<FormatRow[]>(() => {
+    const needle = norm(q.trim());
+    const list = products
+      .filter((p) => !needle || norm(p.name).includes(needle) || (p.aliases ?? []).some((a) => norm(a).includes(needle)) || norm(categoryLabel(p.category)).includes(needle))
+      .sort((a, b) => categoryOrder(a.category) - categoryOrder(b.category) || a.name.localeCompare(b.name, 'es'));
+    const out: FormatRow[] = [];
+    for (const p of list) {
+      p.formats.forEach((f, i) => {
+        const s = stock.get(`${p.id}__${f.formatId}`);
+        const av = availableFor(stock, p.id, f.formatId);
+        const compromised = !!s && s.onHand < s.reserved;
+        if (onlyIssues && !(compromised || av <= 0)) return;
+        out.push({ key: `${p.id}__${f.formatId}`, product: p, format: f, first: i === 0, stock: s, available: av });
+      });
+    }
+    return out;
+  }, [products, stock, q, onlyIssues]);
+
+  const issues = useMemo(() => rows.filter((r) => r.stock && (r.stock.onHand < r.stock.reserved || r.available <= 0)).length, [rows]);
 
   return (
     <div>
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Buscar producto"
-        className="field mb-4"
-      />
-      <p className="text-xs text-charcoal-300 mb-3">
-        Stock según Bsale{sync?.at ? ` · sincronizado ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}` : ''}. Los ajustes se hacen en Bsale.
-      </p>
-      {loading && !error && <p className="text-sm text-charcoal-300">Cargando…</p>}
-      {error && <div className="mb-3"><ErrorBanner message={error} /></div>}
-      <div className="card divide-y divide-charcoal-100">
-        {filtered.map((p) => (
-          <details key={p.id} className="group">
-            <summary className="p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-cream-100/40">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-charcoal-900">{p.name}</span>
-                  {p.discontinued && (
-                    <span className="text-[10px] uppercase tracking-display bg-charcoal-100 text-charcoal-500 border border-charcoal-200 px-2 py-0.5 rounded">Discontinuado</span>
-                  )}
-                  {!p.active && (
-                    <span className="text-[10px] uppercase tracking-display bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded">Inactivo</span>
-                  )}
-                </div>
-                <p className="text-xs text-charcoal-300 mt-0.5">{categoryLabel(p.category)} · {p.formats.length} formato{p.formats.length === 1 ? '' : 's'}</p>
-              </div>
-              <span className="text-charcoal-300 text-sm group-open:rotate-90 transition-transform">›</span>
-            </summary>
-            <div className="border-t border-charcoal-100 divide-y divide-charcoal-100/70">
-              {p.formats.map((f) => {
-                const av = availableFor(stock, p.id, f.formatId);
-                const s = stock.get(`${p.id}__${f.formatId}`);
-                return (
-                  <div key={f.formatId}>
-                  <div className="flex items-center justify-between gap-3 p-3 pl-6 text-sm">
-                    <div className="min-w-0">
-                      <p className="text-charcoal-700 font-medium">{f.label}</p>
-                      <p className="text-[11px] text-charcoal-300 uppercase tracking-display mt-0.5">
-                        Bsale {formatQty(s?.onHand ?? 0, f.unit)} · Reserv. {formatQty(s?.reserved ?? 0, f.unit)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className={'text-sm font-semibold ' + (av > 0 ? 'text-emerald-700' : 'text-red-700')}>
-                        {formatQty(av, f.unit)}
-                      </span>
-                      <button onClick={() => setMovKey((k) => (k === `${p.id}::${f.formatId}` ? null : `${p.id}::${f.formatId}`))} className="text-[10px] uppercase tracking-display text-charcoal-300 hover:text-charcoal-700">
-                        {movKey === `${p.id}::${f.formatId}` ? 'Ocultar' : 'Bitácora'}
-                      </button>
-                    </div>
-                  </div>
-                  {movKey === `${p.id}::${f.formatId}` && (
-                    <ul className="mx-6 mb-3 rounded-md bg-cream-100/60 divide-y divide-charcoal-100 text-xs">
-                      {movements.length === 0 && <li className="p-2 text-charcoal-300">Sin movimientos.</li>}
-                      {movements.map((m) => (
-                        <li key={m.id} className="p-2 flex items-center justify-between gap-2">
-                          <span className="text-charcoal-700"><span className="uppercase tracking-display text-[10px] text-charcoal-300 mr-2">{MOV_LABEL[m.type] ?? m.type}</span>{m.orderId ? <span className="font-mono">{m.orderId}</span> : null}{m.reason ? <span className="text-charcoal-300"> · {m.reason}</span> : null}</span>
-                          <span className="shrink-0 text-charcoal-500">{m.qty > 0 ? '+' : ''}{m.qty} · {new Date(m.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  </div>
-                );
-              })}
-            </div>
-          </details>
-        ))}
+      <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <p className="eyebrow">Administración</p>
+          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Catálogo</h1>
+          <p className="text-xs text-charcoal-300 mt-1">
+            {products.length} productos · {rows.length} formatos · stock según Bsale{sync?.at ? ` (sincronizado ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })})` : ''} · los ajustes se hacen en Bsale · tocá una fila para ver la bitácora
+          </p>
+        </div>
+        <Link to="/clientes" className="text-[11px] uppercase tracking-display text-charcoal-500 hover:text-charcoal-900 border border-charcoal-200 rounded-md px-3 py-1.5">Clientes →</Link>
+      </header>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Producto, alias o categoría" className="field h-9 text-sm w-full sm:w-72" />
+        <button onClick={() => setOnlyIssues((v) => !v)} className={'rounded-md px-2.5 py-1.5 text-[11px] uppercase tracking-display font-medium border transition ' + (onlyIssues ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-500 hover:border-charcoal-300')}>
+          Solo sin stock / comprometidos{issues > 0 && <span className="ml-1 rounded-full bg-brass-100 text-brass-700 px-1.5">{issues}</span>}
+        </button>
       </div>
 
+      {loading && !error && <p className="text-sm text-charcoal-300">Cargando…</p>}
+      {error && <div className="mb-3"><ErrorBanner message={error} /></div>}
+
+      <DataTable<FormatRow>
+        rows={rows}
+        rowKey={(r) => r.key}
+        dense
+        rowTone={(r) => (r.stock && r.stock.onHand < r.stock.reserved ? 'bad' : r.available <= 0 ? 'warn' : undefined)}
+        columns={[
+          { key: 'product', label: 'Producto', mobile: true, render: (r) => r.first ? (
+            <div>
+              <p className="font-semibold text-charcoal-900">{r.product.name}</p>
+              <p className="text-[10px] uppercase tracking-display text-charcoal-300">{categoryLabel(r.product.category)}{r.product.discontinued ? ' · discontinuado' : ''}{!r.product.active ? ' · inactivo' : ''}</p>
+            </div>
+          ) : <span className="text-charcoal-200">↳</span> },
+          { key: 'format', label: 'Formato', mobile: true, render: (r) => <span className="text-charcoal-700">{r.format.label}</span> },
+          { key: 'price', label: 'Precio', align: 'right', render: (r) => <span className="text-xs">{unitPriceLabel(r.format) || '—'}</span>, muted: true },
+          { key: 'bsale', label: 'Bsale', align: 'right', render: (r) => formatQty(r.stock?.onHand ?? 0, r.format.unit) },
+          { key: 'reserved', label: 'Reserv.', align: 'right', render: (r) => formatQty(r.stock?.reserved ?? 0, r.format.unit), muted: true },
+          { key: 'available', label: 'Disp.', align: 'right', mobile: true, render: (r) => {
+            const comp = !!r.stock && r.stock.onHand < r.stock.reserved;
+            return comp ? <Pill tone="bad">comprometido</Pill> : <span className={'font-semibold ' + (r.available > 0 ? 'text-emerald-700' : 'text-red-700')}>{formatQty(r.available, r.format.unit)}</span>;
+          } },
+          { key: 'value', label: 'Valor disp.', align: 'right', render: (r) => {
+            const unit = r.format.priceCLP ?? (r.format.pricePerKgCLP != null ? (r.format.unit === 'kg' ? r.format.pricePerKgCLP : (r.format.avgWeightKg ?? 0) * r.format.pricePerKgCLP) : undefined);
+            return unit && r.available > 0 ? <span className="text-xs">{formatCLP(unit * r.available)}</span> : <span className="text-charcoal-300">—</span>;
+          }, muted: true },
+        ]}
+        expand={(r) => <Bitacora productId={r.product.id} formatId={r.format.formatId} unit={r.format.unit} />}
+      />
     </div>
   );
 }
 
-function ClientesTab() {
-  const { clients, loading, error } = useClients();
-  const [q, setQ] = useState('');
-
-  const filtered = useMemo(() => {
-    if (!q.trim()) return clients;
-    const query = norm(q);
-    return clients.filter((c: Client) =>
-      norm(c.name).includes(query) ||
-      norm(c.fantasyName ?? '').includes(query) ||
-      norm(c.rut ?? '').includes(query)
-    );
-  }, [clients, q]);
-
+function Bitacora({ productId, formatId, unit }: { productId: string; formatId: string; unit: ProductFormat['unit'] }) {
+  const movements = useStockMovements(productId, formatId, 20);
   return (
     <div>
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Buscar cliente"
-        className="field mb-4"
-      />
-      {loading && !error && <p className="text-sm text-charcoal-300">Cargando…</p>}
-      {error && <div className="mb-3"><ErrorBanner message={error} /></div>}
-      <ul className="space-y-1.5">
-        {filtered.map((c) => (
-          <li key={c.id} className="card p-3.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Link to={`/clientes/${c.id}`} className="font-semibold text-charcoal-900 hover:text-brass-700">{c.fantasyName ?? c.name}</Link>
-              {c.isInternalShop && (
-                <span className="text-[10px] uppercase tracking-display bg-charcoal-900 text-cream-50 px-2 py-0.5 rounded">Tienda</span>
-              )}
-              {!c.invoicingComplete && (
-                <span className="text-[10px] uppercase tracking-display bg-brass-100 text-brass-700 border border-brass-300 px-2 py-0.5 rounded">Facturación incompleta</span>
-              )}
-            </div>
-            <div className="text-xs text-charcoal-300 mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5">
-              <span>{c.rut ?? 'Sin RUT'}</span>
-              <span>{c.giro ?? 'Sin giro'}</span>
-              <span className="truncate">{c.address ?? 'Sin dirección'}</span>
-              {c.receivingHours && <span>{c.receivingHours}</span>}
-              {c.email && <span className="truncate">{c.email}</span>}
-              {c.contactPhone && <span>{c.contactPhone}</span>}
-            </div>
-            {c.notes && <p className="text-xs text-charcoal-500 mt-1.5 italic">{c.notes}</p>}
-          </li>
-        ))}
-      </ul>
+      <p className="eyebrow mb-1">Bitácora · últimos {movements.length} movimientos</p>
+      {movements.length === 0 ? <p className="text-xs text-charcoal-300">Sin movimientos.</p> : (
+        <ul className="divide-y divide-charcoal-100 text-xs">
+          {movements.map((m) => (
+            <li key={m.id} className="py-1 flex items-center justify-between gap-2">
+              <span className="text-charcoal-700"><span className="uppercase tracking-display text-[10px] text-charcoal-300 mr-2">{MOV_LABEL[m.type] ?? m.type}</span>{m.orderId ? <span className="font-mono">{m.orderId}</span> : null}{m.reason ? <span className="text-charcoal-300"> · {m.reason}</span> : null}</span>
+              <span className="shrink-0 text-charcoal-500">{m.qty > 0 ? '+' : ''}{formatQty(m.qty, unit)} · {new Date(m.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

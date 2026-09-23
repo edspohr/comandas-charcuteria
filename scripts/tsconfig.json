@@ -13,5 +13,10 @@
       "@/*": ["../app/src/*"]
     }
   },
-  "include": ["./**/*.ts", "../app/src/domain/**/*.ts"]
+  "include": [
+    "./**/*.ts",
+    "../app/src/domain/types.ts",
+    "../app/src/domain/parse/local.ts",
+    "../app/src/domain/parse/client.ts"
+  ]
 }

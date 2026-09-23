@@ -26,28 +26,35 @@ const STOPWORDS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'con', 'sin', 
 const tokens = (s: string) => norm(s).split(/[^a-z0-9]+/).filter((t) => t.length >= 3 && !STOPWORDS.has(t));
 
 // Regexes for qty extraction — order matters (longer patterns first).
-// Sachet 5kg / 500g etc. detection wins over bare grams.
+// Los "N sachet ... Gg" (con palabras entre el conteo y el gramaje) van al
+// principio para que "10 sachet de jamón cocido 200g" no se lea como 200 g.
 const QTY_PATTERNS: Array<{ re: RegExp; unit: Unit; formatHint?: string }> = [
-  { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet\s*)?5\s*k(?:g|ilo|ilos)?\b/i,  unit: 'unidad', formatHint: 'sachet-5kg' },
-  { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet\s*)?1\s*k(?:g|ilo|ilos)?\b/i,  unit: 'unidad', formatHint: 'sachet-1kg' },
+  { re: /\bx\s*(\d{1,3})\b/i,                                          unit: 'unidad' },
+  { re: /(\d+(?:[.,]\d+)?)\s+(?:sachet|sobre)s?\b[^0-9\n]{0,60}?500\s*g\b/i,  unit: 'unidad', formatHint: 'sachet-500g' },
+  { re: /(\d+(?:[.,]\d+)?)\s+(?:sachet|sobre)s?\b[^0-9\n]{0,60}?200\s*g\b/i,  unit: 'unidad', formatHint: 'sachet-200g' },
+  { re: /(\d+(?:[.,]\d+)?)\s+(?:sachet|sobre)s?\b[^0-9\n]{0,60}?100\s*g\b/i,  unit: 'unidad', formatHint: 'sachet-100g' },
   { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet\s*)?500\s*g\b/i,               unit: 'unidad', formatHint: 'sachet-500g' },
   { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet\s*)?200\s*g\b/i,               unit: 'unidad', formatHint: 'sachet-200g' },
-  { re: /(\d+(?:[.,]\d+)?)\s*k(?:g|ilo|ilos)?\b/i,                    unit: 'kg' },
+  { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet\s*)?100\s*g\b/i,               unit: 'unidad', formatHint: 'sachet-100g' },
+  { re: /(\d+(?:[.,]\d+)?)\s*k(?:g|ls|ilo|ilos)?\b/i,                 unit: 'kg' },
   { re: /(\d+(?:[.,]\d+)?)\s*g(?:r|ramos)?\b/i,                       unit: 'g' },
   { re: /(\d+(?:[.,]\d+)?)\s*(?:sachet|sobres?|paquetes?)\b/i,        unit: 'unidad' },
   { re: /(\d+(?:[.,]\d+)?)\s*(?:piezas?)\b/i,                         unit: 'unidad', formatHint: 'pieza' },
   { re: /(\d+(?:[.,]\d+)?)\s*(?:potes?)\b/i,                          unit: 'unidad' },
   { re: /(\d+(?:[.,]\d+)?)\s*(?:un|u|und|unidades?)\b/i,              unit: 'unidad' },
-  { re: /^\s*[-•·]?\s*(\d+(?:[.,]\d+)?)\b/,                            unit: 'unidad' },
+  { re: /^\s*[-•·]?\s*x?\s*(\d+(?:[.,]\d+)?)\b/,                       unit: 'unidad' },
 ];
 
 // Format hints — extra tokens that pin a specific format when the qty regex didn't already fix it.
-// Order matters: more specific tokens (250 g pote) come before the generic pote fallback.
+// Order matters: more specific tokens (250 g pote, 500 g sachet) come before the generic fallback.
 const FORMAT_HINTS: Array<{ tokens: RegExp; formatIdHint: string }> = [
   { tokens: /\bgranel|\blaminado/i,          formatIdHint: 'granel-kg' },
   { tokens: /\bpieza\s*entera|\bpieza/i,     formatIdHint: 'pieza' },
   { tokens: /\bx\s*12\b/i,                    formatIdHint: 'sachet-x12' },
   { tokens: /\bx\s*3\b/i,                     formatIdHint: 'sachet-x3' },
+  { tokens: /\b500\s*g\b/i,                   formatIdHint: 'sachet-500g' },
+  { tokens: /\b200\s*g\b/i,                   formatIdHint: 'sachet-200g' },
+  { tokens: /\b100\s*g\b/i,                   formatIdHint: 'sachet-100g' },
   { tokens: /\bpote[\s\w]*?250|250[\s\w]*?pote/i, formatIdHint: 'pote-250g' },
   { tokens: /\bpote[\s\w]*?150|150[\s\w]*?pote/i, formatIdHint: 'pote-150g' },
   { tokens: /\bpote/i,                        formatIdHint: 'pote-150g' },
@@ -116,10 +123,31 @@ function extractNotes(raw: string, qtyMatch: string | undefined, productName: st
 }
 
 function splitBlocks(text: string): string[] {
-  return text
+  const primary = text
     .split(/[\n;•·]+|(?<=\d\s*[a-z]{0,4})\s*,\s+/gi)
     .map((s) => s.trim())
     .filter((s) => s.length > 3 && s.length < 200);
+  // Compound lines: same producto, dos formatos ("Jamón cocido: 60 sachet de
+  // 200 g y 8 kg laminado"). Si el bloque tiene dos qty separadas por " y ",
+  // lo desdoblamos manteniendo el sujeto (todo lo previo al primer qty) en
+  // ambas mitades para que el matching no se quede sin nombre de producto.
+  const out: string[] = [];
+  const QTY_ANCHOR = /(\d+(?:[.,]\d+)?)\s*(?:sachet|sobre|paquete|kg|kilo|kilos|k\b|g|gr|gramos|un\b|u\b|und|unidad|unidades|pieza|piezas|pote|potes)/i;
+  for (const block of primary) {
+    const parts = block.split(/\s+(?:y|e)\s+/i);
+    if (parts.length < 2) { out.push(block); continue; }
+    const withQty = parts.filter((p) => QTY_ANCHOR.test(p));
+    if (withQty.length < 2) { out.push(block); continue; }
+    // Preserve the subject (product name) from the head of the block.
+    const firstQty = block.search(QTY_ANCHOR);
+    const subject = firstQty > 0 ? block.slice(0, firstQty).trim().replace(/[:\-–—]\s*$/, '') : '';
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i].trim();
+      if (!QTY_ANCHOR.test(p)) continue;
+      out.push(i === 0 || !subject ? p : `${subject} ${p}`);
+    }
+  }
+  return out;
 }
 
 // Score how well a candidate needle (product name / alias) appears inside a line.

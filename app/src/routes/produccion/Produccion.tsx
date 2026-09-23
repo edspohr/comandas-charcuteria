@@ -126,6 +126,7 @@ function ProduccionIA({ uid, onDone }: { uid: string; onDone: (msg: string) => v
   const [text, setText] = useState('');
   const [lines, setLines] = useState<StockLine[] | null>(null);
   const [engine, setEngine] = useState<'ai' | 'local' | null>(null);
+  const [aiFallback, setAiFallback] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -136,16 +137,18 @@ function ProduccionIA({ uid, onDone }: { uid: string; onDone: (msg: string) => v
 
   async function interpret() {
     if (busy || text.trim().length < 3) return;
-    setBusy(true); setError(null); setEngine(null);
+    setBusy(true); setError(null); setEngine(null); setAiFallback(false);
+    let usedFallback = false;
     try {
       if (geminiEnabled()) {
         try {
           const remote = await parseWithGemini(text, products);
           if (remote.length > 0) { setLines(toLines(remote)); setEngine('ai'); return; }
-        } catch (e) { console.warn('[produccion-ia] Gemini failed, local fallback', e); }
+        } catch (e) { console.warn('[produccion-ia] Gemini failed, local fallback', e); usedFallback = true; }
       }
       setLines(toLines(parseLocal(text, products)));
       setEngine('local');
+      if (usedFallback) setAiFallback(true);
     } finally { setBusy(false); }
   }
 
@@ -184,6 +187,12 @@ function ProduccionIA({ uid, onDone }: { uid: string; onDone: (msg: string) => v
           <Button variant="ghost" size="sm" onClick={() => setText(SAMPLE)} disabled={busy}>Cargar texto de ejemplo</Button>
         </div>
       </div>
+
+      {aiFallback && (
+        <div className="mb-3 rounded-md bg-brass-50 border border-brass-300 text-brass-700 px-3 py-2 text-xs">
+          Se usó el intérprete local (Gemini no disponible en este momento). Revisá cada línea antes de cargar en Bsale.
+        </div>
+      )}
 
       {lines && (
         <div className="card p-4 space-y-3">

@@ -58,6 +58,8 @@ export default function PegarPedido() {
   const [parsed, setParsed] = useState<ParsedLine[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [engine, setEngine] = useState<'ai' | 'local' | null>(null);
+  // Only true when Gemini failed at runtime (not when the engine is off).
+  const [aiFallback, setAiFallback] = useState(false);
   // Client detected in the message: hints + either an existing match or the
   // client the vendedor just created from the hints.
   const [hints, setHints] = useState<ClientHints | null>(null);
@@ -68,9 +70,11 @@ export default function PegarPedido() {
     if (busy || text.trim().length < 3) return;
     setBusy(true);
     setEngine(null);
+    setAiFallback(false);
     setClient(null);
     // Deterministic hints always run; Gemini can enrich them.
     let h: ClientHints = extractClientHints(text);
+    let usedFallback = false;
     try {
       if (geminiEnabled()) {
         try {
@@ -82,12 +86,15 @@ export default function PegarPedido() {
             return;
           }
         } catch (err) {
-          // Log to console and fall back — the local parser always works offline.
+          // Log to console + surface a non-blocking notice: silent fallback
+          // reads as a broken promise ("interpretar con IA" que no interpreta).
           console.warn('[parse] Gemini failed, falling back to local:', err);
+          usedFallback = true;
         }
       }
       setParsed(parseLocal(text, products).filter((l) => !isClientInfoLine(l.raw)));
       setEngine('local');
+      if (usedFallback) setAiFallback(true);
     } finally {
       setHints(hintsHaveSomething(h) ? h : null);
       setClient(hintsHaveSomething(h) ? matchExistingClient(h, clients) : null);
@@ -203,6 +210,12 @@ export default function PegarPedido() {
           <button onClick={() => useSample('nuevo')} disabled={busy} className="rounded-md border border-dashed border-charcoal-200 px-2 py-1 hover:border-brass-500 hover:text-charcoal-700">Pedido de cliente nuevo</button>
         </div>
       </div>
+
+      {aiFallback && (
+        <div className="mb-4 rounded-md bg-brass-50 border border-brass-300 text-brass-700 px-3 py-2 text-xs">
+          Se usó el intérprete local (Gemini no disponible en este momento). El resultado puede ser menos preciso; revisá cada línea.
+        </div>
+      )}
 
       {parsed && hints && (
         <section className="mb-4">

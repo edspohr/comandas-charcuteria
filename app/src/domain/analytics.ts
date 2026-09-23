@@ -246,7 +246,10 @@ export function clientRows(clients: Client[], allOrders: Order[], range: DateRan
     const invoiced = inR.filter(isInvoiced);
     const revenue = invoiced.reduce((s, o) => s + (o.totalCLP ?? 0), 0);
     const last = os.length ? os[os.length - 1].requestedDate : null;
-    const daysSince = last ? Math.round((todayMs - Date.parse(last)) / (24 * H)) : null;
+    // "Días sin pedir" counts from when the last order was *placed*, so a
+    // pedido for next week doesn't produce a negative number.
+    const lastPlaced = os.length ? Math.max(...os.map((o) => o.createdAt)) : null;
+    const daysSince = lastPlaced ? Math.max(0, Math.round((todayMs + 12 * H - lastPlaced) / (24 * H))) : null;
     let avgInterval: number | null = null;
     if (os.length >= 2) { let sum = 0; for (let i = 1; i < os.length; i++) sum += (Date.parse(os[i].requestedDate) - Date.parse(os[i - 1].requestedDate)) / (24 * H); avgInterval = sum / (os.length - 1); }
     const first = os.length ? os[0].requestedDate : null;

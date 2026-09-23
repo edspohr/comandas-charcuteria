@@ -126,7 +126,8 @@ Cubre los 3 casos críticos: vendedor no edita ajenos, vendedor no cambia status
 
 ```bash
 firebase login   # una vez
-firebase deploy --only hosting                # UI
+npm run deploy                                # build + hosting (siempre juntos: el deploy sube app/dist tal cual está)
+npm run deploy:rules                          # reglas + índices
 firebase deploy --only firestore:rules        # reglas
 firebase deploy --only firestore:indexes      # índices (si se agregan)
 firebase deploy --only functions              # requiere plan Blaze

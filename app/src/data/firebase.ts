@@ -2,7 +2,7 @@ import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
-import { initializeAppCheck, ReCaptchaV3Provider, type AppCheck } from 'firebase/app-check';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from 'firebase/app-check';
 
 const useEmulators = import.meta.env.VITE_USE_EMULATORS === 'true';
 
@@ -17,20 +17,27 @@ export const app = initializeApp(config);
 
 // App Check is mandatory for Firebase AI Logic (Gemini): the project refuses
 // AI calls until enforcement is on and every request carries an App Check
-// token. reCAPTCHA v3 site key comes from the console (App Check → Apps).
+// token. We use reCAPTCHA *Enterprise* (score key, no secret to paste anywhere);
+// `scripts/appcheck-setup.mjs` creates the key, registers it and turns on
+// enforcement for firebaseml.googleapis.com (= Firebase AI Logic).
 // Without a key we simply don't initialize it (Firestore/Auth keep working;
 // only the AI features fall back to the local parser).
-//   - VITE_RECAPTCHA_SITE_KEY: reCAPTCHA v3 site key registered in App Check.
-//   - VITE_APPCHECK_DEBUG=true: local dev — prints a debug token in the console
-//     once; register it in App Check → Apps → Manage debug tokens.
+//   - VITE_RECAPTCHA_SITE_KEY: reCAPTCHA Enterprise key id (public, ships in
+//     the bundle). `localhost` is an allowed domain, so `vite` works as-is.
+//   - VITE_APPCHECK_DEBUG=true + VITE_APPCHECK_DEBUG_TOKEN: only for
+//     environments where reCAPTCHA can't run (CI, emulators); the token must be
+//     registered in App Check → Apps → Manage debug tokens.
 export let appCheck: AppCheck | null = null;
 const recaptchaKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
-if (typeof window !== 'undefined' && recaptchaKey) {
-  if (import.meta.env.VITE_APPCHECK_DEBUG === 'true' || import.meta.env.DEV) {
+if (typeof window !== 'undefined' && recaptchaKey && !useEmulators) {
+  if (import.meta.env.VITE_APPCHECK_DEBUG === 'true') {
     (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean | string }).FIREBASE_APPCHECK_DEBUG_TOKEN =
       (import.meta.env.VITE_APPCHECK_DEBUG_TOKEN as string | undefined) || true;
   }
-  appCheck = initializeAppCheck(app, { provider: new ReCaptchaV3Provider(recaptchaKey), isTokenAutoRefreshEnabled: true });
+  appCheck = initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(recaptchaKey),
+    isTokenAutoRefreshEnabled: true,
+  });
 }
 
 export const auth = getAuth(app);

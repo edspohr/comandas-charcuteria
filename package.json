@@ -14,7 +14,8 @@
     "seed": "tsx scripts/seed.ts",
     "test:rules": "vitest run tests/rules",
     "deploy": "npm run build && firebase deploy --only hosting --project comandas-charcuteria",
-    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes --project comandas-charcuteria"
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes --project comandas-charcuteria",
+    "appcheck:setup": "node scripts/appcheck-setup.mjs"
   },
   "dependencies": {
     "firebase-admin": "^12.7.0"

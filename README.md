@@ -193,20 +193,24 @@ comandas-charcuteria/
 
 ## Habilitar Gemini (una sola vez)
 
-Firebase AI Logic (`@firebase/ai`) llama a Gemini a través de `firebasevertexai.googleapis.com` con la API key web del proyecto **y un token de App Check**. Si falta cualquiera de las dos cosas, la app cae al parser determinista y muestra el aviso amarillo "Se usó el intérprete local".
+Firebase AI Logic (`@firebase/ai`) llama a Gemini a través de `firebasevertexai.googleapis.com` con la API key web del proyecto **y un token de App Check**. Si falta cualquiera de las dos cosas, la app cae al parser determinista y muestra el aviso amarillo "Se usó el intérprete local". Sin App Check el proyecto responde `403 Firebase AI Logic has been deactivated… you must enforce Firebase App Check`: habilitar la API no alcanza.
 
-1. **APIs** (ya habilitadas en el proyecto): `firebasevertexai.googleapis.com`, `aiplatform.googleapis.com`, `firebaseml.googleapis.com`.
+Ya está hecho en `comandas-charcuteria` (23-09-2026). Para reproducirlo en otro proyecto:
+
+1. **APIs**: `firebasevertexai.googleapis.com`, `aiplatform.googleapis.com`, `firebaseml.googleapis.com`.
    ```bash
    gcloud services enable firebasevertexai.googleapis.com aiplatform.googleapis.com --project comandas-charcuteria
    ```
-2. **App Check** (obligatorio: sin enforcement el proyecto responde `403 Firebase AI Logic has been deactivated… you must enforce Firebase App Check`):
-   - Consola Firebase → *App Check* → *Apps* → registrar la app web `comandas-charcuteria` con **reCAPTCHA v3** (crea la clave en <https://www.google.com/recaptcha/admin> con el dominio `comandas-charcuteria.web.app` y `localhost`). Copiar la **site key**.
-   - Poner `VITE_RECAPTCHA_SITE_KEY=<site key>` en `app/.env.production` (y en `.env.local` para desarrollo).
-   - Consola Firebase → *App Check* → *APIs* → **Firebase AI Logic → Enforce**.
-   - Desarrollo local: `VITE_APPCHECK_DEBUG=true` imprime un debug token en la consola del navegador; registrarlo en *App Check → Apps → ⋮ → Manage debug tokens*.
+2. **App Check con reCAPTCHA Enterprise**, todo por CLI (requiere `gcloud auth login` con una cuenta Owner/Editor):
+   ```bash
+   npm run appcheck:setup
+   ```
+   El script ([`scripts/appcheck-setup.mjs`](scripts/appcheck-setup.mjs)) es idempotente: habilita `recaptchaenterprise` + `firebaseappcheck`, crea (o reutiliza) la key *score* `comandas-appcheck-web` con dominios `comandas-charcuteria.web.app`, `comandas-charcuteria.firebaseapp.com` y `localhost`, la registra como proveedor de App Check de la web app, pone **Enforce solo en Firebase AI Logic** (`firebaseml.googleapis.com`; Firestore y Auth quedan sin enforcement para no romper clientes sin token) y escribe `VITE_RECAPTCHA_SITE_KEY` en `app/.env.production`. Se eligió Enterprise en vez de reCAPTCHA v3 clásico porque no requiere pegar una *secret key* en la consola y se administra por API.
+   - La key recién creada tarda ~1 minuto en propagarse; hasta entonces el SDK loguea `AppCheck: 400 error` y reintenta solo.
+   - `localhost` es dominio permitido, así que `npm run dev` funciona sin debug tokens. `VITE_APPCHECK_DEBUG=true` + `VITE_APPCHECK_DEBUG_TOKEN` quedan para CI/emuladores (registrar el token en *App Check → Apps → ⋮ → Manage debug tokens*).
 3. `npm run deploy`. Verificar en Pedido IA que el chip diga **· Gemini** y no aparezca el aviso amarillo. La consola del navegador loguea `[parse] Gemini failed…` con la causa exacta cuando falla.
 
-Costo aproximado al volumen del cliente (≈ 5 M tokens/mes, gemini-2.5-flash): USD 1–2/mes; entra en la cuota gratuita de Vertex AI.
+Costo aproximado al volumen del cliente (≈ 5 M tokens/mes, gemini-2.5-flash): USD 1–2/mes; entra en la cuota gratuita de Vertex AI. reCAPTCHA Enterprise: gratis hasta 10.000 evaluaciones/mes (un token de App Check dura 1 h, así que el equipo queda muy por debajo).
 
 ## Activar Bsale real (post-demo)
 

@@ -1,31 +1,51 @@
-import { getDocs, collection, doc, runTransaction } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db } from '@/data/firebase';
-import type { BsaleClient, BsaleCustomer, BsaleProduct } from './BsaleClient';
-import type { Order, StockMovement } from '@/domain/types';
+import type { Order } from '@/domain/types';
+import type {
+  BsaleClient, BsaleCustomer, BsaleDocument, BsaleVariantStock,
+} from './BsaleClient';
 
-// MockBsaleClient — reads/writes local Firestore in the shape a future
-// real Bsale integration would use. No external network calls. The demo
-// admin screens surface the JSON payload the client WOULD send, so
-// stakeholders can see the contract.
+// MockBsaleClient — plays the role of the Bsale API using a small "Bsale
+// side" kept in Firestore:
+//   bsaleMock/stock        { quantities: { [sku]: qty }, updatedAt }
+//   bsaleMock/counters     { factura, boleta }
+//   bsaleDocuments/{id}    documents emitted at the (simulated) POS
+//   bsaleReceptions/{id}   production received into Bsale
+// The simulated POS / factory actions live in ./mockAdmin.ts (Consola Bsale).
+// Swapping this class for the real client = same interface, token in a Cloud
+// Function, no UI changes.
+
+export const MOCK_OFFICE_ID = 1;
+
+export interface BsaleMockStockDoc { quantities: Record<string, number>; updatedAt: number; }
+
 export class MockBsaleClient implements BsaleClient {
-  async getProducts(): Promise<BsaleProduct[]> {
-    const snap = await getDocs(collection(db, 'products'));
-    const out: BsaleProduct[] = [];
-    snap.forEach((d) => {
-      const p = d.data() as { id: string; name: string };
-      out.push({ id: p.id, sku: p.id, name: p.name });
-    });
-    return out;
+  async getStocks(officeId: number = MOCK_OFFICE_ID): Promise<BsaleVariantStock[]> {
+    const snap = await getDoc(doc(db, 'bsaleMock', 'stock'));
+    if (!snap.exists()) return [];
+    const data = snap.data() as BsaleMockStockDoc;
+    return Object.entries(data.quantities).map(([sku, quantity]) => ({
+      variantId: `v-${sku}`,
+      sku,
+      officeId,
+      quantity,
+      quantityAvailable: quantity,
+    }));
   }
 
-  async getStock(): Promise<Record<string, number>> {
-    const snap = await getDocs(collection(db, 'stock'));
-    const out: Record<string, number> = {};
-    snap.forEach((d) => {
-      const s = d.data() as { onHand: number };
-      out[d.id] = s.onHand;
-    });
-    return out;
+  async getDocuments(params: { sinceMs?: number; unlinkedOnly?: boolean; limit?: number } = {}): Promise<BsaleDocument[]> {
+    const clauses = [];
+    if (params.sinceMs != null) clauses.push(where('emittedAt', '>=', params.sinceMs));
+    const q = query(collection(db, 'bsaleDocuments'), ...clauses, orderBy('emittedAt', 'desc'), limit(params.limit ?? 100));
+    const snap = await getDocs(q);
+    const out: BsaleDocument[] = [];
+    snap.forEach((d) => out.push(d.data() as BsaleDocument));
+    return params.unlinkedOnly ? out.filter((d) => !d.linkedOrderId) : out;
+  }
+
+  async getDocument(id: string): Promise<BsaleDocument | null> {
+    const snap = await getDoc(doc(db, 'bsaleDocuments', id));
+    return snap.exists() ? (snap.data() as BsaleDocument) : null;
   }
 
   async getCustomers(): Promise<BsaleCustomer[]> {
@@ -38,19 +58,13 @@ export class MockBsaleClient implements BsaleClient {
     return out;
   }
 
-  // Pure payload builder. Passes through invoiceRef so previews can show the
-  // number that will (or already did) get assigned. Kept separate from
-  // createDocument so the Sincronizar preview doesn't accidentally consume
-  // invoice numbers.
-  //
   // netUnitValue matches how the real Bsale API expects it: neto (sin IVA)
   // por unidad. For sachet/unit formats it's the snapshot price / 1.19; for
-  // weight-based formats we divide the line subtotal by the actual quantity
-  // (packedWeightKg si aplica, si no packedQty).
+  // weight-based formats we divide the line subtotal by the actual quantity.
   buildPayload(order: Order, invoiceRef?: string): unknown {
     return {
       documentTypeId: 1,       // Factura Electrónica
-      officeId: 1,
+      officeId: MOCK_OFFICE_ID,
       emissionDate: new Date().toISOString().slice(0, 10),
       invoiceRef: invoiceRef ?? order.invoiceRef ?? null,
       client: {
@@ -69,33 +83,12 @@ export class MockBsaleClient implements BsaleClient {
             quantity: invoicedQty,
             taxId: [1],
             comment: `${l.productName} · ${l.formatLabel}${l.notes ? ` · ${l.notes}` : ''}`,
-            product: { id: l.productId, sku: l.productId },
+            variant: { sku: `${l.productId}__${l.formatId}` },
           };
         }),
       totalCLP: order.totalCLP ?? null,
       references: [{ documentReference: order.id, reason: 'Comandas' }],
     };
-  }
-
-  // Bumps counters/bsale-YYYY transactionally and returns the new invoice
-  // number + the payload that was built with it. Only used from Facturar.
-  async createDocument(order: Order): Promise<{ docNumber: string; payload: unknown }> {
-    const year = new Date().getFullYear();
-    const counterRef = doc(db, 'counters', `bsale-${year}`);
-    const docNumber = await runTransaction(db, async (tx) => {
-      const snap = await tx.get(counterRef);
-      const nextN = ((snap.data()?.last as number | undefined) ?? 0) + 1;
-      tx.set(counterRef, { last: nextN }, { merge: true });
-      return `FA-${String(nextN).padStart(6, '0')}`;
-    });
-    return { docNumber, payload: this.buildPayload(order, docNumber) };
-  }
-
-  async postStockConsumption(_movements: StockMovement[]): Promise<void> {
-    // In the real integration, this would POST to /stocks/consumptions.
-    // For the mockup, consumo movements are already written by markArmado()
-    // in the local audit log. Nothing to send.
-    return;
   }
 }
 

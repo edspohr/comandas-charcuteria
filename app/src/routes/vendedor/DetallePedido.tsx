@@ -31,8 +31,8 @@ export default function DetallePedido() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-4">
-        <Link to="/vendedor/mis" className="text-[11px] uppercase tracking-display text-charcoal-300 hover:text-charcoal-700">
-          ← Mis pedidos
+        <Link to="/tablero" className="text-[11px] uppercase tracking-display text-charcoal-300 hover:text-charcoal-700">
+          ← Tablero
         </Link>
       </div>
 
@@ -133,7 +133,7 @@ export default function DetallePedido() {
               orderId={order.id}
               uid={uid}
               onClose={() => setAnularOpen(false)}
-              onDone={() => navigate('/vendedor/mis')}
+              onDone={() => navigate('/tablero')}
             />
           )}
         </>

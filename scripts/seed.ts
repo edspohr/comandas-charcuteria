@@ -14,8 +14,36 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { products } from './data/products.ts';
 import { clients } from './data/clients.ts';
 import { users } from './data/users.ts';
-import { weekOrders } from './data/orders-week.ts';
-import { stockDocId, type StockMovement } from '../app/src/domain/types.ts';
+import { weekOrders as rawWeekOrders } from './data/orders-week.ts';
+import { stockDocId, type Order, type StockMovement } from '../app/src/domain/types.ts';
+
+// The seeded week is written against 15–22 Sep 2026; treating 19 Sep as
+// "today" leaves the open orders due today/tomorrow and the closed ones in
+// the past.
+// Shift every date so the demo always looks like it was captured this week
+// (otherwise every open order shows up as "Atrasado" in the kanban).
+const SEED_TODAY = '2026-09-19';
+const DAY_MS = 24 * 60 * 60 * 1000;
+function santiagoToday(): string {
+  const chile = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+  return `${chile.getFullYear()}-${String(chile.getMonth() + 1).padStart(2, '0')}-${String(chile.getDate()).padStart(2, '0')}`;
+}
+const SHIFT_DAYS = Math.round((Date.parse(santiagoToday()) - Date.parse(SEED_TODAY)) / DAY_MS);
+const shiftIso = (iso: string) => {
+  const d = new Date(Date.parse(iso) + SHIFT_DAYS * DAY_MS);
+  return d.toISOString().slice(0, 10);
+};
+const shiftMs = (ms: number) => ms + SHIFT_DAYS * DAY_MS;
+function shiftOrder(o: Order): Order {
+  return {
+    ...o,
+    requestedDate: shiftIso(o.requestedDate),
+    createdAt: shiftMs(o.createdAt),
+    updatedAt: shiftMs(o.updatedAt),
+    statusHistory: o.statusHistory.map((h) => ({ ...h, at: shiftMs(h.at) })),
+  };
+}
+const weekOrders: Order[] = rawWeekOrders.map(shiftOrder);
 
 // Target selection:
 //   - Default: Firebase emulators (safer; won't touch production).
@@ -56,7 +84,7 @@ db.settings({ ignoreUndefinedProperties: true });
 
 async function wipeFirestore() {
   // Note: `counters` is included so a re-seed resets both orders-YYYY and bsale-YYYY.
-  const collections = ['products', 'clients', 'orders', 'stock', 'stockMovements', 'users', 'settings', 'counters'];
+  const collections = ['products', 'clients', 'orders', 'stock', 'stockMovements', 'users', 'settings', 'counters', 'bsaleMock', 'bsaleDocuments', 'bsaleReceptions'];
   for (const name of collections) {
     const snap = await db.collection(name).get();
     let batch = db.batch();
@@ -95,11 +123,20 @@ async function seedUsers() {
 async function seedCatalog() {
   const batch = db.batch();
   for (const prod of products) batch.set(db.collection('products').doc(prod.id), prod);
-  for (const cli of clients) batch.set(db.collection('clients').doc(cli.id), cli);
-  batch.set(db.collection('settings').doc('app'), { cutoffHour: 15, timezone: 'America/Santiago' });
+  for (const cli of clients) {
+    // Vendedor responsable = el que más pedidos le ha hecho en la semana sembrada.
+    const counts = new Map<string, number>();
+    for (const o of weekOrders) if (o.clientId === cli.id) counts.set(o.createdBy, (counts.get(o.createdBy) ?? 0) + 1);
+    const ownerUid = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    batch.set(db.collection('clients').doc(cli.id), { ...cli, source: 'seed', ownerUid });
+  }
+  batch.set(db.collection('settings').doc('app'), {
+    cutoffHour: 15,
+    timezone: 'America/Santiago',
+    bsaleOfficeId: 1,
+    kanban: { armadoSinDocHoras: 4, despachadoSinEntregaHoras: 24, sinAsignarHoras: 2, cerradoDias: 7 },
+  });
   batch.set(db.collection('counters').doc('orders-2026'), { last: weekOrders.length });
-  // Bsale doc counter continues from the seeded invoice numbers (FA-000811..FA-000822).
-  batch.set(db.collection('counters').doc('bsale-2026'), { last: 822 });
   await batch.commit();
 }
 
@@ -112,7 +149,7 @@ const initialOnHand: Record<string, number> = {
   // abiertas ~ 26. Start at 100 → 100 − 64 − 28 = 8 disponibles.
   'longaniza-chillan::granel-kg': 100,
   'longaniza-chillan::sachet-4u-400g': 30,
-  'coppa::pieza': 10,                       // PED-0037 splits at 4 reserved / 6 pending; el wizard demo puede pedir hasta 4 más
+  'coppa::pieza': 16,                       // 16 − 2 consumidas = 14 en Bsale; 10 reservadas (PED-0021 + PED-0037) → 4 disponibles, 6 pendientes de producción
   'coppa::granel-kg': 15,
   'coppa::sachet-100g': 40,
   'pastrami-americano::pieza': 6,
@@ -147,6 +184,7 @@ async function seedStock() {
         formatId: fmt.formatId,
         onHand,
         reserved: 0,
+        syncedAt: Date.now(),
       });
     }
   }
@@ -234,6 +272,54 @@ async function assertStockNonNegative() {
   if (bad.length) {
     throw new Error(`Seed left non-negative stock invariant broken:\n  ${bad.join('\n  ')}`);
   }
+  // Soft check: a sku that starts with Bsale < reserved shows every order that
+  // holds it as "stock comprometido" from minute one. Bump initialOnHand.
+  const compromised: string[] = [];
+  snap.forEach((d) => {
+    const s = d.data() as { onHand: number; reserved: number };
+    if (s.onHand < s.reserved) compromised.push(`${d.id}: onHand=${s.onHand} < reserved=${s.reserved}`);
+  });
+  if (compromised.length) console.warn(`⚠️  Stock comprometido de entrada:\n  ${compromised.join('\n  ')}`);
+}
+
+// The simulated Bsale side starts in perfect agreement with the mirror:
+// same quantities per sku, plus one emitted document per seeded order that
+// already carries an invoiceRef (already linked).
+async function seedBsaleMock() {
+  const stockSnap = await db.collection('stock').get();
+  const quantities: Record<string, number> = {};
+  stockSnap.forEach((d) => { quantities[d.id] = (d.data() as { onHand: number }).onHand; });
+  const batch = db.batch();
+  batch.set(db.collection('bsaleMock').doc('stock'), { quantities, updatedAt: Date.now() });
+  batch.set(db.collection('bsaleMock').doc('counters'), { factura: 822, boleta: 4100, guia: 310 });
+  for (const o of weekOrders) {
+    if (!o.invoiceRef) continue;
+    const emittedAt = o.statusHistory.find((h) => h.status === 'facturado')?.at ?? o.updatedAt;
+    const id = `seed-${o.invoiceRef}`;
+    batch.set(db.collection('bsaleDocuments').doc(id), {
+      id,
+      type: 'factura',
+      number: o.invoiceRef,
+      officeId: 1,
+      emissionDate: new Date(emittedAt).toISOString().slice(0, 10),
+      emittedAt,
+      clientRut: o.clientSnapshot.rut,
+      clientName: o.clientSnapshot.name,
+      totalCLP: Math.round(o.totalCLP ?? 0),
+      details: o.lines.map((l) => ({
+        variantId: `v-${l.productId}__${l.formatId}`,
+        sku: `${l.productId}__${l.formatId}`,
+        description: `${l.productName} · ${l.formatLabel}`,
+        quantity: l.packedQty ?? l.reservedQty,
+        netUnitValue: (l.subtotalCLP ?? 0) > 0 ? Math.round((l.subtotalCLP ?? 0) / 1.19 / Math.max(1, l.packedQty ?? l.reservedQty)) : 0,
+      })),
+      reference: o.id,
+      linkedOrderId: o.id,
+    });
+    batch.update(db.collection('orders').doc(o.id), { bsaleDocumentId: id });
+  }
+  batch.set(db.collection('settings').doc('bsaleSync'), { at: Date.now(), by: 'seed', updated: 0, promoted: [], absorbed: 0, compromised: [] });
+  await batch.commit();
 }
 
 async function main() {
@@ -251,11 +337,14 @@ async function main() {
   console.log('→ Seeding initial stock...');
   await seedStock();
 
-  console.log(`→ Seeding ${weekOrders.length} orders + stock movements...`);
+  console.log(`→ Seeding ${weekOrders.length} orders + stock movements (fechas desplazadas ${SHIFT_DAYS} día${SHIFT_DAYS === 1 ? '' : 's'})...`);
   await seedOrdersAndMovements();
 
   console.log('→ Verifying stock invariant...');
   await assertStockNonNegative();
+
+  console.log('→ Seeding simulated Bsale side (stock mirror + documents)...');
+  await seedBsaleMock();
 
   console.log('✅ Seed complete.');
   console.log('   Login: rafael@charcuteria.demo / demo1234 (vendedor)');

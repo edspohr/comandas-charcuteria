@@ -77,7 +77,7 @@ export default function DetalleArmado() {
         }),
         uid,
       );
-      navigate('/despacho/cola', { state: { armadoOk: order.id } });
+      navigate('/tablero', { state: { armadoOk: order.id } });
     } catch (e) {
       setError(describeFirestoreError(e));
       setSubmitting(false);
@@ -90,8 +90,8 @@ export default function DetalleArmado() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-4">
-        <Link to="/despacho/cola" className="text-[11px] uppercase tracking-display text-charcoal-300 hover:text-charcoal-700">
-          ← Cola
+        <Link to="/tablero" className="text-[11px] uppercase tracking-display text-charcoal-300 hover:text-charcoal-700">
+          ← Tablero
         </Link>
       </div>
 
@@ -121,7 +121,7 @@ export default function DetalleArmado() {
 
       {anyPendingProduction && (order.status === 'confirmado_parcial' || order.status === 'en_armado') && (
         <div className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 p-3 text-sm mb-4">
-          Este pedido tiene líneas esperando producción. Producción debe registrar el producto pendiente antes de armar.
+          Este pedido tiene líneas esperando stock. Se libera para armar cuando Bsale reporte la producción (sincronización).
         </div>
       )}
 

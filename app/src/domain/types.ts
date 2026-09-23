@@ -21,7 +21,9 @@ export type StockMovementType =
   | 'consumo'
   | 'produccion'
   | 'ajuste'
-  | 'traslado_tienda';
+  | 'traslado_tienda'
+  | 'sync_bsale'      // onHand overwritten with the quantity Bsale reports
+  | 'venta_bsale';    // reservation released because a Bsale document was linked
 
 export interface ProductFormat {
   formatId: string;
@@ -48,11 +50,19 @@ export interface Product {
   aliases?: string[];
 }
 
+// Stock is a *mirror* of Bsale, not a source of truth. `onHand` is the last
+// quantity Bsale reported for the variant (see syncStockFromBsale); the app
+// never moves it on its own except to pre-apply a sale that was just linked
+// (the next sync overwrites it anyway). `reserved` is app-only: Bsale has no
+// notion of reservations, so open orders hold their quantity here and
+// available = onHand − reserved.
 export interface StockDoc {
   productId: string;
   formatId: string;
   onHand: number;
   reserved: number;
+  bsaleVariantId?: string;
+  syncedAt?: number;
 }
 
 export function stockDocId(productId: string, formatId: string): string {
@@ -77,6 +87,17 @@ export interface Client {
   notes?: string;
   isInternalShop?: boolean;
   invoicingComplete: boolean;
+  // Alta rápida desde el wizard / parser. Queda pendiente de revisión por
+  // administración hasta completar los datos de facturación.
+  source?: 'seed' | 'app';
+  createdBy?: string;
+  createdAt?: number;
+  needsReview?: boolean;
+  // Vendedor responsable de la cuenta (cartera). Drives the sales-force
+  // supervision block in the dashboard.
+  ownerUid?: string;
+  // Future CRM link (HubSpot Company). The app only caches a copy.
+  hubspotCompanyId?: string;
 }
 
 export interface OrderLine {
@@ -124,6 +145,9 @@ export interface Order {
   assignedPackerId?: string;
   statusHistory: StatusEvent[];
   invoiceRef?: string;
+  // Id of the Bsale document (factura/boleta emitted at the POS) that was
+  // linked to this order. The number lives in invoiceRef for display.
+  bsaleDocumentId?: string;
   deliveredBy?: string;
   deliveryProof?: DeliveryProof;
   source: 'app' | 'pasted';
@@ -155,9 +179,28 @@ export interface AppUser {
   email: string;
 }
 
+// Thresholds that drive the kanban card colours. Editable in settings/app
+// without a deploy.
+export interface KanbanThresholds {
+  armadoSinDocHoras: number;        // armado hace > N h sin documento → ámbar
+  despachadoSinEntregaHoras: number; // despachado hace > N h sin entregar → ámbar
+  sinAsignarHoras: number;          // pendiente sin armador hace > N h → ámbar
+  cerradoDias: number;              // cuántos días de entregados mostrar en Cerrado
+}
+
+export const DEFAULT_KANBAN_THRESHOLDS: KanbanThresholds = {
+  armadoSinDocHoras: 4,
+  despachadoSinEntregaHoras: 24,
+  sinAsignarHoras: 2,
+  cerradoDias: 7,
+};
+
 export interface Settings {
   cutoffHour: number;
   timezone: 'America/Santiago';
+  kanban?: KanbanThresholds;
+  // Bsale office whose stock backs the pedidos (fábrica Franklin).
+  bsaleOfficeId?: number;
 }
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {

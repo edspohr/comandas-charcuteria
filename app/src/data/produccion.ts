@@ -10,7 +10,7 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Order, OrderStatus, Product, StockDoc, StockMovement } from '@/domain/types';
+import type { Order, OrderStatus, StockDoc, StockMovement } from '@/domain/types';
 import { stockDocId } from '@/domain/types';
 import { useProducts } from './products';
 import { useAllStock } from './stock';
@@ -143,21 +143,17 @@ export function nextDays(count: number): string[] {
   return days;
 }
 
-// Register a production batch. In one transaction:
-//   1. bump stock.onHand by the produced qty
-//   2. write a stockMovements type produccion
-//   3. FIFO by requestedDate: for each open order with pendingProductionQty
-//      on the same product/format, move pending → reserved up to available.
-//      If the order ends up with all pending == 0, promote to confirmado.
-export async function registrarProduccion(
+// Absorb pending production for one product/format using the stock Bsale
+// reported (available = onHand − reserved). FIFO by requestedDate: each open
+// order with pendingProductionQty on that sku moves pending → reserved up to
+// what's available; an order whose lines all reach pending == 0 is promoted
+// to `confirmado`. Called by syncStockFromBsale after mirroring onHand. The
+// app never bumps onHand itself — production is loaded in Bsale.
+export async function absorbPendingForKey(
   productId: string,
   formatId: string,
-  qty: number,
   by: string,
-  reason?: string,
 ): Promise<{ absorbed: number; promoted: string[] }> {
-  if (qty <= 0) throw new Error('Cantidad debe ser mayor a cero');
-
   const stockRef = doc(db, 'stock', stockDocId(productId, formatId));
 
   // Firestore client transactions only accept DocumentReference reads. We
@@ -176,6 +172,7 @@ export async function registrarProduccion(
       candidateOrderIds.push(o.id);
     }
   });
+  if (candidateOrderIds.length === 0) return { absorbed: 0, promoted: [] };
 
   return await runTransaction(db, async (tx) => {
     // ---- Reads (all before any writes)
@@ -183,6 +180,8 @@ export async function registrarProduccion(
     const prev: StockDoc = stockSnap.exists()
       ? (stockSnap.data() as StockDoc)
       : { productId, formatId, onHand: 0, reserved: 0 };
+    const available = Math.max(0, prev.onHand - prev.reserved);
+    if (available <= 0) return { absorbed: 0, promoted: [] };
 
     const candidates: Array<{ ref: ReturnType<typeof doc>; order: Order; lineIdx: number; pending: number }> = [];
     for (const id of candidateOrderIds) {
@@ -190,7 +189,6 @@ export async function registrarProduccion(
       const snap = await tx.get(ref);
       if (!snap.exists()) continue;
       const o = snap.data() as Order;
-      // Re-check under the fresh read; state may have changed since the query.
       if (o.status !== 'confirmado_parcial' && o.status !== 'recibido') continue;
       o.lines.forEach((l, i) => {
         if (l.productId === productId && l.formatId === formatId && l.pendingProductionQty > 0) {
@@ -198,81 +196,52 @@ export async function registrarProduccion(
         }
       });
     }
-    // FIFO by requestedDate ascending, then created time
     candidates.sort((a, b) => {
       if (a.order.requestedDate !== b.order.requestedDate) return a.order.requestedDate.localeCompare(b.order.requestedDate);
       return a.order.createdAt - b.order.createdAt;
     });
 
-    // ---- Compute distribution
-    let remaining = qty;
+    // ---- Distribute what's available
+    let remaining = available;
     let absorbed = 0;
-    const orderUpdates: Array<{
-      ref: ReturnType<typeof doc>;
-      order: Order;
-      newLines: Order['lines'];
-      newStatus: OrderStatus;
-      appendHistory: boolean;
-    }> = [];
-
+    const orderUpdates = new Map<string, { ref: ReturnType<typeof doc>; order: Order; newLines: Order['lines'] }>();
     for (const c of candidates) {
       if (remaining <= 0) break;
       const move = Math.min(remaining, c.pending);
-      const newLines = c.order.lines.map((l, i) => {
-        if (i !== c.lineIdx) return l;
-        return {
-          ...l,
-          reservedQty: l.reservedQty + move,
-          pendingProductionQty: l.pendingProductionQty - move,
-        };
-      });
-      const stillPending = newLines.some((l) => l.pendingProductionQty > 0);
-      const newStatus: OrderStatus = stillPending ? c.order.status : 'confirmado';
-      const appendHistory = newStatus !== c.order.status;
-      orderUpdates.push({ ref: c.ref, order: c.order, newLines, newStatus, appendHistory });
+      const base = orderUpdates.get(c.order.id)?.newLines ?? c.order.lines;
+      const newLines = base.map((l, i) => i !== c.lineIdx ? l : ({
+        ...l,
+        reservedQty: l.reservedQty + move,
+        pendingProductionQty: l.pendingProductionQty - move,
+      }));
+      orderUpdates.set(c.order.id, { ref: c.ref, order: c.order, newLines });
       remaining -= move;
       absorbed += move;
     }
+    if (absorbed === 0) return { absorbed: 0, promoted: [] };
 
     // ---- Writes
     const now = Date.now();
-    // Stock update: onHand goes up by full qty, reserved goes up by absorbed.
-    tx.set(stockRef, {
-      productId, formatId,
-      onHand: prev.onHand + qty,
-      reserved: prev.reserved + absorbed,
-    });
-
+    tx.update(stockRef, { reserved: prev.reserved + absorbed });
     const mvRef = doc(collection(db, 'stockMovements'));
     const mv: StockMovement = {
-      id: mvRef.id,
-      productId, formatId,
-      qty,
-      type: 'produccion',
-      by,
-      at: now,
-      reason,
+      id: mvRef.id, productId, formatId, qty: absorbed, type: 'reserva', by, at: now,
+      reason: 'Reasignación FIFO tras sync Bsale',
     };
     tx.set(mvRef, mv);
 
     const promoted: string[] = [];
-    // Deduplicate order updates in case the same order had multiple pending
-    // lines on the same product/format (rare, but be safe).
-    const seen = new Map<string, typeof orderUpdates[number]>();
-    for (const u of orderUpdates) seen.set(u.order.id, u);
-    for (const u of seen.values()) {
-      const updates: Record<string, unknown> = {
-        lines: u.newLines,
-        updatedAt: now,
-      };
-      if (u.appendHistory) {
-        updates.status = u.newStatus;
-        updates.statusHistory = [...u.order.statusHistory, { status: u.newStatus, by, at: now }];
-        if (u.newStatus === 'confirmado') promoted.push(u.order.id);
+    for (const u of orderUpdates.values()) {
+      const stillPending = u.newLines.some((l) => l.pendingProductionQty > 0);
+      const newStatus: OrderStatus = stillPending ? u.order.status : 'confirmado';
+      const updates: Record<string, unknown> = { lines: u.newLines, updatedAt: now };
+      if (newStatus !== u.order.status) {
+        updates.status = newStatus;
+        updates.statusHistory = [...u.order.statusHistory, { status: newStatus, by, at: now, note: 'Stock recibido desde Bsale' }];
+        promoted.push(u.order.id);
       }
       tx.update(u.ref, updates);
     }
-
     return { absorbed, promoted };
   });
 }
@@ -280,10 +249,4 @@ export async function registrarProduccion(
 // Small helper used in the UI: which unique products/formats currently need production
 export function needsProduction(rows: DemandRow[]): DemandRow[] {
   return rows.filter((r) => r.toProduce > 0);
-}
-
-// Product picker for the Registrar Producción action — any active product.
-export function useProductsForProduccion(): Product[] {
-  const { products } = useProducts();
-  return useMemo(() => products.filter((p) => p.active && !p.discontinued), [products]);
 }

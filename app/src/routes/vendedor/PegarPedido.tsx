@@ -4,7 +4,11 @@ import Button from '@/components/ui/Button';
 import { useCurrentUser } from '@/data/auth';
 import { useProducts } from '@/data/products';
 import { parseLocal, type ParsedLine, type MatchStatus } from '@/domain/parse/local';
-import { geminiEnabled, parseWithGemini } from '@/domain/parse/gemini';
+import { geminiEnabled, parseWithGeminiFull } from '@/domain/parse/gemini';
+import { extractClientHints, hintsHaveSomething, isClientInfoLine, matchExistingClient, type ClientHints } from '@/domain/parse/client';
+import { useClients } from '@/data/clients';
+import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
+import type { Client } from '@/domain/types';
 import { loadDraft, saveDraft } from '@/lib/draft';
 import { defaultRequestedDate } from '@/domain/cutoff';
 import { useSettings } from '@/data/settings';
@@ -36,27 +40,44 @@ const SAMPLE = `Buenos días! Para mañana necesito:
 - 2 piezas de coppa
 - 500g pastrami vacuno sin jugo`;
 
+const SAMPLE_NUEVO = `Hola, soy Camila del Café Botánico. Queremos empezar a comprarles:
+- 2 kg de jamón cocido laminado
+- 6 sachet de queso gouda ahumado
+- 1 pieza de coppa
+Dirección: Av. Italia 1450, Ñuñoa. Recibimos de 9 a 13 hrs.
+RUT 77.845.210-3, fono +56 9 6123 4455. Gracias!`;
+
 export default function PegarPedido() {
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
   const navigate = useNavigate();
   const { products, loading } = useProducts();
+  const { clients } = useClients();
   const { settings } = useSettings();
   const [text, setText] = useState('');
   const [parsed, setParsed] = useState<ParsedLine[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [engine, setEngine] = useState<'ai' | 'local' | null>(null);
+  // Client detected in the message: hints + either an existing match or the
+  // client the vendedor just created from the hints.
+  const [hints, setHints] = useState<ClientHints | null>(null);
+  const [client, setClient] = useState<Client | null>(null);
+  const [creating, setCreating] = useState(false);
 
   async function interpret() {
     if (busy || text.trim().length < 3) return;
     setBusy(true);
     setEngine(null);
+    setClient(null);
+    // Deterministic hints always run; Gemini can enrich them.
+    let h: ClientHints = extractClientHints(text);
     try {
       if (geminiEnabled()) {
         try {
-          const remote = await parseWithGemini(text, products);
-          if (remote.length > 0) {
-            setParsed(remote);
+          const remote = await parseWithGeminiFull(text, products);
+          if (remote.client) h = { ...h, ...Object.fromEntries(Object.entries(remote.client).filter(([, v]) => v != null && v !== '')) };
+          if (remote.lines.length > 0) {
+            setParsed(remote.lines);
             setEngine('ai');
             return;
           }
@@ -65,15 +86,17 @@ export default function PegarPedido() {
           console.warn('[parse] Gemini failed, falling back to local:', err);
         }
       }
-      setParsed(parseLocal(text, products));
+      setParsed(parseLocal(text, products).filter((l) => !isClientInfoLine(l.raw)));
       setEngine('local');
     } finally {
+      setHints(hintsHaveSomething(h) ? h : null);
+      setClient(hintsHaveSomething(h) ? matchExistingClient(h, clients) : null);
       setBusy(false);
     }
   }
 
-  function useSample() {
-    setText(SAMPLE);
+  function useSample(which: 'existente' | 'nuevo' = 'existente') {
+    setText(which === 'nuevo' ? SAMPLE_NUEVO : SAMPLE);
   }
 
   function selectSuggestion(idx: number, productId: string, catalog: Product[]) {
@@ -133,7 +156,7 @@ export default function PegarPedido() {
       if (!proceed) return;
     }
     const draft: WizardDraft = {
-      clientId: null,
+      clientId: client?.id ?? null,
       lines: usable.map((l) => ({
         productId: l.productId!,
         productName: l.productName!,
@@ -144,10 +167,10 @@ export default function PegarPedido() {
         notes: l.notes,
       })),
       requestedDate: defaultRequestedDate(settings.cutoffHour),
-      deliveryMode: 'despacho',
-      deliveryAddress: '',
-      receivingHours: '',
-      step: 1,
+      deliveryMode: client?.deliveryMode ?? hints?.deliveryMode ?? 'despacho',
+      deliveryAddress: client ? '' : (hints?.address ?? ''),
+      receivingHours: client ? '' : (hints?.receivingHours ?? ''),
+      step: client ? 2 : 1,
     };
     saveDraft(uid, draft);
     navigate('/vendedor/nuevo');
@@ -173,9 +196,51 @@ export default function PegarPedido() {
           <Button onClick={interpret} disabled={loading || busy || text.trim().length < 3} className="flex-1">
             {busy ? 'Interpretando…' : 'Interpretar'}
           </Button>
-          <Button variant="secondary" onClick={useSample} disabled={busy}>Ejemplo</Button>
+          <Button variant="secondary" onClick={() => useSample('existente')} disabled={busy}>Ejemplo</Button>
+          <Button variant="ghost" onClick={() => useSample('nuevo')} disabled={busy}>Cliente nuevo</Button>
         </div>
       </div>
+
+      {parsed && hints && (
+        <section className="mb-4">
+          <p className="eyebrow mb-2">Cliente detectado en el mensaje</p>
+          <div className={'card p-4 ' + (client ? 'border-emerald-200' : 'border-brass-300')}>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0 text-sm">
+                {client ? (
+                  <>
+                    <p className="font-semibold text-charcoal-900">{client.fantasyName ?? client.name} <span className="ml-2 text-[10px] uppercase tracking-display bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 rounded">Cliente existente</span></p>
+                    <p className="text-xs text-charcoal-500 mt-0.5">{client.rut ?? 'Sin RUT'} · {client.address ?? 'Sin dirección'}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-charcoal-900">{hints.fantasyName ?? hints.name ?? 'Cliente nuevo'} <span className="ml-2 text-[10px] uppercase tracking-display bg-brass-50 text-brass-700 border border-brass-300 px-1.5 rounded">No está en el catálogo</span></p>
+                    <p className="text-xs text-charcoal-500 mt-0.5">
+                      {[hints.rut, hints.phone, hints.address, hints.receivingHours].filter(Boolean).join(' · ') || 'Sin más datos en el mensaje'}
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                {client ? (
+                  <Button size="sm" variant="secondary" onClick={() => setClient(null)}>No es este</Button>
+                ) : (
+                  <Button size="sm" onClick={() => setCreating(true)}>Crear cliente con estos datos</Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {creating && hints && (
+        <NuevoClienteDialog
+          uid={uid}
+          initial={hints}
+          onClose={() => setCreating(false)}
+          onCreated={(c) => { setCreating(false); setClient(c); }}
+        />
+      )}
 
       {parsed && parsed.length > 0 && (
         <section>
@@ -204,7 +269,7 @@ export default function PegarPedido() {
             ))}
           </ul>
           <Button onClick={transferToWizard} disabled={!parsed.some((l) => l.productId && l.formatId && (l.qty ?? 0) > 0)} className="w-full">
-            Continuar en el wizard →
+            {client ? `Continuar con ${client.fantasyName ?? client.name} →` : 'Continuar en el wizard →'}
           </Button>
         </section>
       )}

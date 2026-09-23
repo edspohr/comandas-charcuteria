@@ -1,13 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Login from './routes/Login';
 import NuevoPedido from './routes/vendedor/NuevoPedido';
-import MisPedidos from './routes/vendedor/MisPedidos';
 import DetallePedido from './routes/vendedor/DetallePedido';
 import PegarPedido from './routes/vendedor/PegarPedido';
-import ColaDespacho from './routes/despacho/ColaDespacho';
 import DetalleArmado from './routes/despacho/DetalleArmado';
 import Produccion from './routes/produccion/Produccion';
-import Facturacion from './routes/admin/Facturacion';
+import Tablero from './routes/Tablero';
+import BsaleConsola from './routes/admin/Bsale';
 import Panel from './routes/admin/Panel';
 import Catalogo from './routes/admin/Catalogo';
 import Usuarios from './routes/admin/Usuarios';
@@ -60,16 +59,7 @@ export default function App() {
             </RouteGuard>
           }
         />
-        <Route
-          path="/vendedor/mis"
-          element={
-            <RouteGuard current={current} allow={['vendedor', 'admin', 'superAdmin']}>
-              <AppShell current={current!}>
-                <MisPedidos />
-              </AppShell>
-            </RouteGuard>
-          }
-        />
+        <Route path="/vendedor/mis" element={<Navigate to="/tablero" replace />} />
         <Route
           path="/vendedor/mis/:orderId"
           element={
@@ -80,16 +70,7 @@ export default function App() {
             </RouteGuard>
           }
         />
-        <Route
-          path="/despacho/cola"
-          element={
-            <RouteGuard current={current} allow={['despacho', 'admin', 'superAdmin']}>
-              <AppShell current={current!}>
-                <ColaDespacho />
-              </AppShell>
-            </RouteGuard>
-          }
-        />
+        <Route path="/despacho/cola" element={<Navigate to="/tablero" replace />} />
         <Route
           path="/despacho/cola/:orderId"
           element={
@@ -120,12 +101,23 @@ export default function App() {
             </RouteGuard>
           }
         />
+        <Route path="/admin/facturacion" element={<Navigate to="/tablero" replace />} />
         <Route
-          path="/admin/facturacion"
+          path="/tablero"
           element={
-            <RouteGuard current={current} allow={['admin', 'superAdmin']}>
+            <RouteGuard current={current} allow={['vendedor', 'despacho', 'produccion', 'admin', 'superAdmin']}>
               <AppShell current={current!}>
-                <Facturacion />
+                <Tablero />
+              </AppShell>
+            </RouteGuard>
+          }
+        />
+        <Route
+          path="/admin/bsale"
+          element={
+            <RouteGuard current={current} allow={['superAdmin']}>
+              <AppShell current={current!}>
+                <BsaleConsola />
               </AppShell>
             </RouteGuard>
           }

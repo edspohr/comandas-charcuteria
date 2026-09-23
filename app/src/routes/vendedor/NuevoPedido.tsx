@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '@/components/ui/Button';
+import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
 import SemaphoreBadge from '@/components/ui/SemaphoreBadge';
 import Stepper from '@/components/ui/Stepper';
 import { useCurrentUser } from '@/data/auth';
@@ -90,7 +91,7 @@ export default function NuevoPedido() {
         source: 'app',
       });
       clearDraft(uid);
-      navigate('/vendedor/mis', {
+      navigate('/tablero', {
         state: { justCreated: res.orderId, status: res.status, parcialLines: res.parcialLines },
       });
     } catch (e: unknown) {
@@ -119,6 +120,7 @@ export default function NuevoPedido() {
       {draft.step === 1 && (
         <StepCliente
           clients={clients}
+          uid={uid}
           selectedId={draft.clientId}
           onSelect={(c) => { update('clientId', c.id); update('deliveryMode', c.deliveryMode); goto(2); }}
           onRepeat={() => {
@@ -229,15 +231,17 @@ function Steps({ current, onGo }: { current: number; onGo: (n: number) => void }
 // ---------- Step 1: Cliente ----------
 
 function StepCliente({
-  clients, selectedId, onSelect, onRepeat, canRepeat,
+  clients, uid, selectedId, onSelect, onRepeat, canRepeat,
 }: {
   clients: Client[];
+  uid: string;
   selectedId: string | null;
   onSelect: (c: Client) => void;
   onRepeat: () => void;
   canRepeat: boolean;
 }) {
   const [q, setQ] = useState('');
+  const [creating, setCreating] = useState(false);
   const results = useMemo(() => searchClients(clients, q), [clients, q]);
 
   return (
@@ -257,6 +261,26 @@ function StepCliente({
         <Button variant="secondary" size="md" onClick={onRepeat} className="w-full">
           Repetir último pedido de este cliente
         </Button>
+      )}
+
+      {results.length === 0 ? (
+        <div className="card p-5 text-center">
+          <p className="text-sm text-charcoal-500 mb-3">No hay clientes que coincidan con «{q}».</p>
+          <Button onClick={() => setCreating(true)} className="w-full">+ Crear cliente «{q.trim()}»</Button>
+        </div>
+      ) : (
+        <button onClick={() => setCreating(true)} className="w-full text-left rounded-md border border-dashed border-charcoal-200 px-3.5 py-2.5 text-xs uppercase tracking-display text-charcoal-500 hover:border-brass-500 hover:text-charcoal-900">
+          + Cliente nuevo
+        </button>
+      )}
+
+      {creating && (
+        <NuevoClienteDialog
+          uid={uid}
+          initial={{ fantasyName: q.trim() || undefined }}
+          onClose={() => setCreating(false)}
+          onCreated={(c) => { setCreating(false); onSelect(c); }}
+        />
       )}
 
       <ul className="space-y-1.5">

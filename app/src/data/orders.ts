@@ -270,10 +270,11 @@ export interface PackedLineInput {
   packedWeightKg?: number;
 }
 
-// Mark order as armado. Transaction:
-//   Reads:  order doc + one stock doc per line with reservedQty > 0
-//   Writes: stock.reserved -= reservedQty, stock.onHand -= packedQty
-//           per line, appends stockMovements type consumo, updates order
+// Mark order as armado. Bsale is the stock source of truth, so armado no
+// longer moves stock: the reservation stays until the POS document is linked
+// (vincularDocumento) and Bsale discounts the sale on its side.
+//   Reads:  order doc
+//   Writes: packedQty / packedWeightKg / subtotal per line, status, history
 export async function markArmado(
   orderId: string,
   packed: PackedLineInput[],
@@ -281,31 +282,19 @@ export async function markArmado(
 ): Promise<void> {
   const orderRef = doc(db, 'orders', orderId);
   await runTransaction(db, async (tx) => {
-    // ---- Reads
     const orderSnap = await tx.get(orderRef);
     if (!orderSnap.exists()) throw new Error('Pedido no encontrado');
     const order = orderSnap.data() as Order;
     if (order.status !== 'en_armado' && order.status !== 'confirmado' && order.status !== 'confirmado_parcial') {
       throw new Error(`No se puede armar un pedido en estado ${order.status}`);
     }
-    // Hard-block armado while any line still has production pending. The
-    // demo flow is: Registrar producción absorbs the pendiente, the order
-    // is promoted to `confirmado`, then despacho arma. Allowing armado
-    // here would leave the pendingProductionQty orphaned.
+    // Hard-block armado while any line still has production pending — the
+    // stock has to show up in Bsale first (sync promotes the order).
     const stillPending = order.lines.some((l) => l.pendingProductionQty > 0);
     if (stillPending) {
-      throw new Error('El pedido tiene líneas pendientes de producción. Espere a que Yuri registre la producción antes de armar.');
+      throw new Error('El pedido tiene líneas esperando stock de producción. Se arma cuando Bsale reporte el stock.');
     }
 
-    const stockReads: Array<{ ref: ReturnType<typeof doc>; prev: StockDoc | null; line: OrderLine }> = [];
-    for (const line of order.lines) {
-      if (line.reservedQty <= 0) { stockReads.push({ ref: doc(db, 'stock', stockDocId(line.productId, line.formatId)), prev: null, line }); continue; }
-      const ref = doc(db, 'stock', stockDocId(line.productId, line.formatId));
-      const snap = await tx.get(ref);
-      stockReads.push({ ref, prev: snap.exists() ? (snap.data() as StockDoc) : null, line });
-    }
-
-    // ---- Writes
     const now = Date.now();
     const packedMap = new Map(packed.map((p) => [`${p.productId}::${p.formatId}`, p]));
     const enrichedLines: OrderLine[] = order.lines.map((line) => {
@@ -313,8 +302,7 @@ export async function markArmado(
       const p = packedMap.get(key);
       const packedQty = p?.packedQty ?? line.reservedQty;
       // Recompute the subtotal against actual packed values so pieza-by-weight
-      // invoices and the Panel delta reflect merma. Sachet formats and granel
-      // already priced qty × price, so packedQty doesn't shift them.
+      // invoices and the Panel delta reflect merma.
       let subtotalCLP = line.subtotalCLP;
       if (line.unitPriceSnapshotCLP != null) {
         if (line.unit === 'kg') {
@@ -329,27 +317,6 @@ export async function markArmado(
     });
     const totalCLP = enrichedLines.reduce((s, l) => s + (l.subtotalCLP ?? 0), 0);
 
-    stockReads.forEach(({ ref, prev, line }) => {
-      if (line.reservedQty <= 0 || !prev) return;
-      const packedQty = packedMap.get(`${line.productId}::${line.formatId}`)?.packedQty ?? line.reservedQty;
-      tx.update(ref, {
-        reserved: Math.max(0, prev.reserved - line.reservedQty),
-        onHand: Math.max(0, prev.onHand - packedQty),
-      });
-      const mvRef = doc(collection(db, 'stockMovements'));
-      const mv: StockMovement = {
-        id: mvRef.id,
-        productId: line.productId,
-        formatId: line.formatId,
-        qty: packedQty,
-        type: 'consumo',
-        orderId,
-        by: packerUid,
-        at: now,
-      };
-      tx.set(mvRef, mv);
-    });
-
     tx.update(orderRef, {
       lines: enrichedLines,
       status: 'armado',
@@ -363,39 +330,71 @@ export async function markArmado(
 
 // ---------- Facturación / despacho / entrega ----------
 
-export interface FacturarResult {
-  invoiceRef: string;
-  payload: unknown;
-}
-
-// Assigns a mock Bsale doc number and transitions armado → facturado.
-// Kept as a plain function (not a transaction) because MockBsaleClient
-// runs its own transaction on the counter and we don't have concurrent
-// state to protect on the order itself beyond the version we already
-// have. If two admins click Facturar at once, the second observes the
-// invoiceRef and short-circuits.
-export async function facturarOrder(
+// Link a document emitted at the Bsale POS to a packed order. The sale
+// already happened in Bsale (stock discounted there), so here we:
+//   - release the app-side reservation for every line,
+//   - pre-apply the sale to the mirror (onHand −= packed) so availability is
+//     right until the next sync overwrites it with Bsale's number,
+//   - store invoiceRef + bsaleDocumentId, status → facturado,
+//   - mark the mock document as linked so it can't be reused.
+export async function vincularDocumento(
   orderId: string,
+  document: { id: string; number: string },
   by: string,
-  createDocument: (order: Order) => Promise<{ docNumber: string; payload: unknown }>,
-): Promise<FacturarResult> {
+): Promise<void> {
   const orderRef = doc(db, 'orders', orderId);
-  const preview = await import('firebase/firestore').then((m) => m.getDoc(orderRef));
-  if (!preview.exists()) throw new Error('Pedido no encontrado');
-  const order = preview.data() as Order;
-  if (order.invoiceRef) return { invoiceRef: order.invoiceRef, payload: null };
-  if (order.status !== 'armado') throw new Error(`No se puede facturar un pedido en estado ${order.status}`);
+  const docRef = doc(db, 'bsaleDocuments', document.id);
+  await runTransaction(db, async (tx) => {
+    const orderSnap = await tx.get(orderRef);
+    if (!orderSnap.exists()) throw new Error('Pedido no encontrado');
+    const order = orderSnap.data() as Order;
+    if (order.invoiceRef) throw new Error(`El pedido ya tiene el documento ${order.invoiceRef}`);
+    if (order.status !== 'armado') throw new Error(`No se puede vincular un documento a un pedido en estado ${order.status}`);
+    const docSnap = await tx.get(docRef);
+    if (docSnap.exists() && (docSnap.data() as { linkedOrderId?: string }).linkedOrderId) {
+      throw new Error('Ese documento ya está vinculado a otro pedido');
+    }
 
-  const { docNumber, payload } = await createDocument(order);
-  const now = Date.now();
-  const { updateDoc } = await import('firebase/firestore');
-  await updateDoc(orderRef, {
-    status: 'facturado',
-    invoiceRef: docNumber,
-    updatedAt: now,
-    statusHistory: [...order.statusHistory, { status: 'facturado', by, at: now, note: docNumber }],
+    const reads: Array<{ ref: ReturnType<typeof doc>; prev: StockDoc | null; line: OrderLine }> = [];
+    for (const line of order.lines) {
+      if (line.reservedQty <= 0) continue;
+      const ref = doc(db, 'stock', stockDocId(line.productId, line.formatId));
+      const snap = await tx.get(ref);
+      reads.push({ ref, prev: snap.exists() ? (snap.data() as StockDoc) : null, line });
+    }
+
+    const now = Date.now();
+    for (const { ref, prev, line } of reads) {
+      if (!prev) continue;
+      const packedQty = line.packedQty ?? line.reservedQty;
+      tx.update(ref, {
+        reserved: Math.max(0, prev.reserved - line.reservedQty),
+        onHand: Math.max(0, prev.onHand - packedQty),
+      });
+      const mvRef = doc(collection(db, 'stockMovements'));
+      const mv: StockMovement = {
+        id: mvRef.id,
+        productId: line.productId,
+        formatId: line.formatId,
+        qty: packedQty,
+        type: 'venta_bsale',
+        orderId,
+        by,
+        at: now,
+        reason: document.number,
+      };
+      tx.set(mvRef, mv);
+    }
+
+    if (docSnap.exists()) tx.update(docRef, { linkedOrderId: orderId });
+    tx.update(orderRef, {
+      status: 'facturado',
+      invoiceRef: document.number,
+      bsaleDocumentId: document.id,
+      updatedAt: now,
+      statusHistory: [...order.statusHistory, { status: 'facturado', by, at: now, note: document.number }],
+    });
   });
-  return { invoiceRef: docNumber, payload };
 }
 
 export async function despacharOrder(

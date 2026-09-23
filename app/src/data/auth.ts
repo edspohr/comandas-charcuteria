@@ -62,11 +62,11 @@ export async function signOut() {
 }
 
 export const ROLE_HOME: Record<Role, string> = {
-  vendedor: '/vendedor/nuevo',
-  despacho: '/despacho/cola',
+  vendedor: '/tablero',
+  despacho: '/tablero',
   produccion: '/produccion',
-  admin: '/admin/panel',
-  superAdmin: '/admin/panel',
+  admin: '/tablero',
+  superAdmin: '/tablero',
 };
 
 export const ROLE_LABEL: Record<Role, string> = {

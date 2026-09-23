@@ -2,6 +2,7 @@ import { getAI, getGenerativeModel, Schema, VertexAIBackend } from '@firebase/ai
 import { app } from '@/data/firebase';
 import type { Product, Unit } from '@/domain/types';
 import type { ParsedLine, MatchStatus } from './local';
+import type { ClientHints } from './client';
 
 // Firebase AI Logic wire-up. We route through Vertex AI (project data lives in
 // Google Cloud, App Check hooks apply, cheaper than routing through Anthropic).
@@ -24,6 +25,17 @@ interface GeminiParsed {
     notes?: string | null;
     confidence: 'verified' | 'review' | 'not_found';
   }>;
+  client?: {
+    fantasyName?: string | null;
+    razonSocial?: string | null;
+    rut?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+    receivingHours?: string | null;
+    deliveryMode?: 'retiro' | 'despacho' | null;
+    contactName?: string | null;
+  } | null;
 }
 
 let cachedModel: ReturnType<typeof getGenerativeModel> | null = null;
@@ -51,6 +63,21 @@ function getModel() {
       }),
     },
     required: ['lines'],
+  });
+  // Optional client block: whatever the message reveals about who is ordering.
+  (responseSchema as unknown as { properties: Record<string, unknown> }).properties.client = Schema.object({
+    nullable: true,
+    properties: {
+      fantasyName:    Schema.string({ nullable: true, description: 'Nombre comercial del local (Hotel Magnolia, Café Oven…).' }),
+      razonSocial:    Schema.string({ nullable: true, description: 'Razón social si la menciona (para facturar).' }),
+      rut:            Schema.string({ nullable: true, description: 'RUT chileno tal como aparece.' }),
+      phone:          Schema.string({ nullable: true }),
+      email:          Schema.string({ nullable: true }),
+      address:        Schema.string({ nullable: true, description: 'Dirección de entrega, calle número y comuna.' }),
+      receivingHours: Schema.string({ nullable: true, description: 'Horario de recepción si lo indica.' }),
+      deliveryMode:   Schema.enumString({ enum: ['retiro', 'despacho'], nullable: true }),
+      contactName:    Schema.string({ nullable: true, description: 'Nombre de la persona que escribe.' }),
+    },
   });
   cachedModel = getGenerativeModel(ai, {
     model: MODEL_NAME,
@@ -85,6 +112,12 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 export async function parseWithGemini(text: string, products: Product[]): Promise<ParsedLine[]> {
+  return (await parseWithGeminiFull(text, products)).lines;
+}
+
+export interface GeminiFullResult { lines: ParsedLine[]; client: ClientHints | null; }
+
+export async function parseWithGeminiFull(text: string, products: Product[]): Promise<GeminiFullResult> {
   const manifest = buildCatalogManifest(products);
   const prompt = [
     'Catálogo disponible (productId | nombre | formatId | etiqueta formato | unidad | aliases):',
@@ -92,6 +125,7 @@ export async function parseWithGemini(text: string, products: Product[]): Promis
     '',
     'Interpretá el siguiente mensaje y devolvé un JSON con las líneas de pedido encontradas.',
     'Regla: si el texto no mapea a ningún producto del catálogo, no incluyas esa línea.',
+    'Además, si el mensaje revela quién pide (nombre del local, razón social, RUT, teléfono, dirección, horario, retiro/despacho), completá el bloque client; si no, dejalo en null.',
     '',
     'Mensaje:',
     text,
@@ -103,7 +137,20 @@ export async function parseWithGemini(text: string, products: Product[]): Promis
   const parsed = JSON.parse(jsonText) as GeminiParsed;
   const productById = new Map(products.map((p) => [p.id, p]));
 
-  return parsed.lines.map((l): ParsedLine => {
+  const c = parsed.client;
+  const client: ClientHints | null = c && (c.fantasyName || c.razonSocial || c.rut || c.phone || c.address) ? {
+    fantasyName: c.fantasyName ?? undefined,
+    name: c.razonSocial ?? undefined,
+    rut: c.rut ?? undefined,
+    phone: c.phone ?? undefined,
+    email: c.email ?? undefined,
+    address: c.address ?? undefined,
+    receivingHours: c.receivingHours ?? undefined,
+    deliveryMode: c.deliveryMode ?? undefined,
+    contactName: c.contactName ?? undefined,
+  } : null;
+
+  const lines = parsed.lines.map((l): ParsedLine => {
     const prod = productById.get(l.productId);
     const fmt = prod?.formats.find((f) => f.formatId === l.formatId);
     // Suggestions: same product, all formats — lets the user swap formatId inline.
@@ -124,6 +171,7 @@ export async function parseWithGemini(text: string, products: Product[]): Promis
       suggestions,
     };
   });
+  return { lines, client };
 }
 
 // True when Firebase AI Logic looks callable in this environment. We keep this

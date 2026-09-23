@@ -11,15 +11,14 @@ interface NavItem { to: string; label: string; primaryFor?: Role[]; roles: Role[
 // puts those first in the nav so they're immediately reachable on mobile,
 // with the shared admin/reporting items after.
 const NAV: NavItem[] = [
+  { to: '/tablero',           label: 'Tablero',          roles: ['vendedor', 'despacho', 'produccion', 'admin', 'superAdmin'], primaryFor: ['despacho', 'admin', 'superAdmin'] },
   { to: '/vendedor/nuevo',    label: 'Nuevo pedido',     roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor'] },
   { to: '/vendedor/pegar',    label: 'Pegar pedido',     roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor'] },
-  { to: '/vendedor/mis',      label: 'Mis pedidos',      roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor'] },
-  { to: '/despacho/cola',     label: 'Cola de despacho', roles: ['despacho', 'admin', 'superAdmin'], primaryFor: ['despacho'] },
   { to: '/produccion',        label: 'Producción',       roles: ['produccion', 'admin', 'superAdmin'], primaryFor: ['produccion'] },
-  { to: '/admin/facturacion', label: 'Facturación',      roles: ['admin', 'superAdmin'], primaryFor: ['admin', 'superAdmin'] },
   { to: '/admin/panel',       label: 'Panel',            roles: ['admin', 'superAdmin'], primaryFor: ['admin', 'superAdmin'] },
   { to: '/admin/catalogo',    label: 'Catálogo',         roles: ['admin', 'superAdmin'], primaryFor: ['admin', 'superAdmin'] },
   { to: '/admin/usuarios',    label: 'Usuarios',         roles: ['superAdmin'], primaryFor: ['superAdmin'] },
+  { to: '/admin/bsale',       label: 'Bsale',            roles: ['superAdmin'], primaryFor: ['superAdmin'] },
 ];
 
 export default function AppShell({ current, children }: { current: CurrentUser; children: React.ReactNode }) {

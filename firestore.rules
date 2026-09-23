@@ -24,12 +24,36 @@ service cloud.firestore {
 
     match /clients/{id} {
       allow read:  if isAuth();
-      allow write: if isAdminOrSup();
+      // Alta rápida desde el wizard / parser: el vendedor crea el cliente
+      // marcado needsReview; administración lo completa después.
+      allow create: if isAdminOrSup()
+        || (isVendedor() && request.resource.data.createdBy == request.auth.uid);
+      allow update, delete: if isAdminOrSup();
     }
 
     match /settings/{doc} {
       allow read:  if isAuth();
-      allow write: if isSuperAdmin();
+      // bsaleSync is the "last sync" summary written by whoever ran the sync.
+      allow write: if isSuperAdmin() || (doc == 'bsaleSync' && isAuth() && !isVendedor());
+    }
+
+    // -------- Bsale mirror (simulated Bsale side for the demo)
+    // In production these collections disappear: the app reads Bsale's API.
+    match /bsaleMock/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdminOrSup();
+    }
+    match /bsaleDocuments/{id} {
+      allow read:   if isAuth();
+      allow create: if isAdminOrSup();
+      // linking a document to an order only sets linkedOrderId
+      allow update: if isAdminOrSup();
+      allow delete: if isSuperAdmin();
+    }
+    match /bsaleReceptions/{id} {
+      allow read:   if isAuth();
+      allow create: if isAdminOrSup();
+      allow update, delete: if false;
     }
 
     match /users/{uid} {
@@ -50,18 +74,18 @@ service cloud.firestore {
       allow write: if id.matches('bsale-.*') && isAdminOrSup();
     }
 
-    // -------- Stock (mutated only by transactions in code)
+    // -------- Stock mirror of Bsale (mutated only by transactions in code)
     // - Vendedor can touch reserved only (createOrder / anular releases). onHand
     //   must NOT change.
-    // - Despacho consumes on markArmado (both fields move).
-    // - Producción bumps onHand on Registrar producción (and reserved when
-    //   FIFO absorbs pending).
-    // - Admin/SuperAdmin: any change (ajuste con motivo).
+    // - Despacho / Producción / Admin run syncStockFromBsale, which overwrites
+    //   onHand with what Bsale reports and moves reserved when absorbing
+    //   pending production. Admin also releases reservations on
+    //   vincularDocumento.
     // Rules always enforce non-negative onHand and reserved.
     match /stock/{id} {
       allow read: if isAuth();
 
-      allow create: if isAdminOrSup()
+      allow create: if (isAdminOrSup() || isDespacho() || isProduccion())
         && request.resource.data.onHand >= 0
         && request.resource.data.reserved >= 0;
 
@@ -72,8 +96,8 @@ service cloud.firestore {
           isAdminOrSup()
           // Vendedor: cannot move onHand.
           || (isVendedor() && request.resource.data.onHand == resource.data.onHand)
-          // Despacho + Producción: any onHand/reserved delta consistent with a
-          // consumo/produccion transaction. The invariants above still apply.
+          // Despacho + Producción: sync writes (onHand ← Bsale, reserved ←
+          // FIFO absorption). The invariants above still apply.
           || isDespacho()
           || isProduccion()
         );
@@ -125,7 +149,8 @@ service cloud.firestore {
           && request.resource.data.createdBy == resource.data.createdBy
         )
         || (
-          isProduccion()
+          // Sync promotes partial orders; despacho can trigger it too.
+          (isProduccion() || isDespacho())
           && resource.data.status in ['confirmado_parcial', 'recibido']
           && request.resource.data.status in ['confirmado_parcial', 'confirmado']
           && request.resource.data.get('invoiceRef', null) == resource.data.get('invoiceRef', null)

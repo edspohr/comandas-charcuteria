@@ -1,14 +1,11 @@
 import { useMemo, useState } from 'react';
-import Button from '@/components/ui/Button';
-import { useCurrentUser } from '@/data/auth';
 import { useClients } from '@/data/clients';
 import { useProducts } from '@/data/products';
-import { ajustarStock, availableFor, useAllStock } from '@/data/stock';
+import { availableFor, useAllStock, useSyncState } from '@/data/stock';
 import { formatQty } from '@/lib/format';
-import { describeFirestoreError } from '@/lib/errors';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { categoryLabel } from '@/domain/categories';
-import type { Product, ProductFormat, Client } from '@/domain/types';
+import type { Client } from '@/domain/types';
 
 type Tab = 'productos' | 'clientes';
 
@@ -47,13 +44,11 @@ export default function Catalogo() {
 }
 
 function ProductosTab() {
-  const { current } = useCurrentUser();
-  const uid = current!.appUser.uid;
   const { products, loading, error: productsError } = useProducts();
   const { stock, error: stockError } = useAllStock();
+  const sync = useSyncState();
   const error = productsError ?? stockError;
   const [q, setQ] = useState('');
-  const [adjust, setAdjust] = useState<{ product: Product; format: ProductFormat } | null>(null);
 
   const filtered = useMemo(() => {
     if (!q.trim()) return products;
@@ -69,6 +64,9 @@ function ProductosTab() {
         placeholder="Buscar producto"
         className="field mb-4"
       />
+      <p className="text-xs text-charcoal-300 mb-3">
+        Stock según Bsale{sync?.at ? ` · sincronizado ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}` : ''}. Los ajustes se hacen en Bsale.
+      </p>
       {loading && !error && <p className="text-sm text-charcoal-300">Cargando…</p>}
       {error && <div className="mb-3"><ErrorBanner message={error} /></div>}
       <div className="card divide-y divide-charcoal-100">
@@ -98,16 +96,13 @@ function ProductosTab() {
                     <div className="min-w-0">
                       <p className="text-charcoal-700 font-medium">{f.label}</p>
                       <p className="text-[11px] text-charcoal-300 uppercase tracking-display mt-0.5">
-                        En bodega {formatQty(s?.onHand ?? 0, f.unit)} · Reserv. {formatQty(s?.reserved ?? 0, f.unit)}
+                        Bsale {formatQty(s?.onHand ?? 0, f.unit)} · Reserv. {formatQty(s?.reserved ?? 0, f.unit)}
                       </p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <span className={'text-sm font-semibold ' + (av > 0 ? 'text-emerald-700' : 'text-red-700')}>
                         {formatQty(av, f.unit)}
                       </span>
-                      <Button size="sm" variant="secondary" onClick={() => setAdjust({ product: p, format: f })}>
-                        Ajustar
-                      </Button>
                     </div>
                   </div>
                 );
@@ -117,95 +112,6 @@ function ProductosTab() {
         ))}
       </div>
 
-      {adjust && (
-        <AjusteStockDialog
-          product={adjust.product}
-          format={adjust.format}
-          current={stock.get(`${adjust.product.id}__${adjust.format.formatId}`)?.onHand ?? 0}
-          uid={uid}
-          onClose={() => setAdjust(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function AjusteStockDialog({
-  product, format, current, uid, onClose,
-}: {
-  product: Product;
-  format: ProductFormat;
-  current: number;
-  uid: string;
-  onClose: () => void;
-}) {
-  const [newQty, setNewQty] = useState<number>(current);
-  const [reason, setReason] = useState<string>('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const delta = newQty - current;
-
-  async function submit() {
-    setBusy(true); setError(null);
-    try { await ajustarStock(product.id, format.formatId, newQty, reason, uid); onClose(); }
-    catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
-  }
-
-  return (
-    <div className="fixed inset-0 z-20 bg-charcoal-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="w-full max-w-md bg-cream-50 rounded-t-xl sm:rounded-xl shadow-lift p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="eyebrow">Ajuste de stock</p>
-            <h2 className="text-lg font-semibold text-charcoal-900 tracking-display uppercase mt-0.5">{product.name}</h2>
-            <p className="text-xs text-charcoal-300 mt-0.5">{format.label}</p>
-          </div>
-          <button onClick={onClose} className="text-charcoal-300 hover:text-charcoal-700 text-xl w-8 h-8 flex items-center justify-center">×</button>
-        </div>
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="eyebrow">Actual</p>
-              <p className="text-lg font-semibold text-charcoal-700 mt-0.5">{formatQty(current, format.unit)}</p>
-            </div>
-            <div>
-              <p className="eyebrow">Nuevo</p>
-              <input
-                type="number"
-                inputMode="decimal"
-                step={format.unit === 'kg' ? '0.1' : '1'}
-                min="0"
-                value={Number.isFinite(newQty) ? newQty : 0}
-                onChange={(e) => setNewQty(parseFloat(e.target.value))}
-                className="field h-10 text-sm mt-1"
-              />
-            </div>
-          </div>
-
-          <p className={'text-xs uppercase tracking-display ' + (delta === 0 ? 'text-charcoal-300' : delta > 0 ? 'text-emerald-700' : 'text-brass-700')}>
-            Delta {delta > 0 ? '+' : ''}{delta} {format.unit === 'kg' ? 'kg' : format.unit === 'g' ? 'g' : 'u'}
-          </p>
-
-          <div>
-            <label className="eyebrow block mb-1.5">Motivo</label>
-            <input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Ej: conteo mensual, merma, traslado a tienda…"
-              className="field h-10 text-sm"
-            />
-          </div>
-
-          {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-2 text-sm">{error}</div>}
-
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
-            <Button onClick={submit} disabled={busy || delta === 0} className="flex-1">{busy ? '…' : 'Guardar'}</Button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

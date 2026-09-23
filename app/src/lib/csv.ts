@@ -14,12 +14,16 @@ export function toCsv(input: Array<object>, columns?: Array<{ key: string; label
   return [head, ...body].join('\n');
 }
 
-export function downloadCsv(filename: string, rows: Array<object>, columns?: Array<{ key: string; label: string }>): void {
+// Filenames carry the export date so successive downloads don't overwrite
+// each other; `period` becomes a two-line header above the table.
+export function downloadCsv(filename: string, rows: Array<object>, columns?: Array<{ key: string; label: string }>, period?: string): void {
   const csv = toCsv(rows, columns);
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const stamp = new Date().toISOString().slice(0, 10);
+  const head = period ? `Período;${period}\nExportado;${stamp}\n\n` : '';
+  const blob = new Blob(['﻿' + head + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = filename.endsWith('.csv') ? filename : `${filename}.csv`;
+  a.href = url; a.download = `${filename.replace(/\.csv$/, '')}-${stamp}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 }

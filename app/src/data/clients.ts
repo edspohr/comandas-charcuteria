@@ -160,7 +160,12 @@ export async function createClientQuick(input: QuickClientInput, by: string): Pr
     createdAt: Date.now(),
     ownerUid: by,
   };
-  await setDoc(doc(db, 'clients', id), client);
+  try {
+    await setDoc(doc(db, 'clients', id), client);
+  } catch (e) {
+    console.error('[clients] mirror create failed after Bsale create', e);
+    throw new Error('El cliente se creó en Bsale pero la copia local falló. Sincronizá con Bsale y volvé a buscarlo.');
+  }
   return client;
 }
 
@@ -234,6 +239,8 @@ export async function updateClientAdmin(client: Client, patch: ClientAdminPatch,
   if (client.bsaleClientId) {
     await bsale.updateClient(client.bsaleClientId, next);
   }
+  // From here on Bsale already has the new data: if the mirror write fails
+  // we say so explicitly (a sync will heal it) instead of failing silently.
   const invoicingComplete = !!(next.rut && next.name && next.address && next.giro);
   const mirror: Record<string, unknown> = {
     name: next.name,
@@ -252,5 +259,10 @@ export async function updateClientAdmin(client: Client, patch: ClientAdminPatch,
   if (patch.deliveryMode !== undefined) mirror.deliveryMode = patch.deliveryMode;
   if (patch.notes !== undefined) mirror.notes = patch.notes.trim() || null;
   if (patch.ownerUid !== undefined) mirror.ownerUid = patch.ownerUid || null;
-  await updateDoc(doc(db, 'clients', client.id), mirror);
+  try {
+    await updateDoc(doc(db, 'clients', client.id), mirror);
+  } catch (e) {
+    console.error('[clients] mirror update failed after Bsale update', e);
+    throw new Error('Bsale quedó actualizado pero la copia local falló. Tocá "Sincronizar Bsale" en el tablero para alinearla.');
+  }
 }

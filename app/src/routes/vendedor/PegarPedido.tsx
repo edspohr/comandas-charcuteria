@@ -146,7 +146,7 @@ export default function PegarPedido() {
     setParsed((prev) => prev ? prev.filter((_, i) => i !== idx) : prev);
   }
 
-  function transferToWizard() {
+  function transferToWizard(withClient: Client | null = client) {
     const usable = (parsed ?? []).filter((l) => l.productId && l.formatId && l.unit && l.qty && l.qty > 0);
     if (usable.length === 0) return;
     // If there's already a draft with lines, warn before overwriting.
@@ -156,7 +156,7 @@ export default function PegarPedido() {
       if (!proceed) return;
     }
     const draft: WizardDraft = {
-      clientId: client?.id ?? null,
+      clientId: withClient?.id ?? null,
       lines: usable.map((l) => ({
         productId: l.productId!,
         productName: l.productName!,
@@ -167,10 +167,10 @@ export default function PegarPedido() {
         notes: l.notes,
       })),
       requestedDate: defaultRequestedDate(settings.cutoffHour),
-      deliveryMode: client?.deliveryMode ?? hints?.deliveryMode ?? 'despacho',
-      deliveryAddress: client ? '' : (hints?.address ?? ''),
-      receivingHours: client ? '' : (hints?.receivingHours ?? ''),
-      step: client ? 2 : 1,
+      deliveryMode: withClient?.deliveryMode ?? hints?.deliveryMode ?? 'despacho',
+      deliveryAddress: withClient ? '' : (hints?.address ?? ''),
+      receivingHours: withClient ? '' : (hints?.receivingHours ?? ''),
+      step: withClient ? 2 : 1,
     };
     saveDraft(uid, draft);
     navigate('/vendedor/nuevo');
@@ -238,7 +238,7 @@ export default function PegarPedido() {
           uid={uid}
           initial={hints}
           onClose={() => setCreating(false)}
-          onCreated={(c) => { setCreating(false); setClient(c); }}
+          onCreated={(c) => { setCreating(false); setClient(c); transferToWizard(c); }}
         />
       )}
 
@@ -268,7 +268,7 @@ export default function PegarPedido() {
               </li>
             ))}
           </ul>
-          <Button onClick={transferToWizard} disabled={!parsed.some((l) => l.productId && l.formatId && (l.qty ?? 0) > 0)} className="w-full">
+          <Button onClick={() => transferToWizard()} disabled={!parsed.some((l) => l.productId && l.formatId && (l.qty ?? 0) > 0)} className="w-full">
             {client ? `Continuar con ${client.fantasyName ?? client.name} →` : 'Continuar en el wizard →'}
           </Button>
         </section>

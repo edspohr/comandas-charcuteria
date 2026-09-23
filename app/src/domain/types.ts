@@ -204,6 +204,8 @@ export interface Settings {
   cutoffHour: number;
   timezone: 'America/Santiago';
   kanban?: KanbanThresholds;
+  // Días sin pedir que definen activo / en riesgo / inactivo.
+  clientHealth?: { activoDias: number; riesgoDias: number };
   // Bsale office whose stock backs the pedidos (fábrica Franklin).
   bsaleOfficeId?: number;
 }

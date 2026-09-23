@@ -142,6 +142,7 @@ async function seedCatalog() {
     timezone: 'America/Santiago',
     bsaleOfficeId: 1,
     kanban: { armadoSinDocHoras: 4, despachadoSinEntregaHoras: 24, sinAsignarHoras: 2, cerradoDias: 7 },
+    clientHealth: { activoDias: 14, riesgoDias: 30 },
   });
   batch.set(db.collection('counters').doc('orders-2026'), { last: weekOrders.length });
   await batch.commit();

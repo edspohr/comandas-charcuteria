@@ -8,13 +8,13 @@ import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
 import { useCurrentUser } from '@/data/auth';
 import { useClients } from '@/data/clients';
 import { demoUsers } from '@/data/demo-users';
-import { clientRows, rangeFor, type ClientHealth } from '@/domain/analytics';
+import { clientRows, rangeFor, HEALTH_LABEL, DEFAULT_CLIENT_HEALTH, type ClientHealth } from '@/domain/analytics';
+import { useSettings } from '@/data/settings';
 import { formatDateShort } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
 import type { Order } from '@/domain/types';
 
 const NAME: Record<string, string> = Object.fromEntries(demoUsers.map((u) => [u.uid, u.displayName]));
-const HEALTH_LABEL: Record<ClientHealth, string> = { nuevo: 'Nuevo', activo: 'Activo', en_riesgo: 'En riesgo', inactivo: 'Inactivo', sin_pedidos: 'Sin pedidos' };
 const HEALTH_STYLE: Record<ClientHealth, string> = {
   nuevo: 'bg-emerald-50 text-emerald-800 border-emerald-200', activo: 'bg-emerald-50 text-emerald-800 border-emerald-200',
   en_riesgo: 'bg-brass-50 text-brass-700 border-brass-300', inactivo: 'bg-red-50 text-red-700 border-red-200', sin_pedidos: 'bg-charcoal-50 text-charcoal-500 border-charcoal-100',
@@ -28,6 +28,7 @@ export default function Clientes() {
   const uid = current!.appUser.uid;
   const role = current!.appUser.role;
   const { clients, loading, error } = useClients();
+  const { settings } = useSettings();
   const [orders, setOrders] = useState<Order[]>([]);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<Filter>(role === 'vendedor' ? 'cartera' : 'todos');
@@ -38,7 +39,9 @@ export default function Clientes() {
     return unsub;
   }, []);
 
-  const rows = useMemo(() => clientRows(clients, orders, rangeFor('90').current, (u) => NAME[u] ?? u), [clients, orders]);
+  const rows = useMemo(() => clientRows(clients, orders, rangeFor('90').current, (u) => NAME[u] ?? u, undefined, settings.clientHealth ?? DEFAULT_CLIENT_HEALTH), [clients, orders, settings.clientHealth]);
+  const reviewCount = useMemo(() => rows.filter((r) => r.needsReview || !r.invoicingComplete).length, [rows]);
+  const riskCount = useMemo(() => rows.filter((r) => r.health === 'en_riesgo' || r.health === 'inactivo').length, [rows]);
   const filtered = useMemo(() => {
     const needle = norm(q.trim());
     return rows.filter((r) => {
@@ -70,8 +73,8 @@ export default function Clientes() {
         <div className="flex flex-wrap gap-1.5">
           <Chip active={filter === 'todos'} onClick={() => setFilter('todos')}>Todos</Chip>
           <Chip active={filter === 'cartera'} onClick={() => setFilter('cartera')}>Mi cartera</Chip>
-          <Chip active={filter === 'riesgo'} onClick={() => setFilter('riesgo')}>En riesgo / inactivos</Chip>
-          <Chip active={filter === 'revision'} onClick={() => setFilter('revision')}>Pendientes de revisión</Chip>
+          <Chip active={filter === 'riesgo'} onClick={() => setFilter('riesgo')}>En riesgo / inactivos{riskCount > 0 && <span className="ml-1 rounded-full bg-brass-100 text-brass-700 px-1.5">{riskCount}</span>}</Chip>
+          <Chip active={filter === 'revision'} onClick={() => setFilter('revision')}>Pendientes de revisión{reviewCount > 0 && <span className="ml-1 rounded-full bg-brass-100 text-brass-700 px-1.5">{reviewCount}</span>}</Chip>
         </div>
       </div>
 

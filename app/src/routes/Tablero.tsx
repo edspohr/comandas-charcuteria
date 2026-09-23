@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/data/firebase';
 import { useCurrentUser } from '@/data/auth';
@@ -35,6 +35,8 @@ export default function Tablero() {
   const uid = current!.appUser.uid;
   const isAdmin = role === 'admin' || role === 'superAdmin';
   const canSync = role !== 'vendedor';
+  // Auto-refresh only for roles that act on the board; producción syncs by hand.
+  const autoSync = role === 'despacho' || isAdmin;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -57,18 +59,34 @@ export default function Tablero() {
 
   // Flash from the wizard (pedido creado) or from DetalleArmado (armado ok).
   const flash = location.state as null | { justCreated?: string; status?: OrderStatus; parcialLines?: Array<{ productName: string; formatLabel: string; missing: number }>; armadoOk?: string };
+  const dismissFlash = () => navigate(location.pathname + location.search, { replace: true, state: null });
   useEffect(() => {
     if (!flash) return;
-    const t = setTimeout(() => navigate(location.pathname, { replace: true, state: null }), 6000);
+    const t = setTimeout(dismissFlash, 10000);
     return () => clearTimeout(t);
-  }, [flash, navigate, location.pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flash]);
 
-  // Filters
-  const [q, setQ] = useState('');
-  const [mine, setMine] = useState(role === 'vendedor');
-  const [vendedor, setVendedor] = useState<string>('');
-  const [date, setDate] = useState<DateFilter>('todos');
-  const [showAnulados, setShowAnulados] = useState(false);
+  // Filters live in the URL so "Ver" → back keeps them (dueños poke into
+  // several cards in a row during the demo).
+  const [params, setParams] = useSearchParams();
+  const q = params.get('q') ?? '';
+  const mine = params.has('mios') ? params.get('mios') === '1' : role === 'vendedor';
+  const vendedor = params.get('vendedor') ?? '';
+  const date = (params.get('fecha') as DateFilter | null) ?? 'todos';
+  const showAnulados = params.get('anulados') === '1';
+  const setParam = (key: string, value: string | null) => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value == null || value === '') next.delete(key); else next.set(key, value);
+      return next;
+    }, { replace: true });
+  };
+  const setQ = (v: string) => setParam('q', v);
+  const setMine = (v: boolean) => setParam('mios', v ? '1' : '0');
+  const setVendedor = (v: string) => setParam('vendedor', v);
+  const setDate = (v: DateFilter) => setParam('fecha', v === 'todos' ? null : v);
+  const setShowAnulados = (v: boolean) => setParam('anulados', v ? '1' : null);
 
   const today = todayInSantiago();
   const tomorrow = addDaysIso(today, 1);
@@ -146,10 +164,10 @@ export default function Tablero() {
     try { await syncStockFromBsale(uid); } catch (e) { setActionError(describeFirestoreError(e)); } finally { setSyncing(false); }
   }
   useEffect(() => {
-    if (!canSync || autoSynced.current || sync === undefined) return;
+    if (!autoSync || autoSynced.current || sync === undefined) return;
     if (sync === null || (sync && Date.now() - sync.at > 5 * 60 * 1000)) { autoSynced.current = true; void doSync(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sync, canSync]);
+  }, [sync, autoSync]);
 
   // Drag & drop (desktop only)
   const dragEnabled = typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches;
@@ -188,7 +206,8 @@ export default function Tablero() {
       </header>
 
       {flash?.justCreated && (
-        <div className="mx-4 sm:mx-6 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-3">
+        <div className="mx-4 sm:mx-6 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-3 relative pr-9">
+          <button onClick={dismissFlash} className="absolute right-2 top-2 text-emerald-800/60 hover:text-emerald-900" aria-label="Cerrar">×</button>
           Pedido <span className="font-mono">{flash.justCreated}</span> creado — estado <strong>{flash.status ? ORDER_STATUS_LABEL[flash.status] : ''}</strong>.
           {flash.parcialLines && flash.parcialLines.length > 0 && (
             <ul className="mt-1 text-xs list-disc pl-4">{flash.parcialLines.map((p, i) => <li key={i}>{p.productName} · {p.formatLabel}: {p.missing} esperando stock</li>)}</ul>
@@ -196,7 +215,8 @@ export default function Tablero() {
         </div>
       )}
       {flash?.armadoOk && (
-        <div className="mx-4 sm:mx-6 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-3">
+        <div className="mx-4 sm:mx-6 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-3 relative pr-9">
+          <button onClick={dismissFlash} className="absolute right-2 top-2 text-emerald-800/60 hover:text-emerald-900" aria-label="Cerrar">×</button>
           Pedido <span className="font-mono">{flash.armadoOk}</span> marcado como <strong>armado</strong>.
         </div>
       )}
@@ -211,8 +231,8 @@ export default function Tablero() {
           <Chip active={date === 'hoy'} onClick={() => setDate('hoy')}>Hoy</Chip>
           <Chip active={date === 'manana'} onClick={() => setDate('manana')}>Mañana</Chip>
           <Chip active={date === 'atrasados'} onClick={() => setDate('atrasados')} tone="red">Atrasados</Chip>
-          <Chip active={mine} onClick={() => setMine((v) => !v)}>Míos</Chip>
-          <Chip active={showAnulados} onClick={() => setShowAnulados((v) => !v)}>Anulados</Chip>
+          <Chip active={mine} onClick={() => setMine(!mine)}>Míos</Chip>
+          <Chip active={showAnulados} onClick={() => setShowAnulados(!showAnulados)}>Anulados</Chip>
         </div>
         {isAdmin && (
           <select value={vendedor} onChange={(e) => setVendedor(e.target.value)} className="field h-9 text-xs w-auto">
@@ -271,7 +291,9 @@ export default function Tablero() {
               <header className="px-3 pt-3 pb-2 flex items-baseline justify-between">
                 <div>
                   <p className="text-[11px] uppercase tracking-display font-semibold text-charcoal-700">{c.label} <span className="text-charcoal-300 font-normal">{list.length}</span></p>
-                  <p className="text-[10px] text-charcoal-300">{isAdmin && sumCLP > 0 ? formatCLP(sumCLP) : c.hint}</p>
+                  <p className={'text-[10px] ' + (overCol === c.id && dragOrder && !dropOk ? 'text-red-700' : 'text-charcoal-300')}>
+                    {overCol === c.id && dragOrder && !dropOk ? `No se puede mover acá desde «${COLUMNS.find((x) => x.id === columnFor(dragOrder.status))?.label ?? ''}»` : (isAdmin && sumCLP > 0 ? formatCLP(sumCLP) : c.hint)}
+                  </p>
                 </div>
               </header>
               <div className="px-2 pb-2 space-y-2 flex-1">
@@ -356,7 +378,7 @@ function KanbanCard({ order, tone, action, onAction, detailTo, draggable, onDrag
       title={tone.reasons.join(' · ') || undefined}
     >
       <div className="flex items-center justify-between gap-2">
-        <Link to={detailTo} className="font-mono text-[11px] text-charcoal-500 hover:text-charcoal-900 tracking-display">{order.id.replace('PED-2026-', '#')}</Link>
+        <Link to={detailTo} className="font-mono text-[11px] text-charcoal-500 hover:text-charcoal-900 tracking-display">{order.id.replace(/^PED-\d{4}-/, '#')}</Link>
         <span className="flex items-center gap-1.5">
           {order.invoiceRef && <span className="font-mono text-[10px] text-charcoal-300">{order.invoiceRef}</span>}
           <span className={'w-2 h-2 rounded-full ' + TONE_DOT[tone.tone]} />
@@ -386,11 +408,16 @@ function KanbanCard({ order, tone, action, onAction, detailTo, draggable, onDrag
       )}
       <div className="mt-2 flex items-center justify-between gap-2">
         <span className="text-[10px] uppercase tracking-display text-charcoal-300 truncate">{vendedor}</span>
-        {action.kind !== 'none' ? (
-          <Button size="sm" variant={action.kind === 'anular' ? 'ghost' : 'primary'} className="!py-1 !px-2.5 text-[11px]" onClick={() => onAction(action.kind)}>{action.label}</Button>
-        ) : (
-          <Link to={detailTo} className="text-[10px] uppercase tracking-display text-charcoal-300 hover:text-charcoal-700">Ver</Link>
-        )}
+        <span className="flex items-center gap-2">
+          {action.kind === 'anular' && (
+            <button onClick={() => onAction('anular')} className="text-[10px] uppercase tracking-display text-charcoal-300 hover:text-red-700">Anular</button>
+          )}
+          {action.kind !== 'none' && action.kind !== 'anular' ? (
+            <Button size="sm" className="!py-1 !px-2.5 text-[11px]" onClick={() => onAction(action.kind)}>{action.label}</Button>
+          ) : (
+            <Link to={detailTo} className="rounded-md border border-charcoal-200 px-2.5 py-1 text-[11px] uppercase tracking-display text-charcoal-700 hover:border-brass-500">Ver</Link>
+          )}
+        </span>
       </div>
     </article>
   );

@@ -12,10 +12,11 @@ import { categoryLabel } from '@/domain/categories';
 import {
   anulados, backlog, byCategory, byClient, byPacker, byProduct, byVendedor, clientRows, gramsMap, inRange, leadTimes,
   pareto, pctDelta, rangeFor, salesForce, salesTotals, seriesByDay, serviceLevel, stockRows,
-  type ClientHealth, type RangeKey,
+  HEALTH_LABEL, DEFAULT_CLIENT_HEALTH, type ClientHealth, type RangeKey,
 } from '@/domain/analytics';
+import { useSettings } from '@/data/settings';
 import { downloadCsv } from '@/lib/csv';
-import { formatDateShort, formatQty } from '@/lib/format';
+import { formatDateShort, formatQty, todayInSantiago } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
 import type { Order } from '@/domain/types';
 
@@ -40,6 +41,7 @@ export default function Panel() {
   const { clients } = useClients();
   const { stock } = useAllStock();
   const sync = useSyncState();
+  const { settings } = useSettings();
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'orders'), (snap) => {
@@ -66,12 +68,21 @@ export default function Panel() {
   const packers = useMemo(() => byPacker(cur, grams, nameOf), [cur, grams]);
   const anul = useMemo(() => anulados(cur, nameOf), [cur]);
   const stRows = useMemo(() => stockRows(products, stock, orders, grams), [products, stock, orders, grams]);
-  const cRows = useMemo(() => clientRows(clients, orders, current, nameOf), [clients, orders, current]);
+  const cRows = useMemo(() => clientRows(clients, orders, current, nameOf, undefined, settings.clientHealth ?? DEFAULT_CLIENT_HEALTH), [clients, orders, current, settings.clientHealth]);
+  const today = todayInSantiago();
+  const hoy = useMemo(() => {
+    const t = orders.filter((o) => o.requestedDate === today && o.status !== 'anulado');
+    const ventas = t.filter((o) => ['facturado', 'despachado', 'entregado'].includes(o.status)).reduce((s, o) => s + (o.totalCLP ?? 0), 0);
+    return { pedidos: t.length, ventas, atrasados: svc.lateNow, quiebres: stRows.filter((r) => r.pending > 0).length };
+  }, [orders, today, svc.lateNow, stRows]);
   const par = useMemo(() => pareto(cRows), [cRows]);
   const force = useMemo(() => salesForce(cur, cRows, grams, nameOf, VENDEDORES), [cur, cRows, grams]);
 
   const rangeLabel = rangeKey === 'all' ? 'todo el historial' : `últimos ${rangeKey} días`;
-  const prevLabel = rangeKey === 'all' ? '' : `vs. ${rangeKey} días anteriores`;
+  const prevLabel = rangeKey === 'all' ? '(sin comparación)' : `vs. ${rangeKey} días anteriores`;
+  const period = rangeKey === 'all' ? 'todo el historial' : `${current.from} a ${current.to}`;
+  const delta = (cur: number, prev: number) => (rangeKey === 'all' ? undefined : pctDelta(cur, prev));
+  currentPeriod = period;
 
   return (
     <div>
@@ -90,6 +101,13 @@ export default function Panel() {
         </div>
       </header>
 
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+        <Today label="Pedidos para hoy" value={hoy.pedidos} />
+        <Today label="Ventas de hoy" value={formatCLP(hoy.ventas)} />
+        <Today label="Atrasados" value={hoy.atrasados} tone={hoy.atrasados ? 'bad' : undefined} />
+        <Today label="Quiebres de stock" value={hoy.quiebres} tone={hoy.quiebres ? 'warn' : undefined} />
+      </div>
+
       <nav className="mb-5 flex gap-1 border-b border-charcoal-100 overflow-x-auto">
         {TABS.map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} className={'px-4 py-2.5 text-xs uppercase tracking-display font-medium border-b-2 transition -mb-px whitespace-nowrap ' + (t === tab ? 'border-brass-500 text-charcoal-900' : 'border-transparent text-charcoal-300 hover:text-charcoal-500')}>{label}</button>
@@ -99,10 +117,10 @@ export default function Panel() {
       {tab === 'ventas' && (
         <div className="space-y-5">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <Metric label="Ventas facturadas" value={formatCLP(totals.revenue)} delta={pctDelta(totals.revenue, prevTotals.revenue)} sub={`${totals.invoicedOrders} pedidos con documento`} />
-            <Metric label="Pedidos" value={totals.orders} delta={pctDelta(totals.orders, prevTotals.orders)} sub={totals.anulados ? `${totals.anulados} anulados` : undefined} />
-            <Metric label="Ticket promedio" value={formatCLP(totals.ticket)} delta={pctDelta(totals.ticket, prevTotals.ticket)} />
-            <Metric label="Kilos" value={`${totals.kg.toFixed(0)} kg`} delta={pctDelta(totals.kg, prevTotals.kg)} />
+            <Metric label="Ventas facturadas" value={formatCLP(totals.revenue)} delta={delta(totals.revenue, prevTotals.revenue)} sub={`${totals.invoicedOrders} con documento${totals.pendingInvoice ? ` · ${totals.pendingInvoice} sin facturar aún (${formatCLP(totals.pendingRevenue)})` : ''}`} />
+            <Metric label="Pedidos" value={totals.orders} delta={delta(totals.orders, prevTotals.orders)} sub={totals.anulados ? `${totals.anulados} anulados` : undefined} />
+            <Metric label="Ticket promedio" value={formatCLP(totals.ticket)} delta={delta(totals.ticket, prevTotals.ticket)} />
+            <Metric label="Kilos" value={`${totals.kg.toFixed(0)} kg`} delta={delta(totals.kg, prevTotals.kg)} />
           </div>
 
           <Card title="Ventas por día" action={<Export name="ventas-por-dia" rows={series} cols={[['date', 'Fecha'], ['orders', 'Pedidos'], ['revenue', 'Ventas CLP'], ['kg', 'Kg']]} />}>
@@ -259,7 +277,7 @@ export default function Panel() {
   );
 }
 
-const HEALTH: Record<ClientHealth, string> = { nuevo: 'Nuevo', activo: 'Activo', en_riesgo: 'En riesgo', inactivo: 'Inactivo', sin_pedidos: 'Sin pedidos' };
+const HEALTH = HEALTH_LABEL;
 
 function Metric({ label, value, sub, delta, tone }: { label: string; value: number | string; sub?: string; delta?: number | null; tone?: 'warn' | 'bad' }) {
   return (
@@ -270,6 +288,15 @@ function Metric({ label, value, sub, delta, tone }: { label: string; value: numb
         {delta != null && <span className={delta >= 0 ? 'text-emerald-700' : 'text-red-700'}>{delta >= 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(0)}%</span>}
         {sub}
       </p>
+    </div>
+  );
+}
+
+function Today({ label, value, tone }: { label: string; value: number | string; tone?: 'warn' | 'bad' }) {
+  return (
+    <div className={'rounded-md border px-3 py-2 flex items-baseline justify-between gap-2 ' + (tone === 'bad' ? 'bg-red-50 border-red-200' : tone === 'warn' ? 'bg-brass-50 border-brass-300' : 'bg-cream-100/60 border-charcoal-100')}>
+      <span className="text-[10px] uppercase tracking-display text-charcoal-500">{label}</span>
+      <span className={'text-lg font-semibold ' + (tone === 'bad' ? 'text-red-700' : tone === 'warn' ? 'text-brass-700' : 'text-charcoal-900')}>{value}</span>
     </div>
   );
 }
@@ -292,9 +319,13 @@ function Card({ title, action, children }: { title: string; action?: React.React
   );
 }
 
+// The current period label is set by Panel on each render so every export
+// carries it in the header without threading a prop through Table.
+let currentPeriod = '';
+
 function Export({ name, rows, cols }: { name: string; rows: Array<object>; cols: Array<[string, string]> }) {
   return (
-    <Button size="sm" variant="ghost" className="!py-1 !px-2 text-[11px]" onClick={() => downloadCsv(name, rows, cols.map(([key, label]) => ({ key, label })))} disabled={rows.length === 0}>
+    <Button size="sm" variant="ghost" className="!py-1 !px-2 text-[11px]" onClick={() => downloadCsv(name, rows, cols.map(([key, label]) => ({ key, label })), currentPeriod)} disabled={rows.length === 0}>
       Exportar CSV
     </Button>
   );

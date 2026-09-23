@@ -295,6 +295,20 @@ export async function markArmado(
       throw new Error('El pedido tiene líneas esperando stock de producción. Se arma cuando Bsale reporte el stock.');
     }
 
+    // Bsale may have sold at the counter what this order had reserved. Don't
+    // let the packer ship goods that no longer exist: the kanban paints the
+    // card red and admin has to re-sync / resolve first.
+    const compromised: string[] = [];
+    for (const line of order.lines) {
+      if (line.reservedQty <= 0) continue;
+      const snap = await tx.get(doc(db, 'stock', stockDocId(line.productId, line.formatId)));
+      const st = snap.exists() ? (snap.data() as StockDoc) : null;
+      if (st && st.onHand < st.reserved) compromised.push(`${line.productName} · ${line.formatLabel}`);
+    }
+    if (compromised.length > 0) {
+      throw new Error(`Bsale reporta menos stock del reservado en ${compromised.join(', ')}. Sincronizá con Bsale o resolvé el pedido desde administración antes de armar.`);
+    }
+
     const now = Date.now();
     const packedMap = new Map(packed.map((p) => [`${p.productId}::${p.formatId}`, p]));
     const enrichedLines: OrderLine[] = order.lines.map((line) => {
@@ -330,13 +344,15 @@ export async function markArmado(
 
 // ---------- Facturación / despacho / entrega ----------
 
+const DOC_NUMBER_RE = /^(FA|BO|GD)-\d{6}$/;
+
 // Link a document emitted at the Bsale POS to a packed order. The sale
 // already happened in Bsale (stock discounted there), so here we:
-//   - release the app-side reservation for every line,
-//   - pre-apply the sale to the mirror (onHand −= packed) so availability is
-//     right until the next sync overwrites it with Bsale's number,
+//   - release the app-side reservation for every line (onHand is only ever
+//     written by the sync — the caller triggers one right after),
 //   - store invoiceRef + bsaleDocumentId, status → facturado,
 //   - mark the mock document as linked so it can't be reused.
+// Rejects malformed numbers and numbers already linked to another order.
 export async function vincularDocumento(
   orderId: string,
   document: { id: string; number: string },
@@ -344,6 +360,11 @@ export async function vincularDocumento(
 ): Promise<void> {
   const orderRef = doc(db, 'orders', orderId);
   const docRef = doc(db, 'bsaleDocuments', document.id);
+  const number = document.number.trim().toUpperCase();
+  if (!DOC_NUMBER_RE.test(number)) throw new Error('Número de documento inválido. Formato esperado: FA-000824, BO-004102 o GD-000310.');
+  const { getDocs } = await import('firebase/firestore');
+  const dup = await getDocs(query(collection(db, 'orders'), where('invoiceRef', '==', number), limit(1)));
+  if (!dup.empty && dup.docs[0].id !== orderId) throw new Error(`El documento ${number} ya está vinculado al pedido ${dup.docs[0].id}`);
   await runTransaction(db, async (tx) => {
     const orderSnap = await tx.get(orderRef);
     if (!orderSnap.exists()) throw new Error('Pedido no encontrado');
@@ -367,10 +388,7 @@ export async function vincularDocumento(
     for (const { ref, prev, line } of reads) {
       if (!prev) continue;
       const packedQty = line.packedQty ?? line.reservedQty;
-      tx.update(ref, {
-        reserved: Math.max(0, prev.reserved - line.reservedQty),
-        onHand: Math.max(0, prev.onHand - packedQty),
-      });
+      tx.update(ref, { reserved: Math.max(0, prev.reserved - line.reservedQty) });
       const mvRef = doc(collection(db, 'stockMovements'));
       const mv: StockMovement = {
         id: mvRef.id,
@@ -381,7 +399,7 @@ export async function vincularDocumento(
         orderId,
         by,
         at: now,
-        reason: document.number,
+        reason: number,
       };
       tx.set(mvRef, mv);
     }
@@ -389,10 +407,10 @@ export async function vincularDocumento(
     if (docSnap.exists()) tx.update(docRef, { linkedOrderId: orderId });
     tx.update(orderRef, {
       status: 'facturado',
-      invoiceRef: document.number,
+      invoiceRef: number,
       bsaleDocumentId: document.id,
       updatedAt: now,
-      statusHistory: [...order.statusHistory, { status: 'facturado', by, at: now, note: document.number }],
+      statusHistory: [...order.statusHistory, { status: 'facturado', by, at: now, note: number }],
     });
   });
 }
@@ -518,10 +536,15 @@ export async function anularOrder(orderId: string, by: string, reason: string): 
       });
     }
 
+    // Pending production is a promise, not stock: it simply stops counting
+    // once the order is anulado, but we leave a trace in the history.
+    const pendingTotal = order.lines.reduce((s, l) => s + l.pendingProductionQty, 0);
+    const note = pendingTotal > 0 ? `${reason} · incluía ${pendingTotal} pendiente(s) de producción` : reason;
     tx.update(orderRef, {
       status: 'anulado',
       updatedAt: now,
-      statusHistory: [...order.statusHistory, { status: 'anulado', by, at: now, note: reason }],
+      lines: order.lines.map((l) => ({ ...l, pendingProductionQty: 0 })),
+      statusHistory: [...order.statusHistory, { status: 'anulado', by, at: now, note }],
     });
   });
 }

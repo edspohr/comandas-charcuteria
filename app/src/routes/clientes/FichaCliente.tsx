@@ -8,7 +8,7 @@ import { useCurrentUser } from '@/data/auth';
 import { useClient, useClientOrders } from '@/data/clients';
 import { useProducts } from '@/data/products';
 import { demoUsers } from '@/data/demo-users';
-import { gramsMap, lineKg } from '@/domain/analytics';
+import { clientHealth, gramsMap, lineKg, HEALTH_LABEL, DEFAULT_CLIENT_HEALTH } from '@/domain/analytics';
 import { saveDraft } from '@/lib/draft';
 import { defaultRequestedDate } from '@/domain/cutoff';
 import { useSettings } from '@/data/settings';
@@ -42,13 +42,17 @@ export default function FichaCliente() {
     const daysSince = last ? Math.max(0, Math.round((Date.now() - last.createdAt) / DAY)) : null;
     let interval: number | null = null;
     if (sorted.length >= 2) interval = (sorted[sorted.length - 1].createdAt - sorted[0].createdAt) / DAY / (sorted.length - 1);
-    const top = new Map<string, { name: string; format: string; unit: 'g' | 'kg' | 'unidad'; qty: number; kg: number; times: number }>();
+    // Habituales: what they buy *lately* — recent orders weigh more than a
+    // one-off from months ago (weight = 1 / (weeks since + 1)).
+    const top = new Map<string, { name: string; format: string; unit: 'g' | 'kg' | 'unidad'; qty: number; kg: number; times: number; score: number; lastAt: number }>();
+    const nowMs = Date.now();
     for (const o of valid) for (const l of o.lines) {
       const k = `${l.productId}::${l.formatId}`;
-      const t = top.get(k) ?? { name: l.productName, format: l.formatLabel, unit: l.unit, qty: 0, kg: 0, times: 0 };
-      t.qty += l.qty; t.kg += lineKg(l, grams); t.times++; top.set(k, t);
+      const t = top.get(k) ?? { name: l.productName, format: l.formatLabel, unit: l.unit, qty: 0, kg: 0, times: 0, score: 0, lastAt: 0 };
+      const weeks = Math.max(0, (nowMs - o.createdAt) / (7 * DAY));
+      t.qty += l.qty; t.kg += lineKg(l, grams); t.times++; t.score += 1 / (weeks + 1); t.lastAt = Math.max(t.lastAt, o.createdAt); top.set(k, t);
     }
-    const habituales = [...top.values()].sort((a, b) => b.times - a.times || b.kg - a.kg).slice(0, 6);
+    const habituales = [...top.values()].sort((a, b) => b.score - a.score || b.times - a.times).slice(0, 6);
     const open = valid.filter((o) => !['entregado'].includes(o.status));
     const late = open.filter((o) => o.requestedDate < todayInSantiago()).length;
     return { count: valid.length, revenue, ticket: invoiced.length ? revenue / invoiced.length : 0, last, daysSince, interval, habituales, open: open.length, late, anulados: orders.length - valid.length };
@@ -67,7 +71,7 @@ export default function FichaCliente() {
   if (loading) return <p className="text-sm text-charcoal-300">Cargando…</p>;
   if (!client) return <div className="max-w-3xl mx-auto card p-6 text-sm text-charcoal-500">Cliente no encontrado.</div>;
 
-  const health = kpi.daysSince == null ? 'Sin pedidos' : kpi.daysSince <= 14 ? 'Activo' : kpi.daysSince <= 30 ? 'En riesgo' : 'Inactivo';
+  const health = HEALTH_LABEL[clientHealth(kpi.daysSince, false, settings.clientHealth ?? DEFAULT_CLIENT_HEALTH)];
   const healthStyle = health === 'Activo' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : health === 'En riesgo' ? 'bg-brass-50 text-brass-700 border-brass-300' : health === 'Inactivo' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-charcoal-50 text-charcoal-500 border-charcoal-100';
 
   return (
@@ -123,7 +127,7 @@ export default function FichaCliente() {
             {kpi.habituales.map((h) => (
               <li key={`${h.name}-${h.format}`} className="py-1.5 flex items-center justify-between gap-3">
                 <span className="text-charcoal-700 truncate">{h.name} <span className="text-charcoal-300">{h.format}</span></span>
-                <span className="text-charcoal-500 shrink-0 text-xs">{h.times}× · {formatQty(h.qty, h.unit)}{h.kg > 0 && h.unit !== 'kg' ? ` (~${h.kg.toFixed(1)} kg)` : ''}</span>
+                <span className="text-charcoal-500 shrink-0 text-xs">{h.times}× · {formatQty(h.qty, h.unit)}{h.kg > 0 && h.unit !== 'kg' ? ` (~${h.kg.toFixed(1)} kg)` : ''} · últ. {formatDateShort(new Date(h.lastAt).toISOString().slice(0, 10))}</span>
               </li>
             ))}
           </ul>

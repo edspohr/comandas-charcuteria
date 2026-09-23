@@ -36,17 +36,18 @@ export function lineKg(l: OrderLine, grams: Map<string, number | undefined>, qty
 
 // ---------- Ventas ----------
 
-export interface SalesTotals { revenue: number; orders: number; invoicedOrders: number; ticket: number; kg: number; anulados: number; }
+export interface SalesTotals { revenue: number; orders: number; invoicedOrders: number; pendingInvoice: number; pendingRevenue: number; ticket: number; kg: number; anulados: number; }
 
 export function salesTotals(orders: Order[], grams: Map<string, number | undefined>): SalesTotals {
-  let revenue = 0, invoicedOrders = 0, kg = 0, anulados = 0, count = 0;
+  let revenue = 0, invoicedOrders = 0, kg = 0, anulados = 0, count = 0, pendingInvoice = 0, pendingRevenue = 0;
   for (const o of orders) {
     if (o.status === 'anulado') { anulados++; continue; }
     count++;
     if (isInvoiced(o)) { revenue += o.totalCLP ?? 0; invoicedOrders++; }
+    else { pendingInvoice++; pendingRevenue += o.totalCLP ?? 0; }
     for (const l of o.lines) kg += lineKg(l, grams, l.packedQty ?? l.qty);
   }
-  return { revenue, orders: count, invoicedOrders, ticket: invoicedOrders ? revenue / invoicedOrders : 0, kg, anulados };
+  return { revenue, orders: count, invoicedOrders, pendingInvoice, pendingRevenue, ticket: invoicedOrders ? revenue / invoicedOrders : 0, kg, anulados };
 }
 
 export function pctDelta(cur: number, prev: number): number | null {
@@ -126,9 +127,11 @@ export function byCategory(rows: ProductRow[], label: (slug: string) => string):
 // ---------- Operación ----------
 
 const H = 60 * 60 * 1000;
+// Last occurrence: a reversal (armado → anulado → armado) must not pin the
+// stage to the first, stale timestamp.
 function at(o: Order, s: OrderStatus): number | null {
-  const e = o.statusHistory.find((h) => h.status === s);
-  return e ? e.at : null;
+  for (let i = o.statusHistory.length - 1; i >= 0; i--) if (o.statusHistory[i].status === s) return o.statusHistory[i].at;
+  return null;
 }
 export interface LeadTimes { captura: number | null; armado: number | null; documento: number | null; despacho: number | null; entrega: number | null; total: number | null; n: number; }
 export function leadTimes(orders: Order[]): LeadTimes {
@@ -193,7 +196,8 @@ export function byPacker(orders: Order[], grams: Map<string, number | undefined>
 export interface AnuladoRow { id: string; client: string; vendedor: string; date: string; reason: string; revenue: number; }
 export function anulados(orders: Order[], name: (uid: string) => string): AnuladoRow[] {
   return orders.filter((o) => o.status === 'anulado').map((o) => ({
-    id: o.id, client: o.clientSnapshot.fantasyName ?? o.clientSnapshot.name, vendedor: name(o.createdBy), date: o.requestedDate,
+    id: o.id, client: o.clientSnapshot.fantasyName ?? o.clientSnapshot.name, vendedor: name(o.createdBy),
+    date: (() => { const t = at(o, 'anulado'); return t ? new Date(t).toISOString().slice(0, 10) : o.requestedDate; })(),
     reason: [...o.statusHistory].reverse().find((h) => h.status === 'anulado')?.note ?? '', revenue: o.totalCLP ?? 0,
   }));
 }
@@ -232,11 +236,23 @@ export function stockRows(products: Product[], stock: Map<string, StockDoc>, ord
 // ---------- Clientes y fuerza de ventas ----------
 
 export type ClientHealth = 'nuevo' | 'activo' | 'en_riesgo' | 'inactivo' | 'sin_pedidos';
+
+export interface ClientHealthThresholds { activoDias: number; riesgoDias: number; }
+export const DEFAULT_CLIENT_HEALTH: ClientHealthThresholds = { activoDias: 14, riesgoDias: 30 };
+
+// Single definition of the health buckets, shared by the dashboard, the
+// client list and the ficha.
+export function clientHealth(daysSince: number | null, isNew: boolean, t: ClientHealthThresholds = DEFAULT_CLIENT_HEALTH): ClientHealth {
+  if (daysSince == null) return 'sin_pedidos';
+  if (isNew) return 'nuevo';
+  return daysSince <= t.activoDias ? 'activo' : daysSince <= t.riesgoDias ? 'en_riesgo' : 'inactivo';
+}
+export const HEALTH_LABEL: Record<ClientHealth, string> = { nuevo: 'Nuevo', activo: 'Activo', en_riesgo: 'En riesgo', inactivo: 'Inactivo', sin_pedidos: 'Sin pedidos' };
 export interface ClientRow {
   id: string; name: string; owner: string; ownerUid?: string; orders: number; revenue: number; ticket: number;
   lastDate: string | null; daysSince: number | null; avgIntervalDays: number | null; health: ClientHealth; invoicingComplete: boolean; needsReview: boolean;
 }
-export function clientRows(clients: Client[], allOrders: Order[], range: DateRange, name: (uid: string) => string, today = todayInSantiago()): ClientRow[] {
+export function clientRows(clients: Client[], allOrders: Order[], range: DateRange, name: (uid: string) => string, today = todayInSantiago(), thresholds: ClientHealthThresholds = DEFAULT_CLIENT_HEALTH): ClientRow[] {
   const byId = new Map<string, Order[]>();
   for (const o of allOrders) { if (o.status === 'anulado') continue; const l = byId.get(o.clientId) ?? []; l.push(o); byId.set(o.clientId, l); }
   const todayMs = Date.parse(today);
@@ -253,9 +269,8 @@ export function clientRows(clients: Client[], allOrders: Order[], range: DateRan
     let avgInterval: number | null = null;
     if (os.length >= 2) { let sum = 0; for (let i = 1; i < os.length; i++) sum += (Date.parse(os[i].requestedDate) - Date.parse(os[i - 1].requestedDate)) / (24 * H); avgInterval = sum / (os.length - 1); }
     const first = os.length ? os[0].requestedDate : null;
-    let health: ClientHealth = 'sin_pedidos';
-    if (first && first >= range.from && first <= range.to && os.length <= 2) health = 'nuevo';
-    else if (daysSince != null) health = daysSince <= 14 ? 'activo' : daysSince <= 30 ? 'en_riesgo' : 'inactivo';
+    const isNew = !!(first && first >= range.from && first <= range.to && os.length <= 2);
+    const health = clientHealth(daysSince, isNew, thresholds);
     return {
       id: c.id, name: c.fantasyName ?? c.name, owner: c.ownerUid ? name(c.ownerUid) : '—', ownerUid: c.ownerUid,
       orders: inR.length, revenue, ticket: invoiced.length ? revenue / invoiced.length : 0,

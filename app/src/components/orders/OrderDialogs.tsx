@@ -3,6 +3,7 @@ import Button from '@/components/ui/Button';
 import { anularOrder, despacharOrder, entregarOrder, vincularDocumento } from '@/data/orders';
 import { useBsaleDocuments } from '@/data/bsale';
 import { emitDocumentForOrder } from '@/integrations/bsale/mockAdmin';
+import { syncStockFromBsale } from '@/data/stock';
 import { bsale } from '@/integrations/bsale/MockBsaleClient';
 import { describeFirestoreError } from '@/lib/errors';
 import { formatCLP } from '@/lib/pricing';
@@ -144,9 +145,13 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
     return unlinked.map((d) => ({ d, s: score(d) })).sort((a, b) => b.s - a.s || b.d.emittedAt - a.d.emittedAt).slice(0, 8);
   }, [documents, order]);
 
+  // After linking, Bsale is the only writer of onHand: refresh the mirror
+  // right away so availability reflects the counter sale.
+  async function afterLink() { try { await syncStockFromBsale(uid); } catch (e) { console.warn('[vincular] sync', e); } }
+
   async function link(d: BsaleDocument) {
     setBusy(d.id); setError(null);
-    try { await vincularDocumento(order.id, { id: d.id, number: d.number }, uid); onLinked?.(d); onClose(); }
+    try { await vincularDocumento(order.id, { id: d.id, number: d.number }, uid); onLinked?.(d); onClose(); void afterLink(); }
     catch (e) { setError(describeFirestoreError(e)); setBusy(null); }
   }
 
@@ -155,17 +160,21 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
     try {
       const d = await emitDocumentForOrder(order, order.invoicingComplete ? 'factura' : 'boleta');
       await vincularDocumento(order.id, { id: d.id, number: d.number }, uid);
-      onLinked?.(d); onClose();
+      onLinked?.(d); onClose(); void afterLink();
     } catch (e) { setError(describeFirestoreError(e)); setBusy(null); }
   }
 
+  const manualNumber = manual.trim().toUpperCase();
+  const manualValid = /^(FA|BO|GD)-\d{6}$/.test(manualNumber);
+  const manualLinkedElsewhere = documents.find((d) => d.number === manualNumber && d.linkedOrderId && d.linkedOrderId !== order.id);
+
   async function linkManual() {
-    const number = manual.trim().toUpperCase();
-    if (!number) return;
-    const found = documents.find((d) => d.number === number);
+    if (!manualValid) { setError('Formato esperado: FA-000824, BO-004102 o GD-000310.'); return; }
+    if (manualLinkedElsewhere) { setError(`${manualNumber} ya está vinculado al pedido ${manualLinkedElsewhere.linkedOrderId}.`); return; }
+    const found = documents.find((d) => d.number === manualNumber);
     if (found) return link(found);
     setBusy('manual'); setError(null);
-    try { await vincularDocumento(order.id, { id: `manual-${number}`, number }, uid); onClose(); }
+    try { await vincularDocumento(order.id, { id: `manual-${manualNumber}`, number: manualNumber }, uid); onClose(); void afterLink(); }
     catch (e) { setError(describeFirestoreError(e)); setBusy(null); }
   }
 
@@ -213,9 +222,11 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
         <div className="flex gap-2 items-end">
           <div className="flex-1">
             <label className="eyebrow block mb-1.5">O ingresá el número a mano</label>
-            <input value={manual} onChange={(e) => setManual(e.target.value)} placeholder="FA-000824" className="field h-10 text-sm font-mono" />
+            <input value={manual} onChange={(e) => setManual(e.target.value)} placeholder="FA-000824" className={'field h-10 text-sm font-mono ' + (manual.trim() && !manualValid ? 'border-red-400' : '')} />
+            {manual.trim() && !manualValid && <p className="text-[11px] text-red-700 mt-1">Formato FA-000000 / BO-000000 / GD-000000</p>}
+            {manualLinkedElsewhere && <p className="text-[11px] text-red-700 mt-1">Ya vinculado a {manualLinkedElsewhere.linkedOrderId}</p>}
           </div>
-          <Button variant="secondary" onClick={linkManual} disabled={busy != null || !manual.trim()}>Vincular</Button>
+          <Button variant="secondary" onClick={linkManual} disabled={busy != null || !manualValid || !!manualLinkedElsewhere}>Vincular</Button>
         </div>
 
         <div className="rounded-md border border-dashed border-charcoal-200 p-3">

@@ -268,6 +268,9 @@ export interface PackedLineInput {
   formatId: string;
   packedQty: number;
   packedWeightKg?: number;
+  // Si se marcó "Faltó", packedQty=0 y shortReason lleva el motivo (obligatorio
+  // en la UI). Cuando llega presente, la línea no aporta subtotal ni kilos.
+  shortReason?: string;
 }
 
 // Mark order as armado. Bsale is the stock source of truth, so armado no
@@ -327,6 +330,10 @@ export async function markArmado(
           subtotalCLP = packedQty * line.unitPriceSnapshotCLP;
         }
       }
+      const shortReason = p?.shortReason?.trim() || undefined;
+      // Si la línea faltó, forzamos packedQty=0 y subtotal=0: la ficha y el
+      // Panel lo tratan como no-vendido, no como merma.
+      if (shortReason) return { ...line, packedQty: 0, packedWeightKg: undefined, subtotalCLP: 0, shortReason };
       return { ...line, packedQty, packedWeightKg: p?.packedWeightKg, subtotalCLP };
     });
     const totalCLP = enrichedLines.reduce((s, l) => s + (l.subtotalCLP ?? 0), 0);

@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import DataTable, { Pill } from '@/components/ui/DataTable';
 import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
+import EditarClienteDialog from '@/components/clients/EditarClienteDialog';
 import { useCurrentUser } from '@/data/auth';
 import { useClients } from '@/data/clients';
 import { useSettings } from '@/data/settings';
@@ -31,6 +32,8 @@ export default function Clientes() {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<Filter>(role === 'vendedor' ? 'cartera' : 'todos');
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Client | null>(null);
+  const isAdmin = role === 'admin' || role === 'superAdmin';
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'orders'), (snap) => { const l: Order[] = []; snap.forEach((d) => l.push(d.data() as Order)); setOrders(l); });
@@ -116,15 +119,16 @@ export default function Clientes() {
           { key: 'freq', label: 'Cada', align: 'right', render: (r) => r.avgIntervalDays != null ? `${Math.round(r.avgIntervalDays)} d` : '—', muted: true },
           { key: 'address', label: 'Dirección', render: (r) => <span className="text-xs">{byId.get(r.id)?.address ?? '—'}</span>, muted: true },
         ]}
-        expand={(r) => <ClientDetail client={byId.get(r.id)} row={r} habituales={habituales(r.id)} />}
+        expand={(r) => <ClientDetail client={byId.get(r.id)} row={r} habituales={habituales(r.id)} onEdit={isAdmin ? (c) => setEditing(c) : undefined} />}
       />
 
       {creating && <NuevoClienteDialog uid={uid} onClose={() => setCreating(false)} onCreated={() => setCreating(false)} />}
+      {editing && <EditarClienteDialog client={editing} uid={uid} onClose={() => setEditing(null)} />}
     </div>
   );
 }
 
-function ClientDetail({ client, row, habituales }: { client: Client | undefined; row: ClientRow; habituales: Array<{ name: string; times: number }> }) {
+function ClientDetail({ client, row, habituales, onEdit }: { client: Client | undefined; row: ClientRow; habituales: Array<{ name: string; times: number }>; onEdit?: (c: Client) => void }) {
   if (!client) return null;
   return (
     <div className="grid gap-3 md:grid-cols-3 text-xs">
@@ -144,7 +148,10 @@ function ClientDetail({ client, row, habituales }: { client: Client | undefined;
       </div>
       <div className="flex flex-col gap-1.5 md:items-end">
         <p className="text-charcoal-500">{row.orders} pedidos en 90 d · ticket {formatCLP(row.ticket)}</p>
-        <Link to={`/clientes/${client.id}`} className="inline-flex rounded-md border border-charcoal-200 px-2.5 py-1 text-[11px] uppercase tracking-display text-charcoal-700 hover:border-brass-500">Ficha completa →</Link>
+        <div className="flex gap-1.5">
+          {onEdit && <button onClick={(e) => { e.stopPropagation(); onEdit(client); }} className="rounded-md border border-charcoal-200 px-2.5 py-1 text-[11px] uppercase tracking-display text-charcoal-700 hover:border-brass-500">Editar</button>}
+          <Link to={`/clientes/${client.id}`} onClick={(e) => e.stopPropagation()} className="inline-flex rounded-md border border-charcoal-200 px-2.5 py-1 text-[11px] uppercase tracking-display text-charcoal-700 hover:border-brass-500">Ficha completa →</Link>
+        </div>
       </div>
     </div>
   );

@@ -6,3 +6,5 @@ export const parseOrder = onCall({ region: 'us-central1' }, async (req) => {
   if (!req.auth) throw new HttpsError('unauthenticated', 'Debe iniciar sesión.');
   return { fallback: true, lines: [] };
 });
+
+export { bsaleProxy } from './bsaleProxy';

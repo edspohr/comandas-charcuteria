@@ -217,6 +217,26 @@ Requiere `roles/aiplatform.user` en esa SA (el script imprime el comando para ot
 
 Si la llamada a Gemini falla por cualquier motivo, la app cae al parser determinista automáticamente y muestra un banner amarillo *"Se usó el intérprete local"* para que el vendedor sepa que la línea puede ser menos precisa.
 
+## Activar Bsale real (post-demo)
+
+Todo el mockup habla con Bsale a través de la interfaz `BsaleClient` (ver [`app/src/integrations/bsale/BsaleClient.ts`](app/src/integrations/bsale/BsaleClient.ts)). El proxy y el cliente real ya están escritos pero **no se despliegan en la demo**. Pasos para activarlos:
+
+1. **Token de Bsale** en Secret Manager:
+   ```bash
+   gcloud secrets create BSALE_ACCESS_TOKEN --project=comandas-charcuteria
+   printf "TU_TOKEN_BSALE" | gcloud secrets versions add BSALE_ACCESS_TOKEN --data-file=- --project=comandas-charcuteria
+   ```
+2. **Desplegar `bsaleProxy`** (callable en `functions/src/bsaleProxy.ts`). Requiere plan Blaze (ya habilitado):
+   ```bash
+   firebase deploy --only functions:bsaleProxy --project comandas-charcuteria
+   ```
+   Rutas permitidas hoy: `/v1/stocks.json`, `/v1/documents.json`, `/v1/clients.json`, `/v1/receptions.json` (allowlist en el proxy). Ampliar cuando se agreguen endpoints.
+3. **Switch en el cliente**: agregar `VITE_BSALE_MODE=real` a `app/.env.production` y migrar los imports:
+   - `app/src/data/stock.ts`, `app/src/data/clients.ts`, `app/src/components/orders/OrderDialogs.tsx` importan `bsale` desde `@/integrations/bsale/MockBsaleClient`; cambiar a `@/integrations/bsale/client` (el selector lee el env). Con `VITE_BSALE_MODE=mock` (default) sigue todo idéntico.
+4. **Verificar** el mapping en `RealBsaleClient.ts` contra la doc de Bsale (`https://docs.bsale.cl`) antes de probar en producción. La forma asumida (items, expand, emissiondate en segundos) está tomada de la documentación pública Sep-2026; si Bsale cambió algún nombre, es acá.
+
+Mientras `VITE_BSALE_MODE` no esté seteado el archivo `RealBsaleClient.ts` está compilado pero no se instancia, así que no afecta la demo.
+
 ## Notas operativas
 
 - Las reglas actuales son las mínimas necesarias para que cada rol pueda hacer su trabajo. Antes de exponer la URL a usuarios reales, considerar:

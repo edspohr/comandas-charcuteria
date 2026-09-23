@@ -41,5 +41,18 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') },
   },
+  // Split los dos módulos más pesados: recharts (Panel de dueños) y @firebase/ai
+  // (Pedido IA / Producción IA). Así el bundle principal baja y se descargan on
+  // demand cuando alguien abre esas rutas.
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          recharts: ['recharts'],
+          'firebase-ai': ['@firebase/ai'],
+        },
+      },
+    },
+  },
   server: { port: 5173 },
 });

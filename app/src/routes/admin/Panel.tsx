@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/data/firebase';
 import Button from '@/components/ui/Button';
 import { useProducts } from '@/data/products';
@@ -43,24 +43,40 @@ export default function Panel() {
   const sync = useSyncState();
   const { settings } = useSettings();
 
+  // Bound la subscripción a los últimos 365 días para no streamear toda la
+  // colección: el rango máximo del panel es "todo" y "todo" se redefine acá
+  // como el último año (suficiente para dueños). Los pedidos anteriores viven
+  // en Firestore pero no viajan por cable a cada montaje.
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'orders'), (snap) => {
+    const since = Date.now() - 365 * 24 * 60 * 60 * 1000;
+    const q = query(collection(db, 'orders'), where('createdAt', '>=', since));
+    const unsub = onSnapshot(q, (snap) => {
       const list: Order[] = []; snap.forEach((d) => list.push(d.data() as Order)); setOrders(list);
     });
     return unsub;
   }, []);
 
+  // IDs de "tienda" para excluir de Ventas: sus pedidos son transferencias
+  // internas (repos de la tienda física), no ventas a terceros.
+  const internalShopIds = useMemo(() => new Set(clients.filter((c) => c.isInternalShop).map((c) => c.id)), [clients]);
+  const excludeShop = <T extends { clientId: string }>(list: T[]) => list.filter((o) => !internalShopIds.has(o.clientId));
+
   const grams = useMemo(() => gramsMap(products), [products]);
   const { current, previous } = useMemo(() => rangeFor(rangeKey), [rangeKey]);
   const cur = useMemo(() => orders.filter((o) => inRange(o, current)), [orders, current]);
   const prev = useMemo(() => orders.filter((o) => inRange(o, previous)), [orders, previous]);
+  // Ventas = terceros: tienda excluida. Operación/Stock/Fuerza siguen viendo
+  // todo (los repos a tienda igual consumen stock y tiempo de armado).
+  const curSales = useMemo(() => excludeShop(cur), [cur, internalShopIds]);
+  const prevSales = useMemo(() => excludeShop(prev), [prev, internalShopIds]);
+  const shopOrdersCur = cur.length - curSales.length;
 
-  const totals = useMemo(() => salesTotals(cur, grams), [cur, grams]);
-  const prevTotals = useMemo(() => salesTotals(prev, grams), [prev, grams]);
-  const series = useMemo(() => seriesByDay(cur, current, grams), [cur, current, grams]);
-  const vend = useMemo(() => byVendedor(cur, grams, nameOf), [cur, grams]);
-  const cli = useMemo(() => byClient(cur, grams), [cur, grams]);
-  const prod = useMemo(() => byProduct(cur, products, grams), [cur, products, grams]);
+  const totals = useMemo(() => salesTotals(curSales, grams), [curSales, grams]);
+  const prevTotals = useMemo(() => salesTotals(prevSales, grams), [prevSales, grams]);
+  const series = useMemo(() => seriesByDay(curSales, current, grams), [curSales, current, grams]);
+  const vend = useMemo(() => byVendedor(curSales, grams, nameOf), [curSales, grams]);
+  const cli = useMemo(() => byClient(curSales, grams), [curSales, grams]);
+  const prod = useMemo(() => byProduct(curSales, products, grams), [curSales, products, grams]);
   const cats = useMemo(() => byCategory(prod, categoryLabel), [prod]);
   const lt = useMemo(() => leadTimes(cur), [cur]);
   const svc = useMemo(() => serviceLevel(orders), [orders]);
@@ -116,6 +132,9 @@ export default function Panel() {
 
       {tab === 'ventas' && (
         <div className="space-y-5">
+          {shopOrdersCur > 0 && (
+            <p className="text-[11px] text-charcoal-300 uppercase tracking-display">Ventas = terceros. Se excluyen {shopOrdersCur} pedido{shopOrdersCur === 1 ? '' : 's'} a Tienda (transferencia interna).</p>
+          )}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Metric label="Ventas facturadas" value={formatCLP(totals.revenue)} delta={delta(totals.revenue, prevTotals.revenue)} sub={`${totals.invoicedOrders} con documento${totals.pendingInvoice ? ` · ${totals.pendingInvoice} sin facturar aún (${formatCLP(totals.pendingRevenue)})` : ''}`} />
             <Metric label="Pedidos" value={totals.orders} delta={delta(totals.orders, prevTotals.orders)} sub={totals.anulados ? `${totals.anulados} anulados` : undefined} />

@@ -16,7 +16,7 @@ const NAME_BY_UID: Record<string, string> = Object.fromEntries(
   demoUsers.map((u) => [u.uid, u.displayName]),
 );
 
-interface PackedState { packedQty: number; packedWeightKg: string; }
+interface PackedState { packedQty: number; packedWeightKg: string; short: boolean; shortReason: string; }
 
 export default function DetalleArmado() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -37,6 +37,8 @@ export default function DetalleArmado() {
       {
         packedQty: l.packedQty ?? l.reservedQty,
         packedWeightKg: l.packedWeightKg != null ? String(l.packedWeightKg) : '',
+        short: !!l.shortReason,
+        shortReason: l.shortReason ?? '',
       },
     ])));
   }, [order]);
@@ -48,7 +50,18 @@ export default function DetalleArmado() {
   const isDone = order && (order.status === 'armado' || order.status === 'facturado' || order.status === 'despachado' || order.status === 'entregado');
 
   const anyPacked = useMemo(
-    () => order?.lines.some((l) => (state[`${l.productId}::${l.formatId}`]?.packedQty ?? 0) > 0) ?? false,
+    () => order?.lines.some((l) => {
+      const s = state[`${l.productId}::${l.formatId}`];
+      if (!s) return false;
+      return s.short || (s.packedQty ?? 0) > 0;
+    }) ?? false,
+    [order, state],
+  );
+  const missingReasons = useMemo(
+    () => order?.lines.some((l) => {
+      const s = state[`${l.productId}::${l.formatId}`];
+      return s?.short && !s.shortReason.trim();
+    }) ?? false,
     [order, state],
   );
 
@@ -68,6 +81,9 @@ export default function DetalleArmado() {
           const k = `${l.productId}::${l.formatId}`;
           const s = state[k];
           const parsedWeight = s?.packedWeightKg ? Number(s.packedWeightKg) : undefined;
+          if (s?.short) {
+            return { productId: l.productId, formatId: l.formatId, packedQty: 0, shortReason: s.shortReason.trim() || 'Faltó' };
+          }
           return {
             productId: l.productId,
             formatId: l.formatId,
@@ -139,7 +155,7 @@ export default function DetalleArmado() {
         </div>
         {order.lines.map((line) => {
           const k = `${line.productId}::${line.formatId}`;
-          const s = state[k] ?? { packedQty: line.reservedQty, packedWeightKg: '' };
+          const s = state[k] ?? { packedQty: line.reservedQty, packedWeightKg: '', short: false, shortReason: '' };
           const packed = s.packedQty;
           const readOnly = !canPack;
           const showWeight = line.unit !== 'kg';  // extra field only when line's unit isn't already kg
@@ -184,43 +200,67 @@ export default function DetalleArmado() {
               <div className="mt-3 pt-3 border-t border-charcoal-100">
                 <p className="eyebrow mb-2">Empacado</p>
                 {readOnly ? (
-                  <p className="text-sm text-charcoal-700 font-medium">
-                    {line.packedQty != null ? formatQty(line.packedQty, line.unit) : '—'}
-                    {showWeightDelta && (
-                      <span className="ml-2 text-xs text-charcoal-300">
-                        · peso real {line.packedWeightKg} kg
-                      </span>
-                    )}
-                  </p>
+                  line.shortReason ? (
+                    <div className="rounded-md bg-red-50 border border-red-200 text-red-800 px-2.5 py-1.5 text-sm">
+                      Faltó · <em className="not-italic text-red-700">{line.shortReason}</em>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-charcoal-700 font-medium">
+                      {line.packedQty != null ? formatQty(line.packedQty, line.unit) : '—'}
+                      {showWeightDelta && (
+                        <span className="ml-2 text-xs text-charcoal-300">
+                          · peso real {line.packedWeightKg} kg
+                        </span>
+                      )}
+                    </p>
+                  )
                 ) : (
                   <div className="space-y-3">
-                    <Stepper
-                      value={packed}
-                      onChange={(v) => setState((prev) => ({ ...prev, [k]: { ...s, packedQty: v } }))}
-                      step={line.unit === 'kg' ? 0.5 : 1}
-                      decimals={line.unit === 'kg' ? 2 : 0}
-                      quick={line.unit === 'kg' ? [0.5, 1, 5] : [1, 5, 10]}
-                    />
-                    {showWeight && (
+                    <label className="flex items-center gap-2 text-xs text-charcoal-700">
+                      <input type="checkbox" checked={s.short} onChange={(e) => setState((prev) => ({ ...prev, [k]: { ...s, short: e.target.checked, packedQty: e.target.checked ? 0 : line.reservedQty } }))} className="w-4 h-4 accent-red-700" />
+                      Faltó — no pude empacar esta línea
+                    </label>
+                    {s.short ? (
                       <div>
-                        <label className="text-[11px] uppercase tracking-display text-charcoal-300 block mb-1">
-                          Peso real (kg) — opcional
-                        </label>
+                        <label className="text-[11px] uppercase tracking-display text-charcoal-300 block mb-1">Motivo *</label>
                         <input
-                          type="number"
-                          inputMode="decimal"
-                          step="0.1"
-                          placeholder="Solo si difiere del vendido"
-                          value={s.packedWeightKg}
-                          onChange={(e) => setState((prev) => ({ ...prev, [k]: { ...s, packedWeightKg: e.target.value } }))}
-                          className="field h-10 text-sm"
+                          value={s.shortReason}
+                          onChange={(e) => setState((prev) => ({ ...prev, [k]: { ...s, shortReason: e.target.value } }))}
+                          placeholder="Ej: se rompió al cortar, calidad no aceptable, no había en cámara"
+                          className={'field h-10 text-sm ' + (s.short && !s.shortReason.trim() ? 'border-red-400' : '')}
                         />
-                        {Number.isFinite(parsedWeight) && parsedWeight !== undefined && line.unit === 'unidad' && (
-                          <p className="text-[11px] text-charcoal-300 mt-1">
-                            Registrará peso real de {parsedWeight} kg
-                          </p>
-                        )}
                       </div>
+                    ) : (
+                      <>
+                        <Stepper
+                          value={packed}
+                          onChange={(v) => setState((prev) => ({ ...prev, [k]: { ...s, packedQty: v } }))}
+                          step={line.unit === 'kg' ? 0.5 : 1}
+                          decimals={line.unit === 'kg' ? 2 : 0}
+                          quick={line.unit === 'kg' ? [0.5, 1, 5] : [1, 5, 10]}
+                        />
+                        {showWeight && (
+                          <div>
+                            <label className="text-[11px] uppercase tracking-display text-charcoal-300 block mb-1">
+                              Peso real (kg) — opcional
+                            </label>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              step="0.1"
+                              placeholder="Solo si difiere del vendido"
+                              value={s.packedWeightKg}
+                              onChange={(e) => setState((prev) => ({ ...prev, [k]: { ...s, packedWeightKg: e.target.value } }))}
+                              className="field h-10 text-sm"
+                            />
+                            {Number.isFinite(parsedWeight) && parsedWeight !== undefined && line.unit === 'unidad' && (
+                              <p className="text-[11px] text-charcoal-300 mt-1">
+                                Registrará peso real de {parsedWeight} kg
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -244,11 +284,11 @@ export default function DetalleArmado() {
         <div className="mt-5 sticky bottom-0 bg-cream-50 border-t border-charcoal-100 pt-4 pb-2">
           <Button
             onClick={done}
-            disabled={submitting || !anyPacked}
+            disabled={submitting || !anyPacked || missingReasons}
             size="lg"
             className="w-full"
           >
-            {submitting ? 'Registrando…' : 'Marcar armado'}
+            {submitting ? 'Registrando…' : missingReasons ? 'Falta el motivo del faltante' : 'Marcar armado'}
           </Button>
         </div>
       )}

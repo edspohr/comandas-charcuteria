@@ -4,6 +4,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/data/firebase';
 import { useCurrentUser } from '@/data/auth';
 import { assignPacker } from '@/data/orders';
+import { useClients } from '@/data/clients';
 import { syncStockFromBsale, useAllStock, useSyncState } from '@/data/stock';
 import { useSettings } from '@/data/settings';
 import { demoUsers } from '@/data/demo-users';
@@ -44,6 +45,8 @@ export default function Tablero() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { stock } = useAllStock();
+  const { clients } = useClients();
+  const internalShopIds = useMemo(() => new Set(clients.filter((c) => c.isInternalShop).map((c) => c.id)), [clients]);
   const { settings } = useSettings();
   const thresholds = settings.kanban ?? DEFAULT_KANBAN_THRESHOLDS;
   const sync = useSyncState();
@@ -310,6 +313,7 @@ export default function Tablero() {
                     onDragStart={() => setDragId(o.id)}
                     onDragEnd={() => { setDragId(null); setOverCol(null); }}
                     compact={isCerrado}
+                    isShop={internalShopIds.has(o.clientId)}
                   />
                 ))}
                 {isCerrado && list.length > 30 && <p className="text-[11px] text-charcoal-300 px-1">+ {list.length - 30} más</p>}
@@ -354,7 +358,7 @@ function Chip({ active, onClick, children, tone }: { active: boolean; onClick: (
   );
 }
 
-function KanbanCard({ order, tone, action, onAction, detailTo, draggable, onDragStart, onDragEnd, compact }: {
+function KanbanCard({ order, tone, action, onAction, detailTo, draggable, onDragStart, onDragEnd, compact, isShop }: {
   order: Order;
   tone: { tone: Tone; reasons: string[] };
   action: { kind: ActionKind; label: string };
@@ -364,6 +368,7 @@ function KanbanCard({ order, tone, action, onAction, detailTo, draggable, onDrag
   onDragStart?: () => void;
   onDragEnd?: () => void;
   compact?: boolean;
+  isShop?: boolean;
 }) {
   const anyPending = order.lines.some((l) => l.pendingProductionQty > 0);
   const packer = order.assignedPackerId ? NAME_BY_UID[order.assignedPackerId] ?? '?' : null;
@@ -397,8 +402,9 @@ function KanbanCard({ order, tone, action, onAction, detailTo, draggable, onDrag
           {order.lines.length > 2 && <li className="text-charcoal-300">+ {order.lines.length - 2} más</li>}
         </ul>
       )}
-      {(tone.reasons.length > 0 || anyPending || packer) && (
+      {(tone.reasons.length > 0 || anyPending || packer || isShop) && (
         <div className="mt-1.5 flex flex-wrap gap-1">
+          {isShop && <span className="rounded px-1.5 py-0.5 text-[10px] uppercase tracking-display bg-charcoal-900 text-cream-50 border border-charcoal-900">Tienda</span>}
           {tone.reasons.map((r) => (
             <span key={r} className={'rounded px-1.5 py-0.5 text-[10px] uppercase tracking-display border ' + (tone.tone === 'red' ? 'bg-red-50 text-red-700 border-red-200' : tone.tone === 'amber' ? 'bg-brass-50 text-brass-700 border-brass-300' : 'bg-charcoal-50 text-charcoal-500 border-charcoal-100')}>{r}</span>
           ))}

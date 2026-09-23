@@ -117,6 +117,10 @@ export interface OrderLine {
   pendingProductionQty: number;
   packedQty?: number;
   packedWeightKg?: number;
+  // Explicit "faltó" marker: el armador declara que no pudo empacar esta línea.
+  // Distinto de packedQty=0 sin más (que hoy la app trata como merma total y
+  // el Panel no diferencia). shortReason lo hace explícito para ficha y Panel.
+  shortReason?: string;
   // Valorization snapshot (CLP con IVA). Stored so historic orders keep
   // their price even if the catalog moves later. For pieza formats the
   // estimated subtotal at order time uses `avgWeightKg`; on markArmado we

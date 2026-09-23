@@ -84,7 +84,9 @@ export default function DetallePedido() {
                       {formatQty(l.pendingProductionQty, l.unit)} a producción
                     </p>
                   )}
-                  {l.packedQty != null && (
+                  {l.shortReason ? (
+                    <p className="text-[10px] uppercase tracking-display text-red-700 mt-1">Faltó · <span className="normal-case tracking-normal italic">{l.shortReason}</span></p>
+                  ) : l.packedQty != null && (
                     <p className="text-[10px] uppercase tracking-display text-charcoal-500 mt-1">
                       Empacado {formatQty(l.packedQty, l.unit)}
                       {l.packedWeightKg != null && <span> · {l.packedWeightKg} kg reales</span>}

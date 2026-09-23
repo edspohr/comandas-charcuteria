@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { collection, doc, getDocs, onSnapshot, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { bsale } from '@/integrations/bsale/MockBsaleClient';
 import type { BsaleCustomer } from '@/integrations/bsale/BsaleClient';
 import { db } from './firebase';
 import { describeFirestoreError } from '@/lib/errors';
-import type { Client, DeliveryMode } from '@/domain/types';
+import type { Client, DeliveryMode, Order } from '@/domain/types';
 import { cleanRut, formatRut, isValidRut } from '@/lib/rut';
 
 export function useClients(): { clients: Client[]; loading: boolean; error: string | null } {
@@ -162,4 +162,95 @@ export async function createClientQuick(input: QuickClientInput, by: string): Pr
   };
   await setDoc(doc(db, 'clients', id), client);
   return client;
+}
+
+// ---------- Ficha de cliente ----------
+
+export function useClient(id: string | null): { client: Client | null; loading: boolean; error: string | null } {
+  const [client, setClient] = useState<Client | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!id) { setClient(null); setLoading(false); return; }
+    setLoading(true);
+    const unsub = onSnapshot(doc(db, 'clients', id),
+      (snap) => { setClient(snap.exists() ? (snap.data() as Client) : null); setError(null); setLoading(false); },
+      (err) => { setError(describeFirestoreError(err)); setLoading(false); });
+    return unsub;
+  }, [id]);
+  return { client, loading, error };
+}
+
+// All orders of one client, newest first. Equality-only query → no
+// composite index needed; sorting happens client-side.
+export function useClientOrders(clientId: string | null): { orders: Order[]; loading: boolean } {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!clientId) { setOrders([]); setLoading(false); return; }
+    const q = query(collection(db, 'orders'), where('clientId', '==', clientId));
+    const unsub = onSnapshot(q, (snap) => {
+      const l: Order[] = []; snap.forEach((d) => l.push(d.data() as Order));
+      l.sort((a, b) => b.createdAt - a.createdAt);
+      setOrders(l); setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, [clientId]);
+  return { orders, loading };
+}
+
+export interface ClientAdminPatch {
+  fantasyName?: string;
+  name?: string;
+  rut?: string;
+  giro?: string;
+  address?: string;
+  contactPhone?: string;
+  email?: string;
+  receivingHours?: string;
+  deliveryMode?: DeliveryMode;
+  notes?: string;
+  ownerUid?: string;
+}
+
+// Administración completa/corrige la ficha. Los datos de facturación van a
+// Bsale (maestro) y luego al espejo; los campos propios solo al espejo.
+export async function updateClientAdmin(client: Client, patch: ClientAdminPatch, by: string): Promise<void> {
+  const rutRaw = patch.rut !== undefined ? patch.rut : client.rut;
+  const rutClean = rutRaw?.trim() ? cleanRut(rutRaw) : '';
+  // Only validate a RUT the admin actually changed: the master may hold
+  // legacy/foreign identifiers we don't want to block on.
+  const rutChanged = rutClean !== (client.rut ? cleanRut(client.rut) : '');
+  if (rutChanged && rutClean && !isValidRut(rutClean)) throw new Error('El RUT no es válido');
+  const next = {
+    name: (patch.name ?? client.name)?.trim() || client.name,
+    fantasyName: (patch.fantasyName ?? client.fantasyName)?.trim() || undefined,
+    rut: rutClean ? (rutChanged ? formatRut(rutClean) : client.rut) : undefined,
+    giro: (patch.giro ?? client.giro)?.trim() || undefined,
+    address: (patch.address ?? client.address)?.trim() || undefined,
+    phone: (patch.contactPhone ?? client.contactPhone)?.trim() || undefined,
+    email: (patch.email ?? client.email)?.trim() || undefined,
+  };
+  if (client.bsaleClientId) {
+    await bsale.updateClient(client.bsaleClientId, next);
+  }
+  const invoicingComplete = !!(next.rut && next.name && next.address && next.giro);
+  const mirror: Record<string, unknown> = {
+    name: next.name,
+    fantasyName: next.fantasyName ?? null,
+    rut: next.rut ?? null,
+    giro: next.giro ?? null,
+    address: next.address ?? null,
+    contactPhone: next.phone ?? null,
+    email: next.email ?? null,
+    invoicingComplete,
+    needsReview: !invoicingComplete,
+    bsaleSyncedAt: Date.now(),
+    reviewedBy: by,
+  };
+  if (patch.receivingHours !== undefined) mirror.receivingHours = patch.receivingHours.trim() || null;
+  if (patch.deliveryMode !== undefined) mirror.deliveryMode = patch.deliveryMode;
+  if (patch.notes !== undefined) mirror.notes = patch.notes.trim() || null;
+  if (patch.ownerUid !== undefined) mirror.ownerUid = patch.ownerUid || null;
+  await updateDoc(doc(db, 'clients', client.id), mirror);
 }

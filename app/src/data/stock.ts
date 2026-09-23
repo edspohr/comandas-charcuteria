@@ -180,3 +180,20 @@ export async function syncStockFromBsale(by: string, officeId?: number): Promise
 
 // Alias — the sync covers stock + clients now.
 export const syncFromBsale = syncStockFromBsale;
+
+// Bitácora de un formato: últimos movimientos (reserva, liberación, sync,
+// venta). Equality-only query, ordenada en cliente.
+export function useStockMovements(productId: string | null, formatId: string | null, max = 25): StockMovement[] {
+  const [items, setItems] = useState<StockMovement[]>([]);
+  useEffect(() => {
+    if (!productId || !formatId) { setItems([]); return; }
+    const q = query(collection(db, 'stockMovements'), where('productId', '==', productId), where('formatId', '==', formatId));
+    const unsub = onSnapshot(q, (snap) => {
+      const l: StockMovement[] = []; snap.forEach((d) => l.push(d.data() as StockMovement));
+      l.sort((a, b) => b.at - a.at);
+      setItems(l.slice(0, max));
+    }, () => setItems([]));
+    return unsub;
+  }, [productId, formatId, max]);
+  return items;
+}

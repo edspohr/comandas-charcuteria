@@ -6,6 +6,8 @@ import PegarPedido from './routes/vendedor/PegarPedido';
 import DetalleArmado from './routes/despacho/DetalleArmado';
 import Produccion from './routes/produccion/Produccion';
 import Tablero from './routes/Tablero';
+import Clientes from './routes/clientes/Clientes';
+import FichaCliente from './routes/clientes/FichaCliente';
 import BsaleConsola from './routes/admin/Bsale';
 import Panel from './routes/admin/Panel';
 import Catalogo from './routes/admin/Catalogo';
@@ -108,6 +110,26 @@ export default function App() {
             <RouteGuard current={current} allow={['vendedor', 'despacho', 'produccion', 'admin', 'superAdmin']}>
               <AppShell current={current!}>
                 <Tablero />
+              </AppShell>
+            </RouteGuard>
+          }
+        />
+        <Route
+          path="/clientes"
+          element={
+            <RouteGuard current={current} allow={['vendedor', 'admin', 'superAdmin']}>
+              <AppShell current={current!}>
+                <Clientes />
+              </AppShell>
+            </RouteGuard>
+          }
+        />
+        <Route
+          path="/clientes/:clientId"
+          element={
+            <RouteGuard current={current} allow={['vendedor', 'despacho', 'produccion', 'admin', 'superAdmin']}>
+              <AppShell current={current!}>
+                <FichaCliente />
               </AppShell>
             </RouteGuard>
           }

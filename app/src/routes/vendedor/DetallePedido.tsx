@@ -48,7 +48,7 @@ export default function DetallePedido() {
           )}
         </div>
         <h1 className="text-xl font-semibold text-charcoal-900 tracking-display uppercase mt-1">
-          {order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}
+          <Link to={`/clientes/${order.clientId}`} className="hover:text-brass-700">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</Link>
         </h1>
         <p className="text-xs text-charcoal-300 mt-1 first-letter:uppercase">
           Solicitado para {formatDateLong(order.requestedDate)} · {order.deliveryMode === 'retiro' ? 'Retiro en tienda' : (order.deliveryAddress ?? 'Despacho')}

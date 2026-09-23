@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '@/data/firebase';
 import type { Order } from '@/domain/types';
 import type {
@@ -61,6 +61,14 @@ export class MockBsaleClient implements BsaleClient {
     const created: BsaleCustomer = { id: ref.id, ...input, updatedAt: Date.now() };
     await setDoc(ref, created);
     return created;
+  }
+
+  async updateClient(id: string, patch: Partial<BsaleCustomerInput>): Promise<BsaleCustomer> {
+    const ref = doc(db, 'bsaleClients', id);
+    const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+    await updateDoc(ref, { ...clean, updatedAt: Date.now() });
+    const snap = await getDoc(ref);
+    return snap.data() as BsaleCustomer;
   }
 
   // netUnitValue matches how the real Bsale API expects it: neto (sin IVA)

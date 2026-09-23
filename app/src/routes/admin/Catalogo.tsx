@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react';
 import { useClients } from '@/data/clients';
 import { useProducts } from '@/data/products';
-import { availableFor, useAllStock, useSyncState } from '@/data/stock';
+import { availableFor, useAllStock, useStockMovements, useSyncState } from '@/data/stock';
+import { Link } from 'react-router-dom';
 import { formatQty } from '@/lib/format';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { categoryLabel } from '@/domain/categories';
 import type { Client } from '@/domain/types';
 
 type Tab = 'productos' | 'clientes';
+
+const MOV_LABEL: Record<string, string> = {
+  reserva: 'Reserva', liberacion: 'Liberación', consumo: 'Consumo', produccion: 'Producción', ajuste: 'Ajuste',
+  traslado_tienda: 'Traslado', sync_bsale: 'Sync Bsale', venta_bsale: 'Venta Bsale',
+};
 
 const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -49,6 +55,9 @@ function ProductosTab() {
   const sync = useSyncState();
   const error = productsError ?? stockError;
   const [q, setQ] = useState('');
+  const [movKey, setMovKey] = useState<string | null>(null);
+  const [movProduct, movFormat] = movKey ? movKey.split('::') : [null, null];
+  const movements = useStockMovements(movProduct, movFormat);
 
   const filtered = useMemo(() => {
     if (!q.trim()) return products;
@@ -92,7 +101,8 @@ function ProductosTab() {
                 const av = availableFor(stock, p.id, f.formatId);
                 const s = stock.get(`${p.id}__${f.formatId}`);
                 return (
-                  <div key={f.formatId} className="flex items-center justify-between gap-3 p-3 pl-6 text-sm">
+                  <div key={f.formatId}>
+                  <div className="flex items-center justify-between gap-3 p-3 pl-6 text-sm">
                     <div className="min-w-0">
                       <p className="text-charcoal-700 font-medium">{f.label}</p>
                       <p className="text-[11px] text-charcoal-300 uppercase tracking-display mt-0.5">
@@ -103,7 +113,22 @@ function ProductosTab() {
                       <span className={'text-sm font-semibold ' + (av > 0 ? 'text-emerald-700' : 'text-red-700')}>
                         {formatQty(av, f.unit)}
                       </span>
+                      <button onClick={() => setMovKey((k) => (k === `${p.id}::${f.formatId}` ? null : `${p.id}::${f.formatId}`))} className="text-[10px] uppercase tracking-display text-charcoal-300 hover:text-charcoal-700">
+                        {movKey === `${p.id}::${f.formatId}` ? 'Ocultar' : 'Bitácora'}
+                      </button>
                     </div>
+                  </div>
+                  {movKey === `${p.id}::${f.formatId}` && (
+                    <ul className="mx-6 mb-3 rounded-md bg-cream-100/60 divide-y divide-charcoal-100 text-xs">
+                      {movements.length === 0 && <li className="p-2 text-charcoal-300">Sin movimientos.</li>}
+                      {movements.map((m) => (
+                        <li key={m.id} className="p-2 flex items-center justify-between gap-2">
+                          <span className="text-charcoal-700"><span className="uppercase tracking-display text-[10px] text-charcoal-300 mr-2">{MOV_LABEL[m.type] ?? m.type}</span>{m.orderId ? <span className="font-mono">{m.orderId}</span> : null}{m.reason ? <span className="text-charcoal-300"> · {m.reason}</span> : null}</span>
+                          <span className="shrink-0 text-charcoal-500">{m.qty > 0 ? '+' : ''}{m.qty} · {new Date(m.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   </div>
                 );
               })}
@@ -144,7 +169,7 @@ function ClientesTab() {
         {filtered.map((c) => (
           <li key={c.id} className="card p-3.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-charcoal-900">{c.fantasyName ?? c.name}</span>
+              <Link to={`/clientes/${c.id}`} className="font-semibold text-charcoal-900 hover:text-brass-700">{c.fantasyName ?? c.name}</Link>
               {c.isInternalShop && (
                 <span className="text-[10px] uppercase tracking-display bg-charcoal-900 text-cream-50 px-2 py-0.5 rounded">Tienda</span>
               )}

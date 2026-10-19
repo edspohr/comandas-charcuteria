@@ -15,3 +15,6 @@ ui-debug.log*
 *.log
 functions/lib
 functions/.secret.local
+
+# Datos de clientes extraídos (RUT, teléfonos): nunca al repo
+private/

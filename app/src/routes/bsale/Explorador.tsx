@@ -4,7 +4,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { db } from '@/data/firebase';
 import { useProducts } from '@/data/products';
 import { useAllStock } from '@/data/stock';
-import { useBsaleVariants, useCatalogMap } from '@/data/catalogMap';
+import { useBsaleVariants, useCatalogMap, variantNames } from '@/data/catalogMap';
 import { bsaleGet } from '@/data/bsaleAdmin';
 import { DOCUMENTS_PATH, isRealBsale } from '@/integrations/bsale/client';
 import type { BsaleDocument } from '@/integrations/bsale/BsaleClient';
@@ -101,7 +101,7 @@ function groupBy(docs: Doc[], keyOf: (d: Doc) => string, nameOf: (d: Doc) => str
 
 function Ventas({ docs, range }: { docs: Doc[]; range: Range }) {
   const variants = useBsaleVariants();
-  const label = useMemo(() => new Map(variants.map((v) => [v.variantId, v.label])), [variants]);
+  const label = useMemo(() => new Map([...variantNames(variants)].map(([id, n]) => [id, n.label])), [variants]);
   const sales = useMemo(() => docs.filter(isSale), [docs]);
   const total = sales.reduce((s, d) => s + d.totalCLP, 0);
   const period = `Últimos ${range} días`;
@@ -228,7 +228,7 @@ function Documentos({ docs, range }: { docs: Doc[]; range: Range }) {
   // Bsale's variant `description` is only the format ("Granel laminado",
   // "Sachet 100 gr"): name lines from the catalog mirror (product · format).
   const variants = useBsaleVariants();
-  const labels = useMemo(() => new Map(variants.map((v) => [v.variantId, v.label])), [variants]);
+  const labels = useMemo(() => new Map([...variantNames(variants)].map(([id, n]) => [id, n.label])), [variants]);
   const lineLabel = (it: Doc['details'][number]) => labels.get(it.variantId) ?? (it.description || it.sku || it.variantId);
   const [q, setQ] = useState('');
   const [only, setOnly] = useState<'todos' | 'sin_pedido' | 'con_pedido'>('todos');

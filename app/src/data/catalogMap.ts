@@ -42,6 +42,45 @@ function useCollection<T>(path: string): T[] {
   return items;
 }
 
+// Human names for Bsale variants, unique across the catalog. Bsale's variant
+// `description` is only the format ("Granel laminado", "Sachet 100 gr") and
+// product names can repeat across products (an old SKU next to the new one),
+// so: product = product name, plus its type or id when another product has
+// the same name; format = description, plus the code when it repeats within
+// the product or is empty. label = "product · format".
+export interface VariantName { product: string; format: string; label: string }
+export function variantNames(variants: BsaleVariantMirror[]): Map<string, VariantName> {
+  const key = (x: string) => x.trim().toLocaleLowerCase('es');
+  const productsByName = new Map<string, Set<string>>();
+  const typesByName = new Map<string, Set<string>>();
+  const formatCount = new Map<string, number>();
+  const variantsPerProduct = new Map<string, number>();
+  for (const v of variants) {
+    const n = key(v.productName || v.label);
+    if (!productsByName.has(n)) { productsByName.set(n, new Set()); typesByName.set(n, new Set()); }
+    productsByName.get(n)!.add(v.bsaleProductId);
+    typesByName.get(n)!.add(v.productType ?? '');
+    const fk = `${v.bsaleProductId}|${key(v.description)}`;
+    formatCount.set(fk, (formatCount.get(fk) ?? 0) + 1);
+    variantsPerProduct.set(v.bsaleProductId, (variantsPerProduct.get(v.bsaleProductId) ?? 0) + 1);
+  }
+  const out = new Map<string, VariantName>();
+  for (const v of variants) {
+    const n = key(v.productName || v.label);
+    let product = v.productName || v.label || `Variante ${v.variantId}`;
+    if ((productsByName.get(n)?.size ?? 0) > 1) {
+      const typesDiffer = (typesByName.get(n)?.size ?? 0) > 1 && v.productType;
+      product = `${product} (${typesDiffer ? v.productType : `#${v.bsaleProductId}`})`;
+    }
+    const repeated = (formatCount.get(`${v.bsaleProductId}|${key(v.description)}`) ?? 0) > 1;
+    let format = v.description?.trim() || '';
+    if (!format && (variantsPerProduct.get(v.bsaleProductId) ?? 0) > 1) format = v.code || `#${v.variantId}`;
+    else if (repeated) format = `${format} (${v.code || `#${v.variantId}`})`;
+    out.set(v.variantId, { product, format: format || '—', label: format ? `${product} · ${format}` : product });
+  }
+  return out;
+}
+
 export const useCatalogMap = () => useCollection<CatalogMapEntry>('catalogMap');
 export const useBsaleVariants = () => useCollection<BsaleVariantMirror>('bsale/catalog/variants');
 

@@ -1,5 +1,5 @@
 import { SALES_KINDS, type FactDoc, type FactLine, type MonthIndexEntry, type VariantStock } from '@/data/facts';
-import type { BsaleVariantMirror, CatalogMapEntry } from '@/data/catalogMap';
+import { variantNames, type BsaleVariantMirror, type CatalogMapEntry } from '@/data/catalogMap';
 import type { DocKind } from '@/data/bsaleAdmin';
 import type { Product } from './types';
 
@@ -77,6 +77,7 @@ export function variantDims(variants: BsaleVariantMirror[], map: CatalogMapEntry
   const grams = new Map<string, number | undefined>();
   for (const p of products) for (const f of p.formats) grams.set(`${p.id}__${f.formatId}`, f.unit === 'kg' ? 1000 : f.grams);
   const confirmed = new Map(map.filter((m) => m.status === 'confirmado' && m.productId).map((m) => [m.variantId, `${m.productId}__${m.formatId}`]));
+  const names = variantNames(variants);
   const out = new Map<string, VariantDim>();
   for (const v of variants) {
     let kg: number | null = null;
@@ -87,7 +88,7 @@ export function variantDims(variants: BsaleVariantMirror[], map: CatalogMapEntry
       kg = g ? g / 1000 : fromText ? fromText / 1000 : null;
     }
     out.set(v.variantId, {
-      id: v.variantId, product: titleCase(v.productName || v.label), format: v.description || '—', label: titleCase(v.label || v.productName),
+      id: v.variantId, product: titleCase(names.get(v.variantId)!.product), format: names.get(v.variantId)!.format, label: titleCase(names.get(v.variantId)!.label),
       type: titleCase(v.productType || 'Sin tipo'), productKey: v.bsaleProductId, kgPerUnit: kg,
     });
   }

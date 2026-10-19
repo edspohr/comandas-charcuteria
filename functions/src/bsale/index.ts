@@ -139,7 +139,9 @@ function parseCustomer(raw: unknown, partial: boolean): Partial<CustomerInput> {
 export const bsaleCreateClient = onCall({ region: REGION, secrets }, async (req) => {
   const { uid } = requireRole(req, ['vendedor', 'admin', 'superAdmin'], 'crear clientes');
   const s = await loadSettings();
-  requireEnabled(s);
+  // Selling must not stop because Bsale is off: the client stays in the app,
+  // pending review, and administración creates it in Bsale later.
+  if (!s.enabled || !s.writesEnabled) return { dryRun: true, customer: null, pending: true };
   return createClient(apiFromSecret(), s, uid, parseCustomer(req.data, false) as CustomerInput);
 });
 

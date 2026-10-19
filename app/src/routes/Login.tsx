@@ -19,6 +19,7 @@ export default function Login() {
       <Hero />
       <Flow />
       <Features />
+      <BsaleSection />
       <Profiles />
       <Footer />
     </main>
@@ -51,8 +52,8 @@ function Hero() {
             Del pedido a la entrega,<br className="hidden sm:block" /> sin perder nada en el camino.
           </h1>
           <p className="mt-4 text-sm sm:text-lg text-cream-100/80 max-w-xl">
-            Comandas reemplaza el grupo de WhatsApp: cada pedido con su formato, el stock real de Bsale a la vista,
-            un responsable en cada etapa y las cifras del negocio para los dueños.
+            Comandas reemplaza el grupo de WhatsApp y trabaja junto a Bsale: cada pedido con su formato y el stock real
+            a la vista, un responsable en cada etapa, la factura emitida desde la misma app y las cifras del negocio para los dueños.
           </p>
           <Stats className="hidden lg:grid" />
         </div>
@@ -71,8 +72,8 @@ function Stats({ className }: { className: string }) {
   return (
     <ul className={`mt-8 grid-cols-2 gap-3 max-w-xl ${className}`}>
       <Stat value="4 pasos" label="para tomar un pedido desde el teléfono" />
-      <Stat value="Bsale" label="stock y clientes desde la misma fuente" />
-      <Stat value="5 etapas" label="cada pedido con estado y responsable" />
+      <Stat value="Sin retipeo" label="factura, producción y traslados se escriben en Bsale" />
+      <Stat value="2 años" label="de ventas de Bsale en el panel de gestión" />
       <Stat value="8 perfiles" label="cada persona ve solo lo suyo" />
     </ul>
   );
@@ -170,9 +171,9 @@ function LoginCard() {
 
 const STEPS: Array<{ who: string; title: string; text: string }> = [
   { who: 'Vendedor', title: 'Toma el pedido', text: 'Elige cliente, productos y fecha viendo el stock disponible. Si falta, la app separa lo que hay y avisa a producción.' },
-  { who: 'Producción', title: 'Ve lo que falta', text: 'La demanda pendiente por producto y fecha, y la producción terminada se carga en Bsale.' },
+  { who: 'Producción', title: 'Ve lo que falta', text: 'La demanda pendiente por producto y fecha. Registra lo producido y entra al stock de Bsale sin volver a digitarlo.' },
   { who: 'Despacho', title: 'Arma con peso real', text: 'Toma el pedido, registra lo que realmente se empacó y lo deja listo para facturar.' },
-  { who: 'Administración', title: 'Factura en Bsale', text: 'Vincula el documento con las cantidades empacadas. La reserva se libera sola.' },
+  { who: 'Administración', title: 'Factura desde Comandas', text: 'Revisa la vista previa y emite la factura o boleta en Bsale con los pesos empacados. La reserva se libera sola.' },
   { who: 'Reparto', title: 'Entrega', text: 'Marca la salida y la entrega con una nota. El vendedor ve el estado sin preguntar.' },
 ];
 
@@ -202,11 +203,11 @@ const FEATURES: Array<{ icon: ReactNode; title: string; text: string }> = [
   { icon: <IconPhone />, title: 'Pedido en 4 pasos', text: 'Cliente, productos, entrega y confirmar. Con una mano, desde el teléfono, y "Repetir último pedido" para los habituales.' },
   { icon: <IconSpark />, title: 'Pedido IA', text: 'Pegue el mensaje de WhatsApp del cliente y la app lo convierte en un pedido con productos, cantidades y datos del cliente.' },
   { icon: <IconBox />, title: 'Stock real de Bsale', text: 'Semáforo por producto con lo que reporta Bsale menos lo ya reservado. Nadie vende lo que no hay.' },
-  { icon: <IconBoard />, title: 'Tablero por etapas', text: 'Todos los pedidos en cinco columnas. Rojo si está atrasado o la tienda vendió lo reservado; ámbar si se está quedando.' },
-  { icon: <IconScale />, title: 'Peso real empacado', text: 'Lo que sale de la fábrica queda registrado y es lo que se factura. Se acaban las diferencias entre lo vendido y lo entregado.' },
-  { icon: <IconStore />, title: 'Reposición de tienda', text: 'La tienda pide por el mismo canal y el traslado queda registrado en Bsale.' },
-  { icon: <IconUsers />, title: 'Clientes y cartera', text: 'Ficha con habituales, historial y salud del cliente. Cada vendedor ve su cartera y quién dejó de pedir.' },
-  { icon: <IconChart />, title: 'Panel de dueños', text: 'Ventas, fuerza de ventas, operación, stock y clientes, con comparación por período y exportación a Excel.' },
+  { icon: <IconBoard />, title: 'Tablero con visión y detalle', text: 'Resumen por etapa con montos y kilos, vista en tarjetas, compacta o lista, y el detalle del pedido a un clic. Rojo si se atrasa.' },
+  { icon: <IconScale />, title: 'Facturar sin retipeo', text: 'La factura o boleta sale de Comandas a Bsale con el peso real empacado y el precio de la lista. Todo queda en la bitácora.' },
+  { icon: <IconStore />, title: 'Reposición de tienda', text: 'La tienda pide por el mismo canal, el panel sugiere qué llevar según lo que vende y el traslado se registra en Bsale.' },
+  { icon: <IconUsers />, title: 'Clientes y cartera', text: 'Ritmo de compra de cada cliente, quién está en riesgo y quién se perdió, con su historial y lo que compra.' },
+  { icon: <IconChart />, title: 'Panel de gestión', text: 'Dos años de ventas de Bsale: margen, productos ABC, clientes, vendedores, estacionalidad, stock y un explorador con exportación a Excel.' },
 ];
 
 function Features() {
@@ -225,6 +226,34 @@ function Features() {
         </div>
         <p className="mt-6 text-xs text-charcoal-500 text-center">Se instala en el teléfono como una app y guarda el borrador del pedido aunque se corte la señal.</p>
       </div>
+    </section>
+  );
+}
+
+// ---------- Comandas + Bsale ----------
+
+const OWNERSHIP: Array<[string, string[]]> = [
+  ['Bsale es la fuente de', ['Catálogo, precios y costos', 'Clientes y sus datos tributarios', 'Stock de fábrica y tienda', 'Facturas, boletas y notas de crédito']],
+  ['Comandas es la fuente de', ['Pedidos, estados y responsables', 'Reservas de stock y pesos empacados', 'Cartera de cada vendedor', 'Demanda pendiente para producción']],
+];
+
+function BsaleSection() {
+  return (
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14">
+      <SectionTitle eyebrow="Integración con Bsale" title="Una sola verdad, sin digitar dos veces" />
+      <div className="mt-8 grid gap-3 md:grid-cols-2">
+        {OWNERSHIP.map(([title, items]) => (
+          <div key={title} className="card p-5">
+            <p className="text-[10px] uppercase tracking-display font-semibold text-brass-600">{title}</p>
+            <ul className="mt-2 space-y-1.5 text-sm text-charcoal-700">
+              {items.map((i) => <li key={i} className="flex gap-2"><span className="text-brass-500">—</span>{i}</li>)}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <p className="mt-5 text-xs text-charcoal-500 text-center max-w-2xl mx-auto">
+        Se sincroniza cada 10 minutos y con avisos de Bsale. Comandas solo escribe en Bsale lo que nace en la operación (facturas, producción, traslados y clientes nuevos), primero en simulacro y siempre con registro.
+      </p>
     </section>
   );
 }

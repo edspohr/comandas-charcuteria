@@ -57,10 +57,17 @@ Cada persona tiene **un perfil**. La matriz vive en [`app/src/domain/permissions
 
 Todo está construido y probado contra un Bsale falso ([`scripts/fake-bsale.ts`](scripts/fake-bsale.ts)). Pasos en orden; los marcados **(usted)** requieren permisos que Claude no tiene:
 
-1. **(usted) Token en Secret Manager:**
+1. **(usted) Secret Manager.** Las funciones de Bsale declaran el secreto, así que tiene que existir antes del primer deploy, aunque el token aún no llegue:
    ```bash
-   printf "TOKEN_DE_BSALE" | gcloud secrets create BSALE_ACCESS_TOKEN --data-file=- --project=comandas-charcuteria
+   gcloud services enable secretmanager.googleapis.com --project=comandas-charcuteria
+   printf "pendiente" | gcloud secrets create BSALE_ACCESS_TOKEN --data-file=- --project=comandas-charcuteria
    ```
+   Cuando llegue el token, agregar una versión nueva y volver a desplegar las funciones para que la tomen:
+   ```bash
+   printf "TOKEN_DE_BSALE" | gcloud secrets versions add BSALE_ACCESS_TOKEN --data-file=- --project=comandas-charcuteria
+   firebase deploy --only functions --project comandas-charcuteria
+   ```
+   Con el valor "pendiente" no pasa nada malo: mientras la sincronización esté apagada, ninguna función llama a Bsale.
 2. **(usted) Desplegar funciones y reglas:**
    ```bash
    firebase deploy --only functions,firestore:rules,firestore:indexes --project comandas-charcuteria

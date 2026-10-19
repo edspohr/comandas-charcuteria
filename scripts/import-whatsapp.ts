@@ -374,6 +374,17 @@ async function main() {
   if (!apply) return;
 
   // ---------- escritura ----------
+  // Re-runs must respect people already invited: a merged placeholder's
+  // orders and portfolio go to the real uid, not back to wa-*.
+  const mergedTo = new Map<string, string>();
+  for (const p of Object.values(PEOPLE)) {
+    const into = (await db.doc(`users/${p.uid}`).get()).data()?.mergedInto as string | undefined;
+    if (into && into !== p.uid) mergedTo.set(p.uid, into);
+  }
+  const real = (uid?: string) => (uid ? mergedTo.get(uid) ?? uid : uid);
+  for (const o of orders) { o.createdBy = real(o.createdBy)!; }
+  for (const acc of clients.values()) { acc.client.ownerUid = real(acc.client.ownerUid); acc.client.createdBy = real(acc.client.createdBy); }
+  if (mergedTo.size) console.log(`  respetando ${mergedTo.size} vendedores ya fusionados`);
   const prev = await db.collection('orders').where('source', '==', 'whatsapp').get();
   await commit(db, prev.docs.map((d) => ({ ref: d.ref, del: true })));
   const ops: Array<{ ref: DocumentReference; data?: object; merge?: boolean; del?: boolean }> = [];

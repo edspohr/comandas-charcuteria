@@ -73,7 +73,7 @@ const docs: Array<Record<string, any>> = [];
 const DAY = 86400;
 const nowS = () => Math.floor(Date.now() / 1000);
 function emit(typeId: number, client: typeof bsClients[number] | null, lines: Array<{ v: typeof variants[number]; q: number }>, office: number, whenS: number, seller = 2, ref?: string) {
-  const details = lines.map((l, i) => ({ id: i + 1, quantity: l.q, netUnitValue: Math.round(l.v._price / 1.19), totalAmount: Math.round(l.v._price * l.q), variant: { id: l.v.id, code: l.v.code, description: l.v.description } }));
+  const details = lines.map((l, i) => ({ id: i + 1, quantity: l.q, netUnitValue: Math.round(l.v._price / 1.19), netAmount: Math.round(l.v._price / 1.19 * l.q), totalAmount: Math.round(l.v._price * l.q), variant: { id: l.v.id, code: l.v.code, description: l.v.description } }));
   const total = details.reduce((s, d) => s + d.totalAmount, 0);
   const d = {
     id: docs.length + 1, number: ++docSeq, emissionDate: whenS, generationDate: whenS, totalAmount: total, netAmount: Math.round(total / 1.19), taxAmount: total - Math.round(total / 1.19), state: 0,
@@ -87,10 +87,23 @@ function emit(typeId: number, client: typeof bsClients[number] | null, lines: Ar
   for (const l of lines) stock.set(`${l.v.id}:${office}`, (stock.get(`${l.v.id}:${office}`) ?? 0) - l.q);
   return d;
 }
-for (let i = 0; i < 120; i++) {
-  const c = bsClients[i % bsClients.length];
-  const lines = [0, 1, 2].map((k) => ({ v: variants[Math.floor(rnd(i * 3 + k) * variants.length)], q: 1 + Math.floor(rnd(i + k) * 5) }));
-  emit(i % 4 === 3 ? 2 : 1, i % 4 === 3 ? null : c, lines, i % 4 === 3 ? STORE : FACTORY, nowS() - Math.floor(rnd(i) * 80 * DAY), i % 4 === 3 ? 3 : 2);
+// 24 months of history with a December peak, so the Panel facts (backfill,
+// year-over-year, seasonality) have something to chew on. Bsale stores
+// emissionDate as the day's midnight (Chile = 03:00/04:00 UTC).
+const midnight = (s: number) => Math.floor(s / DAY) * DAY + 3 * 3600;
+for (let i = 0; i < 1800; i++) {
+  const ago = Math.floor(rnd(i * 1.7) * 730);
+  const month = new Date((nowS() - ago * DAY) * 1000).getUTCMonth();
+  if (month !== 11 && rnd(i * 5.3) < 0.35) continue; // December sells more
+  const store = i % 4 === 3;
+  const c = bsClients[Math.floor(rnd(i * 2.1) * bsClients.length)];
+  const lines = [0, 1, 2].slice(0, 1 + (i % 3)).map((k) => ({ v: variants[Math.floor(rnd(i * 3 + k) * variants.length)], q: 1 + Math.floor(rnd(i + k) * 5) }));
+  emit(store ? 2 : 1, store ? null : c, lines, store ? STORE : FACTORY, midnight(nowS() - ago * DAY), store ? 3 : 1 + (i % 2));
+}
+// A few credit notes (devoluciones).
+for (let i = 0; i < 12; i++) {
+  const v = variants[Math.floor(rnd(i * 9.1) * variants.length)];
+  emit(4, bsClients[i % bsClients.length], [{ v, q: 1 }], FACTORY, midnight(nowS() - Math.floor(rnd(i * 4.4) * 300) * DAY), 2);
 }
 // Stock back to positive after the history above.
 for (const [k, q] of stock) if (q < 0) stock.set(k, Math.abs(q) % 15);
@@ -145,6 +158,12 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     if (path === '/product_types.json') return send(200, list(productTypes, q, path));
     if (path === '/products.json') return send(200, list(bsProducts, q, path));
     if (path === '/variants.json') return send(200, list(variants.map((v) => ({ ...pub(v), product: { id: v.product.id, name: (bsProducts[v.product.id - 1] as { name: string }).name } })), q, path));
+    if ((m = path.match(/^\/variants\/(\d+)\/costs\.json$/))) {
+      const v = variants.find((x) => x.id === Number(m![1]));
+      if (!v) return send(404, {});
+      const cost = v.id % 7 === 0 ? 0 : Math.round(v._price / 1.19 * (0.45 + rnd(v.id) * 0.2));
+      return send(200, { href: path, averageCost: cost, totalCost: cost * 10, history: [] });
+    }
     if ((m = path.match(/^\/variants\/(\d+)\.json$/))) { const v = variants.find((x) => x.id === Number(m![1])); return v ? send(200, pub(v)) : send(404, {}); }
     if (path === '/users.json') return send(200, list(users, q, path));
     if (path === '/shipping_types.json') return send(200, list(shippingTypes, q, path));

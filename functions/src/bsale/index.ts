@@ -10,6 +10,7 @@ import { runDiagnostic } from './diagnose';
 import { customerFromRaw, fullSync, stripUndefined, syncDocuments, syncStock } from './sync';
 import { createClient, receiveProduction, transferToStore, updateClient, type CustomerInput, type QtyLine } from './writes';
 import { buildInvoice, emitInvoice } from './invoice';
+import { backfillMonth, refreshCosts } from './facts';
 
 const secrets = [BSALE_TOKEN];
 const SYNC_ROLES = ['despacho', 'produccion', 'admin', 'superAdmin'] as const;
@@ -175,4 +176,36 @@ export const bsaleEmitInvoice = onCall({ region: REGION, secrets, timeoutSeconds
   const orderId = String(req.data?.orderId ?? '');
   if (!orderId) throw new HttpsError('invalid-argument', 'Falta el pedido.');
   return emitInvoice(apiFromSecret(), s, uid, orderId, kindArg(req.data?.kind));
+});
+
+// ---------- Hechos del Panel ----------
+
+const FACTS_ROLES = ['admin', 'superAdmin'] as const;
+
+// Carga histórica, un mes por llamada (la app recorre los 24 meses).
+export const bsaleFactsBackfill = onCall({ region: REGION, secrets, timeoutSeconds: 540, memory: '1GiB' }, async (req) => {
+  requireRole(req, [...FACTS_ROLES], 'cargar la historia de ventas');
+  const s = await loadSettings();
+  requireEnabled(s);
+  const month = String(req.data?.month ?? '');
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new HttpsError('invalid-argument', 'Mes inválido (AAAA-MM).');
+  return backfillMonth(apiFromSecret(), s, month);
+});
+
+async function activeVariantIds(): Promise<string[]> {
+  const snap = await getFirestore().collection('bsale/catalog/variants').where('active', '==', true).get();
+  return snap.docs.map((d) => d.id);
+}
+
+export const bsaleRefreshCosts = onCall({ region: REGION, secrets, timeoutSeconds: 540 }, async (req) => {
+  requireRole(req, [...FACTS_ROLES], 'actualizar costos');
+  requireEnabled(await loadSettings());
+  return refreshCosts(apiFromSecret(), await activeVariantIds());
+});
+
+// Costos una vez al día, antes de que parta la operación.
+export const bsaleDailyCosts = onSchedule({ region: REGION, secrets, schedule: 'every day 05:30', timeZone: 'America/Santiago', timeoutSeconds: 540 }, async () => {
+  if (!(await loadSettings()).enabled) return;
+  const r = await refreshCosts(apiFromSecret(), await activeVariantIds());
+  logger.info('[bsale] costos', r);
 });

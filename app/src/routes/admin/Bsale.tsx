@@ -12,6 +12,7 @@ import {
 import { BSALE_MODE, isRealBsale } from '@/integrations/bsale/client';
 import { can } from '@/domain/permissions';
 import { callableMessage } from '@/data/userAdmin';
+import { backfillFacts, monthsBack, refreshCosts, useFactsIndex } from '@/data/facts';
 import { formatCLP } from '@/lib/pricing';
 import BsaleConsolaMock from './BsaleConsolaMock';
 
@@ -127,6 +128,8 @@ function Conexion() {
         </label>
       </section>
 
+      {isRealBsale && <HistoriaVentas editable={editable} enabled={settings.enabled} />}
+
       <section className="card p-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
@@ -149,6 +152,55 @@ function Conexion() {
         )}
       </section>
     </div>
+  );
+}
+
+// Historia de ventas del Panel: carga mes a mes desde Bsale (una llamada
+// por mes) y costos promedio para el margen.
+function HistoriaVentas({ editable, enabled }: { editable: boolean; enabled: boolean }) {
+  const { months, costs, costsUpdatedAt } = useFactsIndex();
+  const wanted = monthsBack(24);
+  const complete = wanted.filter((m) => months[m]?.complete).length;
+  const docs = wanted.reduce((s, m) => s + (months[m]?.docCount ?? 0), 0);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const busy = progress != null && !progress.startsWith('Listo');
+
+  async function load() {
+    // Incomplete months, plus the last two (late documents and credit notes).
+    const todo = wanted.filter((m, i) => !months[m]?.complete || i >= wanted.length - 2);
+    setError(null); setProgress(`Cargando 0 de ${todo.length} meses…`);
+    try {
+      await backfillFacts(todo, (n, last) => setProgress(`Cargando ${n} de ${todo.length} meses… (${last?.month}: ${last?.documents} documentos)`));
+      setProgress(`Listo: ${todo.length} meses cargados.`);
+    } catch (e) { setError(callableMessage(e)); setProgress(null); }
+  }
+  async function loadCosts() {
+    setError(null); setProgress('Leyendo costos de Bsale…');
+    try { const r = await refreshCosts(); setProgress(`Listo: ${r.withCost} de ${r.total} variantes con costo informado.`); }
+    catch (e) { setError(callableMessage(e)); setProgress(null); }
+  }
+
+  return (
+    <section className="card p-4 space-y-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="eyebrow">Historia de ventas (Panel)</p>
+          <p className="text-xs text-charcoal-500 mt-0.5">
+            {complete} de 24 meses cargados · {docs.toLocaleString('es-CL')} documentos · costos de {Object.keys(costs).length} variantes{costsUpdatedAt ? ` (${when(costsUpdatedAt)})` : ''}.
+            Luego se mantiene sola con cada sincronización.
+          </p>
+        </div>
+        {editable && (
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" disabled={busy || !enabled} onClick={load}>{complete < 24 ? 'Cargar 24 meses' : 'Recargar últimos meses'}</Button>
+            <Button size="sm" variant="ghost" disabled={busy || !enabled} onClick={loadCosts}>Actualizar costos</Button>
+          </div>
+        )}
+      </div>
+      {progress && <p className="text-xs text-charcoal-700">{progress}</p>}
+      {error && <ErrorBanner message={error} />}
+    </section>
   );
 }
 

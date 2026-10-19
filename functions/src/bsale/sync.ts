@@ -2,6 +2,7 @@ import { getFirestore, type DocumentReference, type Firestore } from 'firebase-a
 import { logger } from 'firebase-functions/v2';
 import type { BsaleApi, RawClient, RawDocument, RawStock } from './api';
 import { DOC_PREFIX, docKindFor, loadSettings, patchSettings, type BsaleSettings, type DocKind } from './config';
+import { dayOf, daysBetween, writeFactDays } from './facts';
 
 // Sincronización Bsale → Firestore. Bsale es el dueño del stock, los
 // clientes y los documentos; acá solo se espejan. Lo único propio de la app
@@ -407,8 +408,13 @@ export async function syncDocuments(api: BsaleApi, settings: BsaleSettings, opts
     const nowS = Math.floor(Date.now() / 1000);
     // Desde la última corrida menos un día de margen (documentos con fecha
     // de emisión anterior a su generación); la primera vez, 30 días.
-    const from = opts.sinceS ?? (settings.documentsSyncedUntil ? settings.documentsSyncedUntil - 86400 : nowS - 30 * 86400);
+    // Aligned to UTC midnight so every day in the window is complete and the
+    // Panel facts (facts.ts) can replace those days wholesale.
+    const since = opts.sinceS ?? (settings.documentsSyncedUntil ? settings.documentsSyncedUntil - 86400 : nowS - 30 * 86400);
+    const fromDay = dayOf(since);
+    const from = Date.parse(`${fromDay}T00:00:00Z`) / 1000;
     raws.push(...await fetchDocumentsInRange(api, from, nowS));
+    try { await writeFactDays(raws, settings, daysBetween(fromDay, dayOf(nowS))); } catch (e) { logger.error('[bsale] hechos del panel', e); }
     await patchSettings({ documentsSyncedUntil: nowS });
   }
   const docs = raws.filter(Boolean).map((r) => documentFromRaw(r, settings, skuOf));

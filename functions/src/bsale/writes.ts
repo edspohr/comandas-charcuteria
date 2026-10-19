@@ -4,6 +4,7 @@ import { logger } from 'firebase-functions/v2';
 import { BsaleHttpError, type BsaleApi, type RawClient } from './api';
 import { requireFactory, type BsaleSettings } from './config';
 import { confirmedMap, customerFromRaw, stripUndefined } from './sync';
+import { loadCosts } from './facts';
 
 // Escrituras hacia Bsale. Solo hechos que nacen en Comandas:
 //   - recepción de producción terminada (fábrica)
@@ -55,6 +56,14 @@ async function variantsFor(lines: QtyLine[]): Promise<Array<QtyLine & { variantI
   return out;
 }
 
+// Receptions carry the variant's current average cost (bsale/facts.costs):
+// a reception at cost 0 would drag Bsale's average cost down and erase the
+// Panel margin. Without a known cost the field is left out.
+async function withCosts<T extends { variantId: number }>(details: T[]): Promise<Array<T & { cost?: number }>> {
+  const costs = await loadCosts();
+  return details.map((d) => (costs[String(d.variantId)] ? { ...d, cost: costs[String(d.variantId)] } : d));
+}
+
 // POST /v1/stocks/receptions.json — producción terminada entra a la fábrica.
 export async function receiveProduction(api: BsaleApi, s: BsaleSettings, by: string, lines: QtyLine[], note?: string) {
   const officeId = requireFactory(s);
@@ -65,7 +74,7 @@ export async function receiveProduction(api: BsaleApi, s: BsaleSettings, by: str
     officeId,
     documentNumber: `COM-${Date.now()}`,
     note: `Comandas · producción${note ? ` · ${note}` : ''}`,
-    details: items.map((i) => ({ variantId: i.variantId, quantity: i.qty, cost: 0 })),
+    details: await withCosts(items.map((i) => ({ variantId: i.variantId, quantity: i.qty }))),
   };
   return send(api, s, 'recepcion_produccion', by, 'POST', '/v1/stocks/receptions.json', body);
 }
@@ -97,7 +106,7 @@ export async function transferToStore(api: BsaleApi, s: BsaleSettings, by: strin
   const details = items.map((i) => ({ variantId: i.variantId, quantity: i.qty }));
   const consumo = await send(api, s, 'traslado_consumo', by, 'POST', '/v1/stocks/consumptions.json', { officeId: from, note, details }, orderId);
   const recepcion = await send(api, s, 'traslado_recepcion', by, 'POST', '/v1/stocks/receptions.json', {
-    document: 'Traslado', officeId: s.storeOfficeId, documentNumber: orderId, note, details: details.map((d) => ({ ...d, cost: 0 })),
+    document: 'Traslado', officeId: s.storeOfficeId, documentNumber: orderId, note, details: await withCosts(details),
   }, orderId);
   return { consumo, recepcion };
 }

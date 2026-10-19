@@ -13,5 +13,5 @@ export { claimInvite, adminInviteUser, adminUpdateUser, adminDeleteInvite } from
 export {
   bsaleDiagnose, bsaleSyncNow, bsaleScheduledSync, bsaleWebhook, bsaleWebhookInfo,
   bsaleReceiveProduction, bsaleTransferToStore, bsaleCreateClient, bsaleUpdateClient,
-  bsaleInvoicePreview, bsaleEmitInvoice,
+  bsaleInvoicePreview, bsaleEmitInvoice, bsaleFactsBackfill, bsaleRefreshCosts, bsaleDailyCosts,
 } from './bsale';

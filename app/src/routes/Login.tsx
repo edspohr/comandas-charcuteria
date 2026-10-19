@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { DEMO_PASSWORD, demoUsers, type DemoUser } from '@/data/demo-users';
 import { authErrorMessage, requestPasswordReset, signInWithGoogle, signInWithPassword, useCurrentUser } from '@/data/auth';
 import { ROLES, ROLE_DESCRIPTION, ROLE_LABEL } from '@/domain/permissions';
-import Logo from '@/components/ui/Logo';
+import Logo, { LogoLockup } from '@/components/ui/Logo';
 import Button from '@/components/ui/Button';
 import type { Role } from '@/domain/types';
 
@@ -44,7 +44,8 @@ function Hero() {
     <section className="bg-charcoal-900 text-cream-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-14 lg:pt-14 lg:pb-20 grid gap-6 lg:gap-10 lg:grid-cols-[1.15fr_0.85fr] items-start">
         <div>
-          <p className="text-[11px] uppercase tracking-display text-brass-300 font-semibold">La Charcutería Artesanal · Barrio Franklin</p>
+          <div className="mb-6 text-[15px] sm:text-lg"><LogoLockup size={52} /></div>
+          <p className="text-[11px] uppercase tracking-display text-brass-300 font-semibold">Comandas · Barrio Franklin</p>
           <h1 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight tracking-[0.01em]">
             Del pedido a la entrega,<br className="hidden sm:block" /> sin perder nada en el camino.
           </h1>

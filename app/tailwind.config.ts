@@ -18,6 +18,8 @@ export default {
       fontFamily: {
         sans:    ['Montserrat', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         display: ['Montserrat', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        // Wordmark del logo (didone, como la L). Georgia de respaldo.
+        serif:   ['"Bodoni Moda"', 'Didot', 'Georgia', 'serif'],
       },
       letterSpacing: {
         display: '0.06em',

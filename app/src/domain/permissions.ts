@@ -124,5 +124,5 @@ export const ROLE_HOME: Record<Role, string> = {
   produccion: '/produccion',
   admin: '/tablero',
   superAdmin: '/tablero',
-  consultor: '/admin/panel',
+  consultor: '/bsale',
 };

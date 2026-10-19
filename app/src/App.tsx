@@ -12,6 +12,7 @@ import BsaleConsola from './routes/admin/Bsale';
 import Panel from './routes/admin/Panel';
 import Catalogo from './routes/admin/Catalogo';
 import Usuarios from './routes/admin/Usuarios';
+import Explorador from './routes/bsale/Explorador';
 import PWAInstallHint from './components/PWAInstallHint';
 import UpdateToast from './components/UpdateToast';
 import AppShell from './components/AppShell';
@@ -161,6 +162,17 @@ export default function App() {
             <RouteGuard current={current} route="usuarios">
               <AppShell current={current!}>
                 <Usuarios />
+              </AppShell>
+            </RouteGuard>
+          }
+        />
+
+        <Route
+          path="/bsale"
+          element={
+            <RouteGuard current={current} route="bsaleExplorer">
+              <AppShell current={current!}>
+                <Explorador />
               </AppShell>
             </RouteGuard>
           }

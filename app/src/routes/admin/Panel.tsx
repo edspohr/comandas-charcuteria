@@ -96,7 +96,12 @@ export default function Panel() {
   const rangeLabel = rangeKey === 'all' ? 'todo el historial' : `últimos ${rangeKey} días`;
   const prevLabel = rangeKey === 'all' ? '(sin comparación)' : `vs. ${rangeKey} días anteriores`;
   const period = rangeKey === 'all' ? 'todo el historial' : `${current.from} a ${current.to}`;
-  const delta = (cur: number, prev: number) => (rangeKey === 'all' ? undefined : pctDelta(cur, prev));
+  // No comparison when the previous period starts before the first recorded
+  // order (the WhatsApp history begins 15-09): a half-empty baseline would
+  // show +1.000 % and mislead.
+  const firstDay = useMemo(() => orders.reduce((m, o) => (o.requestedDate < m ? o.requestedDate : m), '9999-12-31'), [orders]);
+  const comparable = previous.from >= firstDay;
+  const delta = (cur: number, prev: number) => (rangeKey === 'all' || !comparable ? undefined : pctDelta(cur, prev));
   currentPeriod = period;
 
   return (
@@ -115,6 +120,12 @@ export default function Panel() {
           ))}
         </div>
       </header>
+
+      {orders.some((o) => o.source === 'whatsapp') && (
+        <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-900 text-xs px-3 py-2">
+          Incluye {orders.filter((o) => o.source === 'whatsapp').length} pedidos importados del grupo de WhatsApp (15-09 → 18-10): valorizados con la lista de precios de agosto y con estados inferidos. Con Bsale conectado las ventas pasan a ser las facturadas.
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
         <Today label="Pedidos para hoy" value={hoy.pedidos} />

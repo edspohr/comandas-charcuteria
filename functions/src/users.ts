@@ -28,6 +28,30 @@ function requireSuperAdmin(req: CallableRequest): string {
   return req.auth.uid;
 }
 
+// A placeholder (users/{wa-…}, people who appear in imported WhatsApp
+// history) becomes the real account: their orders, packing and portfolio are
+// re-pointed to the new uid. The placeholder doc stays (inactive, mergedInto)
+// so old status-history entries still resolve to a name.
+async function mergePlaceholder(legacyUid: string | undefined, uid: string): Promise<number> {
+  if (!legacyUid || legacyUid === uid) return 0;
+  const db = getFirestore();
+  const legacy = await db.doc(`users/${legacyUid}`).get();
+  if (!legacy.exists || legacy.data()?.placeholder !== true) return 0;
+  let moved = 0;
+  const queries: Array<[string, string]> = [['orders', 'createdBy'], ['orders', 'assignedPackerId'], ['clients', 'ownerUid']];
+  for (const [col, field] of queries) {
+    const snap = await db.collection(col).where(field, '==', legacyUid).get();
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      const b = db.batch();
+      for (const d of snap.docs.slice(i, i + 400)) b.update(d.ref, { [field]: uid });
+      await b.commit();
+    }
+    moved += snap.size;
+  }
+  await legacy.ref.update({ active: false, mergedInto: uid, mergedAt: Date.now() });
+  return moved;
+}
+
 async function writeUser(user: AppUserDoc) {
   await getAuth().setCustomUserClaims(user.uid, { role: user.role });
   await getFirestore().doc(`users/${user.uid}`).set(user, { merge: true });
@@ -53,7 +77,7 @@ export const claimInvite = onCall({ region: REGION }, async (req) => {
   const inviteRef = db.doc(`invites/${email}`);
   const invite = await inviteRef.get();
   if (!invite.exists) throw new HttpsError('permission-denied', 'No hay una invitación para este correo.');
-  const inv = invite.data() as { displayName: string; role: Role; createdBy: string; createdAt: number };
+  const inv = invite.data() as { displayName: string; role: Role; createdBy: string; createdAt: number; legacyUid?: string };
   const user: AppUserDoc = {
     uid: req.auth.uid,
     displayName: inv.displayName,
@@ -64,6 +88,7 @@ export const claimInvite = onCall({ region: REGION }, async (req) => {
     createdBy: inv.createdBy,
   };
   await writeUser(user);
+  await mergePlaceholder(inv.legacyUid, user.uid);
   await inviteRef.delete();
   return { user };
 });
@@ -78,6 +103,7 @@ export const adminInviteUser = onCall({ region: REGION }, async (req) => {
   const displayName = typeof req.data?.displayName === 'string' ? req.data.displayName.trim() : '';
   const role = req.data?.role;
   const withPassword = req.data?.withPassword === true;
+  const legacyUid = typeof req.data?.legacyUid === 'string' && req.data.legacyUid.startsWith('wa-') ? req.data.legacyUid : undefined;
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpsError('invalid-argument', 'Correo no válido.');
   if (displayName.length < 2) throw new HttpsError('invalid-argument', 'Indique el nombre.');
   if (!isRole(role)) throw new HttpsError('invalid-argument', `Perfil no válido. Use uno de: ${ROLES.join(', ')}.`);
@@ -90,7 +116,7 @@ export const adminInviteUser = onCall({ region: REGION }, async (req) => {
     throw new HttpsError('already-exists', 'Ese correo ya tiene usuario. Cambie su perfil desde la lista.');
   }
 
-  await db.doc(`invites/${email}`).set({ email, displayName, role, createdAt: Date.now(), createdBy: by });
+  await db.doc(`invites/${email}`).set({ email, displayName, role, createdAt: Date.now(), createdBy: by, ...(legacyUid ? { legacyUid } : {}) });
 
   if (withPassword) {
     const uid = existingUid ?? (await auth.createUser({
@@ -100,6 +126,7 @@ export const adminInviteUser = onCall({ region: REGION }, async (req) => {
       password: randomBytes(24).toString('base64url'),
     })).uid;
     await writeUser({ uid, displayName, email, role, active: true, createdAt: Date.now(), createdBy: by });
+    await mergePlaceholder(legacyUid, uid);
     await db.doc(`invites/${email}`).delete();
     return { status: 'created', uid };
   }

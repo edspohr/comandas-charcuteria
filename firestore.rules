@@ -19,7 +19,7 @@ service cloud.firestore {
     function canDeliver()     { return roleIn(['reparto', 'admin', 'superAdmin']); }
     function canSync()        { return roleIn(['despacho', 'produccion', 'admin', 'superAdmin']); }
     function canReceiveProd() { return roleIn(['produccion', 'admin', 'superAdmin']); }
-    function canQuickClient() { return roleIn(['vendedor', 'admin', 'superAdmin']); }
+    function canQuickClient() { return roleIn(['vendedor', 'tienda', 'admin', 'superAdmin']); }
     // Lectura: cualquier perfil (el consultor ve todo, sin escribir nada).
     function canRead()        { return hasRole(); }
 
@@ -88,6 +88,12 @@ service cloud.firestore {
     match /catalogMap/{variantId} {
       allow read:  if canRead();
       allow write: if isSupervisor();
+    }
+
+    // Resúmenes calculados por scripts (Su mes en números). Solo lectura.
+    match /insights/{id} {
+      allow read:  if canRead();
+      allow write: if false;
     }
 
     // -------- Usuarios: solo las Cloud Functions escriben.

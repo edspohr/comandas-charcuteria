@@ -170,7 +170,10 @@ export interface Order {
   bsaleDocumentId?: string;
   deliveredBy?: string;
   deliveryProof?: DeliveryProof;
-  source: 'app' | 'pasted';
+  // whatsapp = importado del grupo de WhatsApp (historial 15-09 → 18-10-2026).
+  source: 'app' | 'pasted' | 'whatsapp';
+  // Importado: valores estimados con la lista de precios, estados inferidos.
+  historical?: boolean;
   rawText?: string;
   invoicingComplete: boolean;
   createdAt: number;
@@ -201,6 +204,11 @@ export interface AppUser {
   active?: boolean;
   createdAt?: number;
   createdBy?: string;
+  // Persona que aparece en el historial (p. ej. pedidos importados de
+  // WhatsApp) pero aún no tiene cuenta. Al invitarla, adminInviteUser y
+  // claimInvite reasignan sus pedidos y cartera al uid real (mergedInto).
+  placeholder?: boolean;
+  mergedInto?: string;
 }
 
 // Invitación pendiente: el superAdmin da de alta a alguien por correo y la
@@ -211,6 +219,7 @@ export interface Invite {
   role: Role;
   createdAt: number;
   createdBy: string;
+  legacyUid?: string;     // placeholder a fusionar al entrar
 }
 
 // Thresholds that drive the kanban card colours. Editable in settings/app

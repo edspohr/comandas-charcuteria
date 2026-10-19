@@ -37,7 +37,8 @@ export const ROLES: Role[] = [
 
 const ROLE_CAPS: Record<Role, Capability[]> = {
   vendedor: ['order.create', 'order.cancelOwn', 'client.quickCreate'],
-  tienda: ['order.createTransfer', 'order.cancelOwn', 'transfer.receive'],
+  // La tienda también toma pedidos de clientes (Lucy), además de su reposición.
+  tienda: ['order.create', 'order.createTransfer', 'order.cancelOwn', 'transfer.receive', 'client.quickCreate'],
   despacho: ['order.pack', 'order.dispatch', 'stock.sync'],
   reparto: ['order.dispatch', 'order.deliver'],
   produccion: ['production.receive', 'stock.sync'],
@@ -83,7 +84,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 export const ROLE_DESCRIPTION: Record<Role, string> = {
   vendedor: 'Toma pedidos de sus clientes, ve stock y el estado de sus pedidos.',
-  tienda: 'Pide reposición para la tienda y confirma lo que llega.',
+  tienda: 'Toma pedidos de clientes de la tienda, pide reposición y confirma lo que llega.',
   despacho: 'Arma los pedidos con pesos reales y los deja listos para salir.',
   reparto: 'Marca la salida y la entrega de los pedidos en ruta.',
   produccion: 'Ve la demanda pendiente y registra la producción terminada en Bsale.',
@@ -97,7 +98,7 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
 // lectura; las pantallas esconden sus acciones con `can()`.
 export type RouteKey =
   | 'tablero' | 'nuevoPedido' | 'pedidoIA' | 'detallePedido' | 'armado' | 'clientes' | 'fichaCliente' | 'produccion'
-  | 'panel' | 'catalogo' | 'usuarios' | 'bsaleConsola' | 'bsaleExplorer';
+  | 'panel' | 'catalogo' | 'usuarios' | 'bsaleConsola' | 'bsaleExplorer' | 'mes';
 
 const everyone = () => true;
 export const ROUTE_ACCESS: Record<RouteKey, (role: Role) => boolean> = {
@@ -106,7 +107,7 @@ export const ROUTE_ACCESS: Record<RouteKey, (role: Role) => boolean> = {
   pedidoIA: (r) => can(r, 'order.create'),
   detallePedido: everyone,
   armado: (r) => can(r, 'order.pack'),
-  clientes: (r) => r !== 'tienda' && r !== 'reparto',
+  clientes: (r) => r !== 'reparto',
   fichaCliente: everyone,
   produccion: (r) => canAny(r, ['production.receive', 'panel.view']),
   panel: (r) => can(r, 'panel.view'),
@@ -114,6 +115,7 @@ export const ROUTE_ACCESS: Record<RouteKey, (role: Role) => boolean> = {
   usuarios: (r) => can(r, 'users.manage') || isReadOnly(r),
   bsaleConsola: (r) => can(r, 'bsale.configure'),
   bsaleExplorer: (r) => can(r, 'bsale.explore'),
+  mes: (r) => can(r, 'panel.view'),
 };
 
 export const ROLE_HOME: Record<Role, string> = {

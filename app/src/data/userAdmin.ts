@@ -8,11 +8,11 @@ import type { Invite, Role } from '@/domain/types';
 // Thin wrappers over the admin callables (functions/src/users.ts). Only a
 // superAdmin token passes them; the rules forbid writing users/invites here.
 
-const inviteFn = httpsCallable<{ email: string; displayName: string; role: Role; withPassword: boolean }, { status: 'invited' | 'created'; uid?: string }>(functions, 'adminInviteUser');
+const inviteFn = httpsCallable<{ email: string; displayName: string; role: Role; withPassword: boolean; legacyUid?: string }, { status: 'invited' | 'created'; uid?: string }>(functions, 'adminInviteUser');
 const updateFn = httpsCallable<{ uid: string; role?: Role; active?: boolean; displayName?: string }, { ok: true }>(functions, 'adminUpdateUser');
 const deleteInviteFn = httpsCallable<{ email: string }, { ok: true }>(functions, 'adminDeleteInvite');
 
-export async function inviteUser(input: { email: string; displayName: string; role: Role; withPassword: boolean }): Promise<string> {
+export async function inviteUser(input: { email: string; displayName: string; role: Role; withPassword: boolean; legacyUid?: string }): Promise<string> {
   const res = await inviteFn(input);
   if (res.data.status === 'created') {
     // The account exists with a throwaway password: the person receives
@@ -20,7 +20,7 @@ export async function inviteUser(input: { email: string; displayName: string; ro
     await sendPasswordResetEmail(auth, input.email.trim());
     return `Se creó la cuenta y se envió a ${input.email.trim()} un correo para crear su contraseña. También puede entrar con Google si ese correo es de Google.`;
   }
-  return `Invitación lista: ${input.email.trim()} puede entrar con "Continuar con Google".`;
+  return `Invitación lista: ${input.email.trim()} puede entrar con "Continuar con Google".${input.legacyUid ? ' Al entrar recibe su historial de pedidos y cartera.' : ''}`;
 }
 
 export async function updateUser(uid: string, patch: { role?: Role; active?: boolean; displayName?: string }) {

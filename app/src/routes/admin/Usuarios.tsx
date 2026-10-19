@@ -37,7 +37,7 @@ export default function Usuarios() {
   const invites = useInvites();
   const [orders, setOrders] = useState<Order[]>([]);
   const { clients } = useClients();
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<false | { displayName?: string; role?: Role; legacyUid?: string }>(false);
   const [editing, setEditing] = useState<AppUser | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export default function Usuarios() {
 
   const rows = useMemo<UserRow[]>(() => {
     const since = addDaysIso(todayInSantiago(), -30);
-    return users.map((u) => {
+    return users.filter((u) => !u.mergedInto).map((u) => {
       const created = orders.filter((o) => o.createdBy === u.uid);
       const packed = orders.filter((o) => o.assignedPackerId === u.uid && o.statusHistory.some((h) => h.status === 'armado' && h.by === u.uid));
       const touched = orders.filter((o) => o.statusHistory.some((h) => h.by === u.uid));
@@ -78,10 +78,10 @@ export default function Usuarios() {
           <p className="eyebrow">{manage ? 'Super Administración' : 'Consulta'}</p>
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Usuarios</h1>
           <p className="text-xs text-charcoal-300 mt-1">
-            {users.filter((u) => u.active !== false).length} activos · {byRole.filter(([, n]) => n > 0).map(([r, n]) => `${n} ${ROLE_LABEL[r].toLowerCase()}`).join(' · ')}
+            {users.filter((u) => u.active !== false && !u.placeholder).length} con cuenta{users.some((u) => u.placeholder && !u.mergedInto) ? ` · ${users.filter((u) => u.placeholder && !u.mergedInto).length} sin cuenta (historial WhatsApp)` : ''} · {byRole.filter(([, n]) => n > 0).map(([r, n]) => `${n} ${ROLE_LABEL[r].toLowerCase()}`).join(' · ')}
           </p>
         </div>
-        {manage && <Button size="sm" onClick={() => setAdding(true)}>+ Agregar persona</Button>}
+        {manage && <Button size="sm" onClick={() => setAdding({})}>+ Agregar persona</Button>}
       </header>
 
       {flash && <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-3">{flash}</div>}
@@ -111,7 +111,7 @@ export default function Usuarios() {
         rowTone={(r) => (r.active === false ? 'bad' : undefined)}
         emptyText="Todavía no hay usuarios. Agregue a la primera persona."
         columns={[
-          { key: 'name', label: 'Usuario', mobile: true, render: (r) => <div><p className="font-semibold text-charcoal-900">{r.displayName}{r.active === false && <span className="ml-2 text-[10px] uppercase text-red-700">desactivado</span>}</p><p className="text-[11px] text-charcoal-300 truncate">{r.email}</p></div> },
+          { key: 'name', label: 'Usuario', mobile: true, render: (r) => <div><p className="font-semibold text-charcoal-900">{r.displayName}{r.active === false && <span className="ml-2 text-[10px] uppercase text-red-700">desactivado</span>}{r.placeholder && <span className="ml-2 text-[10px] uppercase text-brass-700">sin cuenta</span>}</p><p className="text-[11px] text-charcoal-300 truncate">{r.placeholder ? 'Aparece en el historial de WhatsApp' : r.email}</p></div> },
           { key: 'role', label: 'Perfil', mobile: true, render: (r) => <Pill tone={ROLE_TONE[r.role]}>{ROLE_LABEL[r.role]}</Pill> },
           { key: 'cartera', label: 'Cartera', align: 'right', render: (r) => r.role === 'vendedor' ? r.cartera : '—', muted: true },
           { key: 'creados', label: 'Pedidos 30 d', align: 'right', render: (r) => r.creados30 || '—' },
@@ -124,7 +124,10 @@ export default function Usuarios() {
           <div className="text-xs text-charcoal-500 flex flex-wrap items-center gap-x-6 gap-y-2">
             <span>{ROLE_DESCRIPTION[r.role]}</span>
             {r.role === 'vendedor' && <Link to={`/tablero?vendedor=${r.uid}`} className="underline hover:text-charcoal-900">Ver sus pedidos →</Link>}
-            {manage && (
+            {manage && r.placeholder && (
+              <Button size="sm" onClick={(e) => { e.stopPropagation(); setAdding({ displayName: r.displayName, role: r.role, legacyUid: r.uid }); }}>Invitar con su historial</Button>
+            )}
+            {manage && !r.placeholder && (
               <span className="flex gap-2">
                 <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); setEditing(r); }}>Editar</Button>
                 <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void act(async () => { await resendPasswordEmail(r.email); return `Se envió a ${r.email} el correo para crear o cambiar su contraseña.`; }); }}>Enviar correo de contraseña</Button>
@@ -146,7 +149,7 @@ export default function Usuarios() {
         </div>
       </section>
 
-      {adding && <AgregarDialog onClose={() => setAdding(false)} onDone={(m) => { setAdding(false); setFlash(m); }} />}
+      {adding && <AgregarDialog preset={adding} onClose={() => setAdding(false)} onDone={(m) => { setAdding(false); setFlash(m); }} />}
       {editing && <EditarDialog user={editing} isSelf={editing.uid === me.uid} onClose={() => setEditing(null)} onDone={(m) => { setEditing(null); setFlash(m); }} />}
     </div>
   );
@@ -165,10 +168,10 @@ function RoleSelect({ value, onChange }: { value: Role; onChange: (r: Role) => v
   );
 }
 
-function AgregarDialog({ onClose, onDone }: { onClose: () => void; onDone: (msg: string) => void }) {
-  const [displayName, setDisplayName] = useState('');
+function AgregarDialog({ preset, onClose, onDone }: { preset: { displayName?: string; role?: Role; legacyUid?: string }; onClose: () => void; onDone: (msg: string) => void }) {
+  const [displayName, setDisplayName] = useState(preset.displayName ?? '');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<Role>('vendedor');
+  const [role, setRole] = useState<Role>(preset.role ?? 'vendedor');
   const [withPassword, setWithPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -176,12 +179,13 @@ function AgregarDialog({ onClose, onDone }: { onClose: () => void; onDone: (msg:
 
   async function submit() {
     setBusy(true); setError(null);
-    try { onDone(await inviteUser({ email, displayName, role, withPassword })); } catch (e) { setError(callableMessage(e)); setBusy(false); }
+    try { onDone(await inviteUser({ email, displayName, role, withPassword, legacyUid: preset.legacyUid })); } catch (e) { setError(callableMessage(e)); setBusy(false); }
   }
 
   return (
-    <ModalShell eyebrow="Usuarios" title="Agregar persona" onClose={onClose} wide>
+    <ModalShell eyebrow="Usuarios" title={preset.legacyUid ? `Invitar a ${preset.displayName}` : 'Agregar persona'} onClose={onClose} wide>
       <div className="space-y-3">
+        {preset.legacyUid && <p className="rounded-md bg-cream-100 p-2.5 text-xs text-charcoal-700">Al entrar por primera vez recibe sus pedidos y su cartera del historial de WhatsApp.</p>}
         <label className="block"><span className="text-xs text-charcoal-500">Nombre</span><input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="field mt-1 w-full" autoFocus /></label>
         <label className="block"><span className="text-xs text-charcoal-500">Correo</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="field mt-1 w-full" /></label>
         <div>

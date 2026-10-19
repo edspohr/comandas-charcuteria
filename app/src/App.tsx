@@ -13,6 +13,7 @@ import Panel from './routes/admin/Panel';
 import Catalogo from './routes/admin/Catalogo';
 import Usuarios from './routes/admin/Usuarios';
 import Explorador from './routes/bsale/Explorador';
+import SuMes from './routes/admin/SuMes';
 import PWAInstallHint from './components/PWAInstallHint';
 import UpdateToast from './components/UpdateToast';
 import AppShell from './components/AppShell';
@@ -167,6 +168,16 @@ export default function App() {
           }
         />
 
+        <Route
+          path="/admin/mes"
+          element={
+            <RouteGuard current={current} route="mes">
+              <AppShell current={current!}>
+                <SuMes />
+              </AppShell>
+            </RouteGuard>
+          }
+        />
         <Route
           path="/bsale"
           element={

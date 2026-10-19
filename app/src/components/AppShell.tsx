@@ -19,6 +19,7 @@ const NAV: NavItem[] = [
   { to: '/clientes',       label: 'Clientes',     route: 'clientes',      primaryFor: ['vendedor', 'admin', 'superAdmin'] },
   { to: '/produccion',     label: 'Producción',   route: 'produccion',    primaryFor: ['produccion'] },
   { to: '/bsale',          label: 'Bsale',        route: 'bsaleExplorer', primaryFor: ['consultor'] },
+  { to: '/admin/mes',      label: 'Su mes',       route: 'mes',           primaryFor: ['superAdmin'] },
   { to: '/admin/panel',    label: 'Panel',        route: 'panel',         primaryFor: ['admin', 'superAdmin', 'consultor'] },
   { to: '/admin/catalogo', label: 'Catálogo',     route: 'catalogo',      primaryFor: ['admin', 'superAdmin'] },
   { to: '/admin/usuarios', label: 'Usuarios',     route: 'usuarios',      primaryFor: ['superAdmin'] },

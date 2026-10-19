@@ -406,8 +406,9 @@ function KanbanCard({ order, tone, action, onAction, detailTo, draggable, onDrag
           {order.lines.length > 2 && <li className="text-charcoal-300">+ {order.lines.length - 2} más</li>}
         </ul>
       )}
-      {(tone.reasons.length > 0 || anyPending || packer || isShop) && (
+      {(tone.reasons.length > 0 || anyPending || packer || isShop || order.source === 'whatsapp') && (
         <div className="mt-1.5 flex flex-wrap gap-1">
+          {order.source === 'whatsapp' && <span className="rounded px-1.5 py-0.5 text-[10px] uppercase tracking-display bg-emerald-50 text-emerald-800 border border-emerald-200" title="Importado del grupo de WhatsApp">WhatsApp</span>}
           {isShop && <span className="rounded px-1.5 py-0.5 text-[10px] uppercase tracking-display bg-charcoal-900 text-cream-50 border border-charcoal-900">Tienda</span>}
           {tone.reasons.map((r) => (
             <span key={r} className={'rounded px-1.5 py-0.5 text-[10px] uppercase tracking-display border ' + (tone.tone === 'red' ? 'bg-red-50 text-red-700 border-red-200' : tone.tone === 'amber' ? 'bg-brass-50 text-brass-700 border-brass-300' : 'bg-charcoal-50 text-charcoal-500 border-charcoal-100')}>{r}</span>

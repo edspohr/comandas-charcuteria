@@ -80,8 +80,24 @@ Todo está construido y probado contra un Bsale falso ([`scripts/fake-bsale.ts`]
 8. **Catálogo → Cruce con Bsale:** confirmar las sugerencias (en la prueba acertó 96 de 97) y resolver las que queden. Opcional: *Traer precios de Bsale*.
 9. Encender **Sincronización** (cron cada 10 min de 06:00 a 23:00 + webhooks). Botón **Webhook** → pedirle a soporte de Bsale que registre esa URL.
 10. Encender **Escrituras** con **Simulacro**; revisar la **Bitácora**; cuando todo calce, apagar Simulacro.
+11. **Conexión Bsale → Historia de ventas → Cargar 2 años** y **Actualizar costos**: llena el Panel de gestión (unos minutos, un mes por llamada). Después se mantiene solo con cada sincronización, y los costos se refrescan todos los días a las 05:30.
 
-Funciones: `bsaleDiagnose`, `bsaleSyncNow`, `bsaleScheduledSync`, `bsaleWebhook`, `bsaleWebhookInfo`, `bsaleReceiveProduction`, `bsaleTransferToStore`, `bsaleCreateClient`, `bsaleUpdateClient`, `bsaleProxy` (solo GET). Código en [`functions/src/bsale/`](functions/src/bsale). Los supuestos sobre la API (rutas, paginación, nombres de campos) están anotados en `api.ts`; el diagnóstico guarda las respuestas para verificarlos.
+### Sin retipeo
+
+Lo que nace en Comandas se escribe en Bsale desde la app, siempre pasando por la bitácora y el simulacro:
+
+| En Comandas | En Bsale |
+|---|---|
+| Pedido armado → **Facturar** (factura o boleta, con los pesos reales del armado y el precio de la lista) | documento tributario, reservas liberadas, pedido facturado con su PDF |
+| Producción → **Registrar producción** | recepción de stock en fábrica, a costo promedio vigente |
+| Tablero → **Traslado a tienda** | consumo en fábrica + recepción en tienda (o guía de traslado) |
+| Alta rápida de cliente | cliente nuevo |
+
+### Panel de gestión
+
+Corre sobre las ventas de Bsale (facturas + boletas − notas de crédito, neto), no sobre los pedidos. Los hechos se guardan comprimidos, un documento por mes (`bsale/facts/months/{AAAA-MM}`): dos años de historia cuestan ~25 lecturas. Pestañas: Resumen, Ventas, Productos (ABC, margen), Clientes (ritmo de compra, en riesgo, perdidos), Vendedores (la tienda cuenta como vendedora), Stock (cobertura, reposición a tienda), Explorador (tabla dinámica + CSV) y Pedidos (el panel operativo de Comandas). El margen usa el costo promedio de Bsale; si las recepciones se cargan sin costo, aparece como "costo no informado".
+
+Funciones: `bsaleDiagnose`, `bsaleSyncNow`, `bsaleScheduledSync`, `bsaleWebhook`, `bsaleWebhookInfo`, `bsaleReceiveProduction`, `bsaleTransferToStore`, `bsaleCreateClient`, `bsaleUpdateClient`, `bsaleInvoicePreview`, `bsaleEmitInvoice`, `bsaleFactsBackfill`, `bsaleRefreshCosts`, `bsaleDailyCosts`, `bsaleProxy` (solo GET). Código en [`functions/src/bsale/`](functions/src/bsale). Los supuestos sobre la API (rutas, paginación, nombres de campos) están anotados en `api.ts`; el diagnóstico guarda las respuestas para verificarlos.
 
 ### Colecciones
 
@@ -91,6 +107,7 @@ Funciones: `bsaleDiagnose`, `bsaleSyncNow`, `bsaleScheduledSync`, `bsaleWebhook`
 | `clients/*` | espejo de Bsale + cartera, modalidad, horario, notas | servidor + alta rápida |
 | `catalogMap/{variantId}` | cruce variante Bsale ↔ producto/formato | administración |
 | `bsale/catalog/variants`, `bsale/stock/byVariant`, `bsale/sales/documents`, `bsale/master/*`, `bsale/meta` | espejos y diagnóstico | servidor |
+| `bsale/facts` (índice de meses + costos), `bsale/facts/months/{AAAA-MM}` | hechos de venta del Panel, comprimidos | servidor |
 | `bsale/writes/log`, `bsale/webhooks/log` | bitácoras | servidor |
 | `settings/bsale` | configuración de la integración | superAdmin |
 

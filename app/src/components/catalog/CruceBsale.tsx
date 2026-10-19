@@ -5,11 +5,12 @@ import DataTable, { Pill } from '@/components/ui/DataTable';
 import { useCurrentUser } from '@/data/auth';
 import { useProducts } from '@/data/products';
 import {
-  confirmMany, createProductFromBsale, pullPricesFromBsale, setMapping, useBsaleVariants, useCatalogMap,
+  confirmMany, ignoreMany, createProductFromBsale, pullPricesFromBsale, setMapping, useBsaleVariants, useCatalogMap,
   type BsaleVariantMirror, type CatalogMapEntry, type MapStatus,
 } from '@/data/catalogMap';
 import { can } from '@/domain/permissions';
 import { formatCLP } from '@/lib/pricing';
+import { useVariantSales, useVariantStock } from '@/data/facts';
 import { describeFirestoreError } from '@/lib/errors';
 
 type Filter = 'pendientes' | 'sin_match' | 'confirmado' | 'ignorado' | 'todas';
@@ -30,6 +31,13 @@ export default function CruceBsale() {
   const { products } = useProducts();
   const [filter, setFilter] = useState<Filter>('pendientes');
   const [q, setQ] = useState('');
+  const [onlyActive, setOnlyActive] = useState(false);
+  const { sold, ready: salesReady } = useVariantSales(90);
+  const stockRows = useVariantStock();
+  const stockOf = useMemo(() => new Map(stockRows.map((s) => [s.variantId, Object.values(s.offices).reduce((a, o) => a + (o.quantity ?? 0), 0)])), [stockRows]);
+  // Activity = sold in the last 90 days or stock on hand. Variants without
+  // either are the first candidates to ignore (old SKUs, one-off items).
+  const moving = (id: string) => (sold.get(id) ?? 0) > 0 || (stockOf.get(id) ?? 0) > 0;
   const [busy, setBusy] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,10 +56,12 @@ export default function CruceBsale() {
         if (filter === 'sin_match' && !(st === 'sugerido' && !matched)) return false;
         if ((filter === 'confirmado' || filter === 'ignorado') && st !== filter) return false;
         if (needle && !norm(`${v.label} ${v.code ?? ''} ${v.barCode ?? ''}`).includes(needle)) return false;
+        if (onlyActive && salesReady && !moving(v.variantId)) return false;
         return true;
       })
-      .sort((a, b) => (b.m?.score ?? 0) - (a.m?.score ?? 0) || a.v.label.localeCompare(b.v.label, 'es'));
-  }, [variants, mapById, filter, q]);
+      .sort((a, b) => (salesReady ? (sold.get(b.v.variantId) ?? 0) - (sold.get(a.v.variantId) ?? 0) : 0) || (b.m?.score ?? 0) - (a.m?.score ?? 0) || a.v.label.localeCompare(b.v.label, 'es'));
+  }, [variants, mapById, filter, q, onlyActive, salesReady, sold, stockOf]);
+  const idle = salesReady ? rows.filter((r) => r.m?.status !== 'confirmado' && r.m?.status !== 'ignorado' && !moving(r.v.variantId)) : [];
 
   const counts = useMemo(() => {
     const c = { pendientes: 0, sin_match: 0, confirmado: 0, ignorado: 0 };
@@ -88,8 +98,19 @@ export default function CruceBsale() {
             {label}{f !== 'todas' && <span className="ml-1 opacity-70">{counts[f]}</span>}
           </button>
         ))}
+        {salesReady && (
+          <label className="flex items-center gap-1.5 text-xs text-charcoal-500">
+            <input type="checkbox" checked={onlyActive} onChange={(e) => setOnlyActive(e.target.checked)} /> Solo con venta (90 d) o stock
+          </label>
+        )}
         {editable && (
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex gap-2 flex-wrap">
+            {idle.length > 0 && !onlyActive && (
+              <Button size="sm" variant="ghost" disabled={busy != null} onClick={() => {
+                if (!window.confirm(`¿Ignorar ${idle.length} variantes sin venta en 90 días ni stock? Se pueden volver a pendiente después.`)) return;
+                void act('idle', async () => { await ignoreMany(idle.map((r) => r.v.variantId), uid); return `${idle.length} variantes sin movimiento ignoradas.`; });
+              }}>Ignorar {idle.length} sin movimiento</Button>
+            )}
             {strong.length > 0 && <Button size="sm" disabled={busy != null} onClick={() => act('bulk', async () => { await confirmMany(strong.map((r) => r.m!), uid); return `${strong.length} cruces confirmados.`; })}>Confirmar {strong.length} con puntaje alto</Button>}
             {filter === 'pendientes' && rows.length > strong.length && (
               <Button size="sm" variant="secondary" disabled={busy != null} onClick={() => {
@@ -113,13 +134,25 @@ export default function CruceBsale() {
         columns={[
           { key: 'bsale', label: 'Variante Bsale', mobile: true, render: ({ v }) => <div><p className="font-semibold text-charcoal-900">{v.label}</p><p className="text-[11px] text-charcoal-300">{v.code ?? '—'}{v.productType ? ` · ${v.productType}` : ''}</p></div> },
           { key: 'price', label: 'Precio Bsale', align: 'right', render: ({ v }) => (v.priceCLP != null ? formatCLP(v.priceCLP) : '—'), muted: true },
+          ...(salesReady ? [{ key: 'activity', label: 'Venta 90 d · stock', align: 'right' as const, muted: true, render: ({ v }: Row) => {
+            const s = sold.get(v.variantId) ?? 0; const st = stockOf.get(v.variantId) ?? 0;
+            return s || st ? `${s.toLocaleString('es-CL', { maximumFractionDigits: 1 })} · ${st.toLocaleString('es-CL', { maximumFractionDigits: 1 })}` : <span className="text-charcoal-300">sin movimiento</span>;
+          } }] : []),
           {
             key: 'app', label: 'Producto · formato en la app', mobile: true, render: ({ v, m }) => (
               <MappingCell v={v} m={m} products={products} disabled={!editable || busy != null}
                 onChange={(productId, formatId) => act(v.variantId, () => setMapping(v.variantId, { productId, formatId, status: 'confirmado' }, uid))} />
             ),
           },
-          { key: 'status', label: 'Estado', mobile: true, render: ({ m }) => <StatusPill status={m?.status ?? 'sugerido'} score={m?.score} matched={!!m?.productId} /> },
+          { key: 'status', label: 'Estado', mobile: true, render: ({ v, m }) => {
+            const fmt = m?.productId ? productById.get(m.productId)?.formats.find((f) => f.formatId === m.formatId) : undefined;
+            return (
+              <div className="flex flex-col items-start gap-1">
+                <StatusPill status={m?.status ?? 'sugerido'} score={m?.score} matched={!!m?.productId} />
+                {fmt?.unit === 'kg' && !v.allowDecimal && <span title="En la app se vende por kg, pero el producto en Bsale no permite cantidades con decimales: las facturas por peso fallarán. Actívelo en Bsale (producto → permitir decimales)."><Pill tone="warn">Bsale sin decimales</Pill></span>}
+              </div>
+            );
+          } },
         ]}
         expand={editable ? ({ v, m }) => (
           <div className="flex flex-wrap gap-2 text-xs">

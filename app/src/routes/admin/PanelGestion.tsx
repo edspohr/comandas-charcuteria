@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '@/data/firebase';
-import { useFactsIndex, useSalesFacts, type SalesFacts } from '@/data/facts';
+import { useFactsIndex, useSalesFacts, useVariantStock, type SalesFacts } from '@/data/facts';
 import { useBsaleSettings, useDiagnostic } from '@/data/bsaleAdmin';
 import { useBsaleVariants, useCatalogMap } from '@/data/catalogMap';
 import { useProducts } from '@/data/products';
@@ -17,7 +15,7 @@ import {
   sellerRows, seasonality, series, stockAnalysis, totals, byKind, byWeekday, variantDims, dimOf,
   CLIENT_STATUS_LABEL, KIND_LABEL, PERIOD_LABEL, PIVOT_DIM_LABEL, PIVOT_MEASURE_LABEL, STOCK_FLAG_LABEL,
   type ClientRow, type ClientStatus, type CompareMode, type Filters, type PeriodKey, type PivotDim, type PivotMeasure,
-  type ProductGroup, type ProductRow, type Range, type StockFlag, type VariantDim, type VariantStock,
+  type ProductGroup, type ProductRow, type Range, type StockFlag, type VariantDim,
 } from '@/domain/bsaleAnalytics';
 import Button from '@/components/ui/Button';
 import { Card, Export, Metric, Table, setExportPeriod } from '@/components/panel/PanelUI';
@@ -455,12 +453,6 @@ function Vendedores(c: Ctx) {
 }
 
 // ---------- Stock ----------
-
-function useVariantStock(): VariantStock[] {
-  const [rows, setRows] = useState<VariantStock[]>([]);
-  useEffect(() => onSnapshot(collection(db, 'bsale', 'stock', 'byVariant'), (s) => { const l: VariantStock[] = []; s.forEach((d) => l.push(d.data() as VariantStock)); setRows(l); }, () => setRows([])), []);
-  return rows;
-}
 
 function Stock(c: Ctx) {
   const stock = useVariantStock();

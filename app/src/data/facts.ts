@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { doc, getDoc, onSnapshot, type Bytes } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, type Bytes } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from './firebase';
 import type { DocKind } from './bsaleAdmin';
@@ -120,3 +120,25 @@ export async function backfillFacts(months: string[], onProgress: (done: number,
   }
 }
 export async function refreshCosts() { return (await costsFn()).data; }
+
+// Stock per Bsale variant and office (bsale/stock/byVariant, ~270 docs).
+export interface VariantStock { variantId: string; offices: Record<string, { quantity: number; reserved: number; available: number }> }
+export function useVariantStock(): VariantStock[] {
+  const [rows, setRows] = useState<VariantStock[]>([]);
+  useEffect(() => onSnapshot(collection(db, 'bsale', 'stock', 'byVariant'), (s) => { const l: VariantStock[] = []; s.forEach((d) => l.push(d.data() as VariantStock)); setRows(l); }, () => setRows([])), []);
+  return rows;
+}
+
+// Units sold per variant in the last `days` (default 90), from the facts.
+export function useVariantSales(days = 90): { sold: Map<string, number>; ready: boolean } {
+  const { months: index, loading: idx } = useFactsIndex();
+  const since = new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+  const months = useMemo(() => monthsBack(Math.ceil(days / 30) + 1), [days]);
+  const { facts, loading } = useSalesFacts(months, index);
+  const sold = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of facts.lines) if (l.date >= since && SALES_KINDS.has(l.kind)) m.set(l.variantId, (m.get(l.variantId) ?? 0) + l.qty);
+    return m;
+  }, [facts, since]);
+  return { sold, ready: !idx && !loading && Object.keys(index).length > 0 };
+}

@@ -1,4 +1,4 @@
-import { SALES_KINDS, type FactDoc, type FactLine, type MonthIndexEntry } from '@/data/facts';
+import { SALES_KINDS, type FactDoc, type FactLine, type MonthIndexEntry, type VariantStock } from '@/data/facts';
 import type { BsaleVariantMirror, CatalogMapEntry } from '@/data/catalogMap';
 import type { DocKind } from '@/data/bsaleAdmin';
 import type { Product } from './types';
@@ -342,7 +342,6 @@ export function sellerRows(curDocs: FactDoc[], cmpDocs: FactDoc[], curLines: Fac
 
 // ---------- Stock ----------
 
-export interface VariantStock { variantId: string; offices: Record<string, { quantity: number; reserved: number; available: number }> }
 export type StockFlag = 'quiebre' | 'bajo' | 'ok' | 'sobre' | 'sin_movimiento';
 export const STOCK_FLAG_LABEL: Record<StockFlag, string> = { quiebre: 'Quiebre', bajo: 'Bajo', ok: 'OK', sobre: 'Sobre-stock', sin_movimiento: 'Sin movimiento' };
 export interface StockAnalysisRow {

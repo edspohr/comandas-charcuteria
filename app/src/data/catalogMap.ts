@@ -57,6 +57,14 @@ export async function confirmMany(entries: CatalogMapEntry[], by: string) {
   }
 }
 
+export async function ignoreMany(variantIds: string[], by: string) {
+  for (let i = 0; i < variantIds.length; i += 400) {
+    const b = writeBatch(db);
+    for (const id of variantIds.slice(i, i + 400)) b.set(doc(db, 'catalogMap', id), { variantId: id, status: 'ignorado', updatedAt: Date.now(), updatedBy: by }, { merge: true });
+    await b.commit();
+  }
+}
+
 const slug = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
 const title = (s: string) => s.toLocaleLowerCase('es').replace(/(^|\s)\S/g, (m) => m.toLocaleUpperCase('es'));
 

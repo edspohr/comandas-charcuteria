@@ -57,7 +57,11 @@ export default function SuMes() {
   return (
     <div className="-mx-4 sm:-mx-6">
       {/* Hero */}
-      <section className="bg-charcoal-900 text-cream-50 px-4 sm:px-6 py-10 -mt-4 sm:-mt-6">
+      <div className="-mt-4 sm:-mt-6 bg-brass-500 text-charcoal-900 text-[11px] uppercase tracking-display font-semibold px-4 sm:px-6 py-1.5 flex flex-wrap justify-between gap-2">
+        <span>Vista de demostración · análisis del grupo de WhatsApp</span>
+        <span className="font-normal normal-case tracking-normal">No es parte de la app de operación</span>
+      </div>
+      <section className="bg-charcoal-900 text-cream-50 px-4 sm:px-6 py-10">
         <p className="text-[11px] uppercase tracking-display text-brass-300 font-semibold">Su grupo de pedidos · {fmtDate(d.period.from)} al {fmtDate(d.period.to)}</p>
         <h1 className="mt-2 text-3xl sm:text-4xl font-semibold leading-tight">Cinco semanas de pedidos,<br className="hidden sm:block" /> leídas mensaje por mensaje.</h1>
         <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">

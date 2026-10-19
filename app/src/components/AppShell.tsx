@@ -5,7 +5,9 @@ import Logo from '@/components/ui/Logo';
 import type { Role } from '@/domain/types';
 import { ROUTE_ACCESS, type RouteKey } from '@/domain/permissions';
 
-interface NavItem { to: string; label: string; route: RouteKey; primaryFor?: Role[]; }
+// `demo`: pantallas de presentación (no son parte del producto definitivo):
+// van primero y se ven distintas para que nadie las confunda con la operación.
+interface NavItem { to: string; label: string; route: RouteKey; primaryFor?: Role[]; demo?: boolean; }
 
 // `primaryFor` lists the roles where this item is that user's "own" work
 // (the wizard for a vendedor, the queue for despacho, etc.). The shell
@@ -19,7 +21,7 @@ const NAV: NavItem[] = [
   { to: '/clientes',       label: 'Clientes',     route: 'clientes',      primaryFor: ['vendedor', 'admin', 'superAdmin'] },
   { to: '/produccion',     label: 'Producción',   route: 'produccion',    primaryFor: ['produccion'] },
   { to: '/bsale',          label: 'Bsale',        route: 'bsaleExplorer', primaryFor: ['consultor'] },
-  { to: '/admin/mes',      label: 'Su mes',       route: 'mes',           primaryFor: ['superAdmin'] },
+  { to: '/admin/mes',      label: 'Su mes',       route: 'mes',           demo: true },
   { to: '/admin/panel',    label: 'Panel',        route: 'panel',         primaryFor: ['admin', 'superAdmin', 'consultor'] },
   { to: '/admin/catalogo', label: 'Catálogo',     route: 'catalogo',      primaryFor: ['admin', 'superAdmin'] },
   { to: '/admin/usuarios', label: 'Usuarios',     route: 'usuarios',      primaryFor: ['superAdmin'] },
@@ -34,9 +36,11 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
     const visible = NAV.filter((n) => ROUTE_ACCESS[n.route](role));
     // Primary items (owned by this role) first, then the rest, preserving
     // NAV order within each group.
+    const own = visible.filter((n) => !n.demo);
     return [
-      ...visible.filter((n) => n.primaryFor?.includes(role)),
-      ...visible.filter((n) => !n.primaryFor?.includes(role)),
+      ...visible.filter((n) => n.demo),
+      ...own.filter((n) => n.primaryFor?.includes(role)),
+      ...own.filter((n) => !n.primaryFor?.includes(role)),
     ];
   }, [role]);
 
@@ -77,6 +81,24 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
               <ul className="flex gap-0 py-0">
                 {items.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + '/');
+                  if (item.demo) {
+                    return (
+                      <li key={item.to} className="flex items-center pr-2 mr-1 border-r border-cream-100/15">
+                        <Link
+                          to={item.to}
+                          ref={active ? activeRef : undefined}
+                          title="Pantalla de demostración: no es parte de la app de operación"
+                          className={
+                            'my-1.5 inline-flex items-center gap-1.5 rounded-md border border-dashed px-2.5 py-1 text-[11px] uppercase tracking-display whitespace-nowrap transition ' +
+                            (active ? 'border-brass-300 bg-brass-500/20 text-brass-300' : 'border-brass-500/70 text-brass-300/90 hover:bg-brass-500/10')
+                          }
+                        >
+                          <span className="rounded-sm bg-brass-500 text-charcoal-900 px-1 text-[9px] font-semibold leading-4">Demo</span>
+                          {item.label}
+                        </Link>
+                      </li>
+                    );
+                  }
                   return (
                     <li key={item.to}>
                       <Link

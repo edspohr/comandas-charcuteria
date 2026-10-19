@@ -13,6 +13,7 @@ import { doc, onSnapshot, type Unsubscribe } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions } from './firebase';
 import { resetUsersDirectory } from './users';
+import { resetClientsStore } from './clients';
 import type { AppUser } from '@/domain/types';
 
 export { ROLE_HOME, ROLE_LABEL } from '@/domain/permissions';
@@ -94,6 +95,7 @@ function startAuthListener() {
     if (!fbUser) {
       userDocUnsub?.(); userDocUnsub = null;
       resetUsersDirectory();
+      resetClientsStore();
       emit({ current: null, loading: false, denied: authState.denied });
       return;
     }

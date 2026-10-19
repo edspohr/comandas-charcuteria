@@ -50,6 +50,9 @@ export default defineConfig({
         manualChunks: {
           recharts: ['recharts'],
           'firebase-ai': ['@firebase/ai'],
+          // Firebase core changes rarely: its own chunk stays cached across deploys.
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/functions', 'firebase/app-check'],
+          react: ['react', 'react-dom', 'react-router-dom'],
         },
       },
     },

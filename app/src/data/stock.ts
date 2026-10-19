@@ -74,7 +74,8 @@ export interface SyncSummary {
   compromised: string[];  // skus where Bsale < reserved
 }
 
-export interface SyncState extends SyncSummary { running?: boolean; }
+export interface SyncHealth { lastOkAt?: number; lastErrorAt?: number; lastError?: string; consecutiveFailures: number; partial?: string[] }
+export interface SyncState extends SyncSummary { running?: boolean; health?: SyncHealth; unmappedVariantsWithStock?: number }
 
 // undefined = still loading, null = never synced.
 export function useSyncState(): SyncState | null | undefined {

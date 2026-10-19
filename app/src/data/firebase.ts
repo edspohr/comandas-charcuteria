@@ -1,6 +1,6 @@
 import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { initializeFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeFirestore, connectFirestoreEmulator, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from 'firebase/app-check';
 
@@ -43,7 +43,13 @@ if (typeof window !== 'undefined' && recaptchaKey && !useEmulators) {
 export const auth = getAuth(app);
 // Real Firestore rejects undefined field values (createOrder sends optional
 // notes / rawText / clientSnapshot.rut as undefined for some inputs).
-export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
+// Persistent cache: reopening a screen (or the installed PWA) serves from
+// IndexedDB and only fetches what changed — fewer billed reads, faster on
+// weak signal. Falls back to memory where IndexedDB isn't available.
+export const db = initializeFirestore(app, {
+  ignoreUndefinedProperties: true,
+  ...(typeof indexedDB !== 'undefined' && !useEmulators ? { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) } : {}),
+});
 export const functions = getFunctions(app, 'us-central1');
 
 if (useEmulators && typeof window !== 'undefined' && !(globalThis as any).__emulatorsWired) {

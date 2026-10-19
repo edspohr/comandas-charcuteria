@@ -1,19 +1,21 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+// Screens load on demand: the first paint (login, tablero for most roles)
+// doesn't pay for the Panel's charts or the admin tools.
 import Login from './routes/Login';
-import NuevoPedido from './routes/vendedor/NuevoPedido';
-import DetallePedido from './routes/vendedor/DetallePedido';
-import PegarPedido from './routes/vendedor/PegarPedido';
-import DetalleArmado from './routes/despacho/DetalleArmado';
-import Produccion from './routes/produccion/Produccion';
-import Tablero from './routes/Tablero';
-import Clientes from './routes/clientes/Clientes';
-import FichaCliente from './routes/clientes/FichaCliente';
-import BsaleConsola from './routes/admin/Bsale';
-import Panel from './routes/admin/Panel';
-import Catalogo from './routes/admin/Catalogo';
-import Usuarios from './routes/admin/Usuarios';
-import Explorador from './routes/bsale/Explorador';
-import SuMes from './routes/admin/SuMes';
+const NuevoPedido = lazy(() => import('./routes/vendedor/NuevoPedido'));
+const DetallePedido = lazy(() => import('./routes/vendedor/DetallePedido'));
+const PegarPedido = lazy(() => import('./routes/vendedor/PegarPedido'));
+const DetalleArmado = lazy(() => import('./routes/despacho/DetalleArmado'));
+const Produccion = lazy(() => import('./routes/produccion/Produccion'));
+const Tablero = lazy(() => import('./routes/Tablero'));
+const Clientes = lazy(() => import('./routes/clientes/Clientes'));
+const FichaCliente = lazy(() => import('./routes/clientes/FichaCliente'));
+const BsaleConsola = lazy(() => import('./routes/admin/Bsale'));
+const Panel = lazy(() => import('./routes/admin/Panel'));
+const Catalogo = lazy(() => import('./routes/admin/Catalogo'));
+const Usuarios = lazy(() => import('./routes/admin/Usuarios'));
+const Explorador = lazy(() => import('./routes/bsale/Explorador'));
 import PWAInstallHint from './components/PWAInstallHint';
 import UpdateToast from './components/UpdateToast';
 import AppShell from './components/AppShell';
@@ -36,6 +38,7 @@ export default function App() {
     <BrowserRouter>
       <PWAInstallHint />
       <UpdateToast />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-charcoal-300 text-sm">Cargando…</div>}>
       <Routes>
         <Route path="/login" element={current ? <Navigate to={ROLE_HOME[current.appUser.role]} replace /> : <Login />} />
 
@@ -169,16 +172,6 @@ export default function App() {
         />
 
         <Route
-          path="/admin/mes"
-          element={
-            <RouteGuard current={current} route="mes">
-              <AppShell current={current!}>
-                <SuMes />
-              </AppShell>
-            </RouteGuard>
-          }
-        />
-        <Route
           path="/bsale"
           element={
             <RouteGuard current={current} route="bsaleExplorer">
@@ -191,6 +184,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

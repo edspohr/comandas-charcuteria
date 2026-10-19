@@ -3,7 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { ROLE_LABEL, signOut, type CurrentUser } from '@/data/auth';
 import Logo from '@/components/ui/Logo';
 import type { Role } from '@/domain/types';
-import { ROUTE_ACCESS, type RouteKey } from '@/domain/permissions';
+import { ROUTE_ACCESS, can, canAny, type RouteKey } from '@/domain/permissions';
+import IntegrationHealth from '@/components/IntegrationHealth';
 
 // Navegación en dos formas:
 //   - Escritorio (lg+): sidebar fijo con grupos. El superadmin tiene 11
@@ -23,7 +24,6 @@ const GROUP_ORDER: Group[] = ['demo', 'operacion', 'gestion', 'config'];
 // Visibility comes from ROUTE_ACCESS so the menu never offers a screen the
 // guard would bounce.
 const NAV: NavItem[] = [
-  { to: '/admin/mes',      label: 'Su mes',         route: 'mes',           group: 'demo', demo: true },
   { to: '/tablero',        label: 'Tablero',        route: 'tablero',       group: 'operacion', primaryFor: ['despacho', 'reparto', 'admin', 'superAdmin'] },
   { to: '/vendedor/nuevo', label: 'Nuevo pedido',   route: 'nuevoPedido',   group: 'operacion', primaryFor: ['vendedor', 'tienda'] },
   { to: '/vendedor/pegar', label: 'Pedido IA',      route: 'pedidoIA',      group: 'operacion', primaryFor: ['vendedor'] },
@@ -173,7 +173,10 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
         </header>
 
         {/* Con sidebar el contenido aprovecha el ancho (tablas, kanban). */}
-        <main className="flex-1 w-full mx-auto p-4 sm:p-6 max-w-5xl lg:max-w-7xl">{children}</main>
+        <main className="flex-1 w-full mx-auto p-4 sm:p-6 max-w-5xl lg:max-w-7xl">
+          {canAny(role, ['stock.sync', 'order.link', 'bsale.configure']) && <IntegrationHealth canFix={can(role, 'bsale.configure')} />}
+          {children}
+        </main>
         <footer className="text-center py-6 text-[10px] uppercase tracking-display text-charcoal-300">
           La Charcutería Artesanal · Barrio Franklin
         </footer>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { collection, doc, getDocs, onSnapshot, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { bsale, isRealBsale } from '@/integrations/bsale/client';
 import type { BsaleCustomer } from '@/integrations/bsale/BsaleClient';
@@ -7,28 +7,31 @@ import { describeFirestoreError } from '@/lib/errors';
 import type { Client, DeliveryMode, Order } from '@/domain/types';
 import { cleanRut, formatRut, isValidRut } from '@/lib/rut';
 
-export function useClients(): { clients: Client[]; loading: boolean; error: string | null } {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// One shared listener per session for the client mirror (~2.000 docs since
+// Bsale went live): every screen that needs clients reuses it instead of
+// opening its own subscription and re-reading the whole collection.
+interface ClientsState { clients: Client[]; loading: boolean; error: string | null }
+let clientsState: ClientsState = { clients: [], loading: true, error: null };
+const clientListeners = new Set<() => void>();
+let clientsUnsub: (() => void) | null = null;
+function startClients() {
+  if (clientsUnsub) return;
+  clientsUnsub = onSnapshot(
+    collection(db, 'clients'),
+    (snap) => {
+      const list: Client[] = [];
+      snap.forEach((d) => list.push(d.data() as Client));
+      list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+      clientsState = { clients: list, loading: false, error: null };
+      clientListeners.forEach((l) => l());
+    },
+    (err) => { clientsState = { ...clientsState, loading: false, error: describeFirestoreError(err) }; clientListeners.forEach((l) => l()); },
+  );
+}
+export function resetClientsStore() { clientsUnsub?.(); clientsUnsub = null; clientsState = { clients: [], loading: true, error: null }; }
 
-  useEffect(() => {
-    const unsub = onSnapshot(
-      collection(db, 'clients'),
-      (snap) => {
-        const list: Client[] = [];
-        snap.forEach((d) => list.push(d.data() as Client));
-        list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
-        setClients(list);
-        setError(null);
-        setLoading(false);
-      },
-      (err) => { setError(describeFirestoreError(err)); setLoading(false); },
-    );
-    return unsub;
-  }, []);
-
-  return { clients, loading, error };
+export function useClients(): ClientsState {
+  return useSyncExternalStore((l) => { startClients(); clientListeners.add(l); return () => { clientListeners.delete(l); }; }, () => clientsState);
 }
 
 const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');

@@ -86,9 +86,20 @@ export async function syncStock(api: BsaleApi, settings: BsaleSettings, opts: { 
     byVariant.set(v, entry);
   }
   const now = Date.now();
-  await writeInChunks(db, [...byVariant.entries()].map(([v, offs]) => ({
+  // Write only variants whose stock changed: a one-doc fingerprint index
+  // (bsale/index.stock) replaces ~500 writes per run with a single read.
+  const indexRef = db.doc('bsale/index');
+  const index = ((await indexRef.get()).data() ?? {}) as { stock?: Record<string, string>; docs?: Record<string, string> };
+  const stockIdx = { ...(index.stock ?? {}) };
+  const changedVariants = [...byVariant.entries()].filter(([v, offs]) => {
+    const fp = Object.keys(offs).sort().map((o) => `${o}:${offs[o].quantity}/${offs[o].reserved}`).join('|');
+    if (stockIdx[v] === fp) return false;
+    stockIdx[v] = fp; return true;
+  });
+  await writeInChunks(db, changedVariants.map(([v, offs]) => ({
     ref: db.doc(`bsale/stock/byVariant/${v}`), data: { variantId: v, offices: offs, syncedAt: now }, merge: true,
   })));
+  if (changedVariants.length) await indexRef.set({ stock: stockIdx }, { merge: true });
 
   // 2. Espejo de la app para las variantes cruzadas. Varias variantes pueden
   //    apuntar al mismo producto/formato: se suman.
@@ -119,7 +130,7 @@ export async function syncStock(api: BsaleApi, settings: BsaleSettings, opts: { 
     const refs = keys.slice(i, i + 200).map((k) => db.doc(`stock/${k}`));
     if (refs.length) stockSnaps.push(...await db.getAll(...refs));
   }
-  const prevByKey = new Map(stockSnaps.filter((s) => s.exists).map((s) => [s.id, s.data() as { onHand: number; reserved: number }]));
+  const prevByKey = new Map(stockSnaps.filter((s) => s.exists).map((s) => [s.id, s.data() as { onHand: number; reserved: number; storeOnHand?: number; bsaleVariantIds?: string[] }]));
   const writes: WriteOp[] = [];
   const compromised: string[] = [];
   let updated = 0;
@@ -128,7 +139,10 @@ export async function syncStock(api: BsaleApi, settings: BsaleSettings, opts: { 
     const [productId, formatId] = k.split('__');
     if (prev && prev.reserved > a.onHand) compromised.push(k);
     if (prev && prev.onHand === a.onHand) {
-      writes.push({ ref: db.doc(`stock/${k}`), data: { storeOnHand: a.storeOnHand, bsaleVariantIds: a.variantIds, syncedAt: now }, merge: true });
+      const sameVariants = (prev.bsaleVariantIds ?? []).join(',') === a.variantIds.join(',');
+      if (prev.storeOnHand !== a.storeOnHand || !sameVariants) {
+        writes.push({ ref: db.doc(`stock/${k}`), data: { storeOnHand: a.storeOnHand, bsaleVariantIds: a.variantIds, syncedAt: now }, merge: true });
+      }
       continue;
     }
     updated++;
@@ -249,8 +263,12 @@ const cleanRut = (r?: string) => (r ?? '').replace(/[^0-9kK]/g, '').toUpperCase(
 export async function syncClients(api: BsaleApi): Promise<{ updated: number; total: number }> {
   const db = getFirestore();
   const all = await api.getAll<RawClient>('/clients.json', { state: 0 });
+  // Buyers: clients of documents mirrored since the last client sync (the
+  // ones already linked are covered by byBsale below). Reading only the new
+  // documents instead of the whole mirror keeps this hourly job cheap.
+  const since = (await loadSettings()).clientsSyncedAt ?? 0;
   const buyers = new Set<string>();
-  (await db.collection('bsale').doc('sales').collection('documents').select('bsaleClientId').get())
+  (await db.collection('bsale').doc('sales').collection('documents').where('syncedAt', '>=', since).select('bsaleClientId').get())
     .forEach((d) => { const id = d.get('bsaleClientId'); if (id) buyers.add(String(id)); });
   const snap = await db.collection('clients').get();
   const byBsale = new Map<string, AppClient>();
@@ -394,23 +412,59 @@ export async function syncDocuments(api: BsaleApi, settings: BsaleSettings, opts
     await patchSettings({ documentsSyncedUntil: nowS });
   }
   const docs = raws.filter(Boolean).map((r) => documentFromRaw(r, settings, skuOf));
+  // Each run re-reads today and yesterday (emissionDate has no time): skip
+  // documents whose content didn't change, tracked in bsale/index.docs for
+  // the last days only.
+  const indexRef = db.doc('bsale/index');
+  const docIdx = { ...((((await indexRef.get()).data() ?? {}) as { docs?: Record<string, string> }).docs ?? {}) };
+  const fp = (d: MirrorDocument) => `${d.emissionDate}|${d.state}|${d.totalCLP}|${d.details.length}|${d.details.map((x) => x.sku).join(',')}`;
+  const changed = docs.filter((d) => { const f = fp(d); if (docIdx[d.id] === f) return false; docIdx[d.id] = f; return true; });
   // merge: conserva linkedOrderId que escribe la app al vincular.
-  await writeInChunks(db, docs.map((d) => ({ ref: db.doc(`bsale/sales/documents/${d.id}`), data: stripUndefined(d), merge: true })));
-  return docs.length;
+  await writeInChunks(db, changed.map((d) => ({ ref: db.doc(`bsale/sales/documents/${d.id}`), data: stripUndefined(d), merge: true })));
+  if (changed.length) {
+    const cutoff = new Date(Date.now() - 4 * 86400_000).toISOString().slice(0, 10);
+    const pruned = Object.fromEntries(Object.entries(docIdx).filter(([, f]) => f.slice(0, 10) >= cutoff));
+    // update() replaces the whole `docs` map (set+merge would only add keys).
+    await indexRef.set({}, { merge: true });
+    await indexRef.update({ docs: pruned });
+  }
+  return changed.length;
 }
 
 // ---------- Corrida completa ----------
 
+// Health of the integration lives next to the last summary
+// (settings/bsaleSync.health): the app shows a banner when it degrades and a
+// Cloud Monitoring alert (scripts/setup-alerts.sh) mails on errors.
+export interface SyncHealth { lastOkAt?: number; lastErrorAt?: number; lastError?: string; consecutiveFailures: number; partial?: string[] }
+
+async function recordHealth(ok: boolean, error?: string, partial: string[] = []) {
+  const ref = getFirestore().doc('settings/bsaleSync');
+  const prev = ((await ref.get()).data()?.health ?? { consecutiveFailures: 0 }) as SyncHealth;
+  const health: SyncHealth = ok
+    ? { ...prev, lastOkAt: Date.now(), consecutiveFailures: 0, partial }
+    : { ...prev, lastErrorAt: Date.now(), lastError: (error ?? '').slice(0, 300), consecutiveFailures: (prev.consecutiveFailures ?? 0) + 1 };
+  await ref.set({ health: stripUndefined(health) }, { merge: true });
+}
+
 export async function fullSync(api: BsaleApi, by: string, opts: { forceClients?: boolean } = {}): Promise<SyncSummary> {
   const settings = await loadSettings();
-  const summary = await syncStock(api, settings, { by });
-  try { summary.documentsUpserted = await syncDocuments(api, settings); } catch (e) { logger.error('[bsale] documentos', e); }
+  const partial: string[] = [];
+  let summary: SyncSummary;
+  try {
+    summary = await syncStock(api, settings, { by });
+  } catch (e) {
+    await recordHealth(false, `stock: ${(e as Error).message}`);
+    throw e;
+  }
+  try { summary.documentsUpserted = await syncDocuments(api, settings); } catch (e) { logger.error('[bsale] documentos', e); partial.push(`documentos: ${(e as Error).message}`); }
   const hourAgo = Date.now() - 60 * 60 * 1000;
   if (opts.forceClients || !settings.clientsSyncedAt || settings.clientsSyncedAt < hourAgo) {
-    try { summary.clientsUpdated = (await syncClients(api)).updated; } catch (e) { logger.error('[bsale] clientes', e); }
+    try { summary.clientsUpdated = (await syncClients(api)).updated; } catch (e) { logger.error('[bsale] clientes', e); partial.push(`clientes: ${(e as Error).message}`); }
   }
   summary.apiCalls = api.callCount;
   await getFirestore().doc('settings/bsaleSync').set(summary, { merge: true });
+  await recordHealth(true, undefined, partial);
   return summary;
 }
 

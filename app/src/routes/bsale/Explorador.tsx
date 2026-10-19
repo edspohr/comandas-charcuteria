@@ -225,6 +225,11 @@ function Stock() {
 // ---------- Documentos (conciliación) ----------
 
 function Documentos({ docs, range }: { docs: Doc[]; range: Range }) {
+  // Bsale's variant `description` is only the format ("Granel laminado",
+  // "Sachet 100 gr"): name lines from the catalog mirror (product · format).
+  const variants = useBsaleVariants();
+  const labels = useMemo(() => new Map(variants.map((v) => [v.variantId, v.label])), [variants]);
+  const lineLabel = (it: Doc['details'][number]) => labels.get(it.variantId) ?? (it.description || it.sku || it.variantId);
   const [q, setQ] = useState('');
   const [only, setOnly] = useState<'todos' | 'sin_pedido' | 'con_pedido'>('todos');
   const rows = useMemo(() => {
@@ -266,7 +271,7 @@ function Documentos({ docs, range }: { docs: Doc[]; range: Range }) {
         ]}
         expand={(d) => (
           <ul className="text-xs text-charcoal-700 space-y-0.5">
-            {d.details.map((it, i) => <li key={i} className="flex justify-between gap-3"><span>{it.description || it.sku || it.variantId}</span><span className="tabular-nums">{it.quantity} × {formatCLP(Math.round(it.netUnitValue * 1.19))}</span></li>)}
+            {d.details.map((it, i) => <li key={i} className="flex justify-between gap-3"><span>{lineLabel(it)}</span><span className="tabular-nums">{it.quantity} × {formatCLP(Math.round(it.netUnitValue * 1.19))}</span></li>)}
             {d.reference && <li className="text-charcoal-500">Referencia: {d.reference}</li>}
           </ul>
         )}

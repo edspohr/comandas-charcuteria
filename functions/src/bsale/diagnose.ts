@@ -194,7 +194,8 @@ export async function runDiagnostic(api: BsaleApi, by: string): Promise<Diagnost
   }
 
   // ---- Documents
-  const mirrorDocs = docs.map((d) => documentFromRaw(d, settings, () => undefined));
+  const labelById = new Map(variants.map((v) => [String(v.id), [productById.get(String(v.product?.id ?? ''))?.name ?? v.product?.name, v.description].filter(Boolean).join(' · ')]));
+  const mirrorDocs = docs.map((d) => documentFromRaw(d, settings, () => undefined, (v) => labelById.get(v) || undefined));
   mirrorDocs.forEach((d) => put(`bsale/sales/documents/${d.id}`, d));
   await writeInChunks(db, ops);
 

@@ -338,7 +338,20 @@ export interface MirrorDocument {
   reference?: string; state: number; urlPdf?: string; syncedAt: number;
 }
 
-export function documentFromRaw(d: RawDocument, s: BsaleSettings, skuOf: (variantId: string) => string | undefined): MirrorDocument {
+// Bsale's variant `description` is just the format ("Granel laminado",
+// "Sachet 100 gr"); the product name lives on the product. Document lines are
+// named from the catalog mirror (bsale/catalog/variants, label = product ·
+// format), cached for an hour per instance so each sync doesn't reread it.
+let labelCache: { at: number; map: Map<string, string> } | null = null;
+export async function variantLabels(db: Firestore): Promise<Map<string, string>> {
+  if (labelCache && Date.now() - labelCache.at < 3600_000) return labelCache.map;
+  const snap = await db.collection('bsale/catalog/variants').get();
+  const map = new Map<string, string>(snap.docs.map((x) => [x.id, String((x.data() as { label?: string }).label ?? '')] as [string, string]).filter(([, l]) => l));
+  labelCache = { at: Date.now(), map };
+  return map;
+}
+
+export function documentFromRaw(d: RawDocument, s: BsaleSettings, skuOf: (variantId: string) => string | undefined, labelOf: (variantId: string) => string | undefined = () => undefined): MirrorDocument {
   const kind = docKindFor(s, d.document_type?.id, d.document_type?.codeSii, d.document_type?.name);
   const seller = d.sellers?.items?.[0] ?? d.user;
   const emitted = Number(d.emissionDate) * 1000;
@@ -365,7 +378,7 @@ export function documentFromRaw(d: RawDocument, s: BsaleSettings, skuOf: (varian
       return {
         variantId: v,
         sku: skuOf(v) ?? '',
-        description: String(it.variant?.description ?? it.note ?? ''),
+        description: labelOf(v) ?? String(it.variant?.description ?? it.note ?? ''),
         quantity: Number(it.quantity ?? 0),
         netUnitValue: Number(it.netUnitValue ?? 0),
         totalCLP: it.totalAmount != null ? Number(it.totalAmount) : undefined,
@@ -417,7 +430,8 @@ export async function syncDocuments(api: BsaleApi, settings: BsaleSettings, opts
     try { await writeFactDays(raws, settings, daysBetween(fromDay, dayOf(nowS))); } catch (e) { logger.error('[bsale] hechos del panel', e); }
     await patchSettings({ documentsSyncedUntil: nowS });
   }
-  const docs = raws.filter(Boolean).map((r) => documentFromRaw(r, settings, skuOf));
+  const labels = raws.length ? await variantLabels(db) : new Map<string, string>();
+  const docs = raws.filter(Boolean).map((r) => documentFromRaw(r, settings, skuOf, (v) => labels.get(v)));
   // Each run re-reads today and yesterday (emissionDate has no time): skip
   // documents whose content didn't change, tracked in bsale/index.docs for
   // the last days only.

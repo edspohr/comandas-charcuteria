@@ -2,7 +2,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { BsaleApi, RawDocument } from './api';
 import { DOC_PREFIX, requireFactory, type BsaleSettings, type DocKind } from './config';
-import { confirmedMap, documentFromRaw, stripUndefined, syncStock } from './sync';
+import { confirmedMap, documentFromRaw, stripUndefined, syncStock, variantLabels } from './sync';
 import { send } from './writes';
 
 // Facturar desde Comandas: el pedido armado (con los pesos reales que
@@ -145,7 +145,8 @@ export async function emitInvoice(api: BsaleApi, s: BsaleSettings, by: string, o
   const raw = result.response;
   const db = getFirestore();
   const map = await confirmedMap(db);
-  const mirror = documentFromRaw({ ...raw, document_type: raw.document_type ?? { id: preview.documentTypeId!, name: preview.documentTypeName } }, s, (v) => map.get(v));
+  const labels = await variantLabels(getFirestore());
+  const mirror = documentFromRaw({ ...raw, document_type: raw.document_type ?? { id: preview.documentTypeId!, name: preview.documentTypeName } }, s, (v) => map.get(v), (v) => labels.get(v));
   const number = `${DOC_PREFIX[preview.kind]}-${String(raw.number ?? '').padStart(6, '0')}`;
 
   // Same bookkeeping as vincularDocumento (app): release reservations,

@@ -26,6 +26,9 @@ export type LineRow = [number, DocKind, number, string, string, string, number, 
 interface MonthData { docs: DocRow[]; lines: LineRow[]; clients: Record<string, string>; sellers: Record<string, string> }
 
 const MONTHS = 'bsale/facts/months';
+// What counts as a sale: invoices, receipts and credit notes (negative).
+// Dispatch guides don't add up (they are usually invoiced later).
+export const SALES_KINDS = new Set<DocKind>(['factura', 'boleta', 'nota_credito', 'otro']);
 export const dayOf = (emissionS: number) => new Date(Number(emissionS) * 1000).toISOString().slice(0, 10);
 const r2 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -95,7 +98,9 @@ export async function writeFactDays(raws: RawDocument[], s: BsaleSettings, days:
     const prev = snap.data() as { dayHash?: Record<string, string>; data?: unknown; complete?: boolean } | undefined;
     const dayHash = { ...(prev?.dayHash ?? {}) };
     const fresh = new Map<number, ReturnType<typeof rowsForDay>>();
-    let changed = !snap.exists || (opts.complete && !prev?.complete);
+    // A historical load (complete) always rewrites: it is an explicit request
+    // and also rebuilds the month's entry in the index.
+    let changed = !snap.exists || !!opts.complete;
     for (const [day, list] of perDay) {
       const rows = rowsForDay(list, s);
       const dd = day.slice(8, 10);
@@ -121,8 +126,12 @@ export async function writeFactDays(raws: RawDocument[], s: BsaleSettings, days:
       month, updatedAt: Date.now(), complete: !!(opts.complete || prev?.complete),
       docCount: out.docs.length, lineCount: out.lines.length, bytes: gz.length, dayHash, data: gz,
     }));
-    // Cheap index for the app: which months exist and how complete they are.
-    await db.doc('bsale/facts').set({ months: { [month]: { docCount: out.docs.length, bytes: gz.length, complete: !!(opts.complete || prev?.complete), updatedAt: Date.now() } } }, { merge: true });
+    // Cheap index for the app: which months exist, how complete they are and
+    // their net sales per office (the 24-month chart reads only this).
+    const netByOffice: Record<string, number> = {};
+    for (const r of out.docs) if (SALES_KINDS.has(r[2])) netByOffice[r[3]] = (netByOffice[r[3]] ?? 0) + r[6];
+    const net = Object.values(netByOffice).reduce((a, b) => a + b, 0);
+    await db.doc('bsale/facts').set({ months: { [month]: { docCount: out.docs.length, bytes: gz.length, net, netByOffice, complete: !!(opts.complete || prev?.complete), updatedAt: Date.now() } } }, { merge: true });
     written++;
   }
   return written;

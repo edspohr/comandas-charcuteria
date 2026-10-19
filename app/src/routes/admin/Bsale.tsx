@@ -159,7 +159,8 @@ function Conexion() {
 // por mes) y costos promedio para el margen.
 function HistoriaVentas({ editable, enabled }: { editable: boolean; enabled: boolean }) {
   const { months, costs, costsUpdatedAt } = useFactsIndex();
-  const wanted = monthsBack(24);
+  // 25 months: "últimos 12 meses vs. año anterior" needs one more than two years.
+  const wanted = monthsBack(25);
   const complete = wanted.filter((m) => months[m]?.complete).length;
   const docs = wanted.reduce((s, m) => s + (months[m]?.docCount ?? 0), 0);
   const [progress, setProgress] = useState<string | null>(null);
@@ -187,13 +188,13 @@ function HistoriaVentas({ editable, enabled }: { editable: boolean; enabled: boo
         <div>
           <p className="eyebrow">Historia de ventas (Panel)</p>
           <p className="text-xs text-charcoal-500 mt-0.5">
-            {complete} de 24 meses cargados · {docs.toLocaleString('es-CL')} documentos · costos de {Object.keys(costs).length} variantes{costsUpdatedAt ? ` (${when(costsUpdatedAt)})` : ''}.
+            {complete} de {wanted.length} meses cargados · {docs.toLocaleString('es-CL')} documentos · costos de {Object.keys(costs).length} variantes{costsUpdatedAt ? ` (${when(costsUpdatedAt)})` : ''}.
             Luego se mantiene sola con cada sincronización.
           </p>
         </div>
         {editable && (
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" disabled={busy || !enabled} onClick={load}>{complete < 24 ? 'Cargar 24 meses' : 'Recargar últimos meses'}</Button>
+            <Button size="sm" variant="secondary" disabled={busy || !enabled} onClick={load}>{complete < wanted.length ? 'Cargar 2 años' : 'Recargar últimos meses'}</Button>
             <Button size="sm" variant="ghost" disabled={busy || !enabled} onClick={loadCosts}>Actualizar costos</Button>
           </div>
         )}

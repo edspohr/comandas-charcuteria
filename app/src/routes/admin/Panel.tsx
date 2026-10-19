@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/data/firebase';
-import Button from '@/components/ui/Button';
+import { Card, Export, Metric, Mini, Table, Today, setExportPeriod } from '@/components/panel/PanelUI';
 import { useProducts } from '@/data/products';
 import { useClients } from '@/data/clients';
 import { useAllStock, useSyncState } from '@/data/stock';
@@ -15,7 +15,6 @@ import {
   HEALTH_LABEL, DEFAULT_CLIENT_HEALTH, type ClientHealth, type RangeKey,
 } from '@/domain/analytics';
 import { useSettings } from '@/data/settings';
-import { downloadCsv } from '@/lib/csv';
 import { formatDateShort, formatQty, todayInSantiago } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
 import type { Order } from '@/domain/types';
@@ -30,7 +29,9 @@ const kFmt = (v: number) => `$${Math.round(v / 1000)}k`;
 const h = (v: number | null) => (v == null ? '—' : v < 1 ? `${Math.round(v * 60)} min` : v < 48 ? `${v.toFixed(1)} h` : `${(v / 24).toFixed(1)} d`);
 const pct = (v: number | null) => (v == null ? '—' : `${v.toFixed(0)}%`);
 
-export default function Panel() {
+// Panel de pedidos de Comandas (operación, reservas, cartera asignada). Con
+// Bsale real vive como pestaña "Pedidos" dentro del Panel de gestión.
+export default function Panel({ embedded = false }: { embedded?: boolean } = {}) {
   const { nameOf, sellers } = useUsers();
   const VENDEDORES = useMemo(() => sellers.map((u) => ({ uid: u.uid, name: u.displayName })), [sellers]);
   const [tab, setTab] = useState<Tab>('ventas');
@@ -102,14 +103,14 @@ export default function Panel() {
   const firstDay = useMemo(() => orders.reduce((m, o) => (o.requestedDate < m ? o.requestedDate : m), '9999-12-31'), [orders]);
   const comparable = previous.from >= firstDay;
   const delta = (cur: number, prev: number) => (rangeKey === 'all' || !comparable ? undefined : pctDelta(cur, prev));
-  currentPeriod = period;
+  setExportPeriod(period);
 
   return (
     <div>
       <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <p className="eyebrow">Gerencia</p>
-          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Panel de dueños</h1>
+          {!embedded && <p className="eyebrow">Gerencia</p>}
+          {!embedded && <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Panel de dueños</h1>}
           <p className="text-xs text-charcoal-300 mt-1">Pedidos por fecha solicitada · {rangeLabel} {prevLabel}{sync?.at ? ` · stock Bsale ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}` : ''}</p>
         </div>
         <div className="flex items-center gap-1.5">
@@ -307,86 +308,3 @@ export default function Panel() {
 }
 
 const HEALTH = HEALTH_LABEL;
-
-function Metric({ label, value, sub, delta, tone }: { label: string; value: number | string; sub?: string; delta?: number | null; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className={'card p-4 ' + (tone === 'warn' ? 'border-brass-300' : tone === 'bad' ? 'border-red-200' : '')}>
-      <p className="eyebrow">{label}</p>
-      <p className={'text-2xl font-semibold mt-1 tracking-display ' + (tone === 'warn' ? 'text-brass-700' : tone === 'bad' ? 'text-red-700' : 'text-charcoal-900')}>{value}</p>
-      <p className="text-[11px] text-charcoal-300 mt-1 uppercase tracking-display flex items-center gap-2">
-        {delta != null && <span className={delta >= 0 ? 'text-emerald-700' : 'text-red-700'}>{delta >= 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(0)}%</span>}
-        {sub}
-      </p>
-    </div>
-  );
-}
-
-function Today({ label, value, tone }: { label: string; value: number | string; tone?: 'warn' | 'bad' }) {
-  return (
-    <div className={'rounded-md border px-3 py-2 flex items-baseline justify-between gap-2 ' + (tone === 'bad' ? 'bg-red-50 border-red-200' : tone === 'warn' ? 'bg-brass-50 border-brass-300' : 'bg-cream-100/60 border-charcoal-100')}>
-      <span className="text-[10px] uppercase tracking-display text-charcoal-500">{label}</span>
-      <span className={'text-lg font-semibold ' + (tone === 'bad' ? 'text-red-700' : tone === 'warn' ? 'text-brass-700' : 'text-charcoal-900')}>{value}</span>
-    </div>
-  );
-}
-
-function Mini({ label, value, tone }: { label: string; value: number; tone?: 'ok' | 'warn' | 'bad' }) {
-  return (
-    <div className="rounded-md bg-cream-100/60 py-1.5">
-      <p className={'text-base font-semibold ' + (tone === 'ok' ? 'text-emerald-700' : tone === 'warn' ? 'text-brass-700' : tone === 'bad' ? 'text-red-700' : 'text-charcoal-900')}>{value}</p>
-      <p className="text-[9px] uppercase tracking-display text-charcoal-300">{label}</p>
-    </div>
-  );
-}
-
-function Card({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="card p-4">
-      <div className="flex items-center justify-between mb-3"><p className="eyebrow">{title}</p>{action}</div>
-      {children}
-    </div>
-  );
-}
-
-// The current period label is set by Panel on each render so every export
-// carries it in the header without threading a prop through Table.
-let currentPeriod = '';
-
-function Export({ name, rows, cols }: { name: string; rows: Array<object>; cols: Array<[string, string]> }) {
-  return (
-    <Button size="sm" variant="ghost" className="!py-1 !px-2 text-[11px]" onClick={() => downloadCsv(name, rows, cols.map(([key, label]) => ({ key, label })), currentPeriod)} disabled={rows.length === 0}>
-      Exportar CSV
-    </Button>
-  );
-}
-
-type Col = [string, string, ((v: unknown, row: Record<string, unknown>) => React.ReactNode)?];
-const rec = (r: object) => r as Record<string, unknown>;
-
-function Table<T extends object>({ title, rows, cols, export: exp, rowTone }: { title: string; rows: T[]; cols: Col[]; export?: { name: string; rows: Array<object> }; rowTone?: (r: T) => 'warn' | 'bad' | undefined }) {
-  return (
-    <Card title={title} action={exp ? <Export name={exp.name} rows={exp.rows} cols={cols.map(([k, l]) => [k, l])} /> : undefined}>
-      {rows.length === 0 ? <p className="text-xs text-charcoal-300">Sin datos en el período.</p> : (
-        <div className="overflow-x-auto -mx-4 px-4">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-left text-[10px] uppercase tracking-display text-charcoal-300 border-b border-charcoal-100">
-                {cols.map(([k, l], i) => <th key={k} className={'py-1.5 pr-3 font-semibold ' + (i > 0 ? 'text-right' : '')}>{l}</th>)}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-charcoal-100/70">
-              {rows.map((r, ri) => {
-                const tone = rowTone?.(r);
-                return (
-                  <tr key={ri} className={tone === 'bad' ? 'bg-red-50/40' : tone === 'warn' ? 'bg-brass-50/40' : ''}>
-                    {cols.map(([k, , fmt], i) => <td key={k} className={'py-1.5 pr-3 ' + (i > 0 ? 'text-right tabular-nums text-charcoal-700' : 'text-charcoal-900 font-medium')}>{fmt ? fmt(rec(r)[k], rec(r)) : String(rec(r)[k] ?? '')}</td>)}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
-  );
-}

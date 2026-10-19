@@ -10,7 +10,10 @@ import type { DocKind } from './bsaleAdmin';
 
 export interface FactDoc { date: string; docId: string; kind: DocKind; officeId: number; sellerId: string; clientId: string; net: number; total: number }
 export interface FactLine { date: string; kind: DocKind; officeId: number; sellerId: string; clientId: string; variantId: string; qty: number; net: number }
-export interface MonthIndexEntry { docCount: number; bytes: number; complete: boolean; updatedAt: number }
+export interface MonthIndexEntry { docCount: number; bytes: number; complete: boolean; updatedAt: number; net?: number; netByOffice?: Record<string, number> }
+
+// Mirrors functions/src/bsale/facts.ts SALES_KINDS.
+export const SALES_KINDS = new Set<DocKind>(['factura', 'boleta', 'nota_credito', 'otro']);
 
 export interface SalesFacts {
   docs: FactDoc[];

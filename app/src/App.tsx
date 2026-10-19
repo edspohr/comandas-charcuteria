@@ -12,7 +12,7 @@ const Tablero = lazy(() => import('./routes/Tablero'));
 const Clientes = lazy(() => import('./routes/clientes/Clientes'));
 const FichaCliente = lazy(() => import('./routes/clientes/FichaCliente'));
 const BsaleConsola = lazy(() => import('./routes/admin/Bsale'));
-const Panel = lazy(() => import('./routes/admin/Panel'));
+const Panel = lazy(() => import('./routes/admin/PanelGestion'));
 const Catalogo = lazy(() => import('./routes/admin/Catalogo'));
 const Usuarios = lazy(() => import('./routes/admin/Usuarios'));
 const Explorador = lazy(() => import('./routes/bsale/Explorador'));

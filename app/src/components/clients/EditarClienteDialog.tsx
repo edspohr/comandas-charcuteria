@@ -12,7 +12,7 @@ import type { Client, DeliveryMode } from '@/domain/types';
 // (maestro) y espejo; campos propios (modalidad, horario, notas, vendedor)
 // solo al espejo.
 export default function EditarClienteDialog({ client, uid, onClose }: { client: Client; uid: string; onClose: () => void }) {
-  const VENDEDORES = useUsers().byRole('vendedor');
+  const VENDEDORES = useUsers().sellers;
   const [fantasyName, setFantasyName] = useState(client.fantasyName ?? '');
   const [name, setName] = useState(client.name);
   const [rut, setRut] = useState(client.rut ?? '');

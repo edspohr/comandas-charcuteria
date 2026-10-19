@@ -57,6 +57,11 @@ const ROLE_CAPS: Record<Role, Capability[]> = {
   consultor: ['bsale.explore', 'panel.view'],
 };
 
+// Perfiles que venden y entran en los análisis de fuerza de ventas (cartera,
+// ventas por vendedor). La tienda (Lucy) vende como una vendedora más.
+export const SELLER_ROLES: Role[] = ['vendedor', 'tienda'];
+export const isSeller = (role: Role | undefined | null) => !!role && SELLER_ROLES.includes(role);
+
 export function can(role: Role | undefined | null, cap: Capability): boolean {
   return !!role && ROLE_CAPS[role]?.includes(cap) === true;
 }

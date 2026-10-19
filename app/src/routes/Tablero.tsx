@@ -33,8 +33,7 @@ export default function Tablero() {
   const { current } = useCurrentUser();
   const role = current!.appUser.role;
   const uid = current!.appUser.uid;
-  const { byRole } = useUsers();
-  const VENDEDORES = byRole('vendedor');
+  const { sellers: VENDEDORES } = useUsers();
   const isAdmin = can(role, 'order.cancelAny') || isReadOnly(role);
   const canSync = can(role, 'stock.sync');
   // Auto-refresh only for roles that act on the board; producción syncs by hand.

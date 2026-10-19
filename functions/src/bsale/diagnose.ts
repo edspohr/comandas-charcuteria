@@ -5,7 +5,7 @@ import type {
   RawProductType, RawStock, RawUser, RawVariant,
 } from './api';
 import { docKindFor, loadSettings, patchSettings } from './config';
-import { documentFromRaw, stripUndefined, writeInChunks, type WriteOp } from './sync';
+import { documentFromRaw, fetchDocumentsInRange, stripUndefined, writeInChunks, type WriteOp } from './sync';
 
 // Diagnóstico: la primera vez que llega el token se corre esto y queda
 // todo lo que hace falta para "darle forma definitiva" a la integración:
@@ -39,7 +39,7 @@ export interface DiagnosticSummary {
   topVariants90d: Array<{ variantId: string; label: string; quantity: number; totalCLP: number }>;
   mapping: { suggested: number; confirmed: number; unmatched: number };
   warnings: string[];
-  suggestedSettings: { factoryOfficeId?: number; storeOfficeId?: number; priceListId?: number };
+  suggestedSettings: { factoryOfficeId?: number; storeOfficeId?: number; priceListId?: number; transferShippingTypeId?: number };
 }
 
 const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -91,20 +91,21 @@ export async function runDiagnostic(api: BsaleApi, by: string): Promise<Diagnost
   const products = await safe('productos', () => api.getAll<RawProduct>('/products.json', { expand: '[product_type]' }));
   const variants = await safe('variantes', () => api.getAll<RawVariant>('/variants.json', { expand: '[product]' }));
   const users = await safe('usuarios', () => api.getAll<RawUser>('/users.json'));
-  const shippingTypes = await safe('tipos de despacho', () => api.getAll<{ id: number; name: string }>('/shipping_types.json'));
+  const shippingTypes = await safe('tipos de despacho', () => api.getAll<{ id: number; name: string; useDestinationOffice?: number; state?: number }>('/shipping_types.json'));
   const stock = await safe('stock', () => api.getAll<RawStock>('/stocks.json'));
   let clientsCount = 0;
   try { clientsCount = Number((await api.get<{ count?: number }>('/clients.json', { limit: 1, state: 0 })).count ?? 0); } catch (e) { warnings.push(`No se pudo contar clientes: ${(e as Error).message}`); }
 
   const activePL = priceLists.filter((p) => p.state !== 1);
-  const priceListId = settings.priceListId ?? activePL[0]?.id;
+  // Each office carries its default price list; the factory's is the one for orders.
+  const factoryDefaultPL = offices.find((o) => o.id === settings.factoryOfficeId)?.defaultPriceList
+    ?? offices.find((o) => /proceso|f[aá]brica|planta|marcosi/i.test(o.name))?.defaultPriceList;
+  const priceListId = settings.priceListId ?? (factoryDefaultPL ? Number(factoryDefaultPL) : (activePL[0] ? Number(activePL[0].id) : undefined));
   const prices = priceListId ? await safe('precios', () => api.getAll<RawPriceDetail>(`/price_lists/${priceListId}/details.json`)) : [];
   const priceByVariant = new Map(prices.map((p) => [String(p.variant?.id), p]));
 
   const nowS = Math.floor(Date.now() / 1000);
-  const docs = await safe('documentos 90 días', () => api.getAll<RawDocument>('/documents.json', {
-    emissiondaterange: `[${nowS - 90 * 86400},${nowS}]`, expand: '[details,client,document_type,sellers,office,references]',
-  }));
+  const docs = await safe('documentos 90 días', () => fetchDocumentsInRange(api, nowS - 90 * 86400, nowS));
 
   // ---- Mirrors
   const productById = new Map(products.map((p) => [String(p.id), p]));
@@ -130,7 +131,7 @@ export async function runDiagnostic(api: BsaleApi, by: string): Promise<Diagnost
       productType: p?.product_type ? typeById.get(String(p.product_type.id)) ?? p.product_type.name : undefined,
       active: v.state !== 1 && p?.state !== 1,
       stockControl: p?.stockControl !== 0,
-      allowDecimal: v.allowDecimal === 1,
+      allowDecimal: (p?.allowDecimal ?? v.product?.allowDecimal ?? v.allowDecimal) === 1,
       priceListId,
       priceCLP: price?.variantValueWithTaxes,
       netPriceCLP: price?.variantValue,
@@ -195,13 +196,17 @@ export async function runDiagnostic(api: BsaleApi, by: string): Promise<Diagnost
   // "bodega web" must never be taken for the factory.
   const physical = realOffices.filter((o) => o.isVirtual !== 1 && (stockOffices.get(String(o.id)) ?? 0) > 0);
   const sortedByStock = [...physical].sort((a, b) => (stockOffices.get(String(b.id)) ?? 0) - (stockOffices.get(String(a.id)) ?? 0));
-  const storeGuess = physical.find((o) => /tienda|local|mes[oó]n|sala/i.test(o.name));
-  const factoryGuess = physical.find((o) => o.id !== storeGuess?.id && /f[aá]brica|planta|bodega|producci|matriz/i.test(o.name)) ?? sortedByStock.find((o) => o.id !== storeGuess?.id);
+  // Factory first ('MARCOSI (SALA DE PROCESO)' in this account): 'sala' alone
+  // must not read as the store.
+  const FACTORY_RE = /f[aá]brica|planta|bodega|producci|proceso|matriz|marcosi/i;
+  const factoryGuess = physical.find((o) => FACTORY_RE.test(o.name)) ?? sortedByStock[0];
+  const storeGuess = physical.find((o) => o.id !== factoryGuess?.id && /tienda|local|mes[oó]n|charcuter/i.test(o.name)) ?? physical.find((o) => o.id !== factoryGuess?.id);
 
   if (!variants.length) warnings.push('Bsale no devolvió variantes: revisar permisos del token.');
   if (realOffices.length < 2) warnings.push('Hay menos de dos sucursales activas: la tienda podría no estar separada de la fábrica.');
   if (!activePL.length) warnings.push('No hay listas de precio activas.');
-  if (variants.some((v) => v.allowDecimal !== 1) && variants.some((v) => /kg|granel/i.test(v.description ?? ''))) warnings.push('Hay variantes por kg que no permiten decimales: Bsale redondearía los pesos reales.');
+  const kgNoDecimal = variants.filter((v) => v.state !== 1 && /\bkg\b|granel|kilo/i.test(v.description ?? '') && (productById.get(String(v.product?.id ?? ''))?.allowDecimal ?? v.product?.allowDecimal) !== 1);
+  if (kgNoDecimal.length) warnings.push(`${kgNoDecimal.length} variantes por kg en productos que no permiten decimales: Bsale redondearía los pesos reales.`);
 
   const summary: DiagnosticSummary = {
     at: now,
@@ -210,7 +215,7 @@ export async function runDiagnostic(api: BsaleApi, by: string): Promise<Diagnost
     apiCalls: api.callCount,
     offices: realOffices.map((o) => ({ id: o.id, name: o.name, isVirtual: o.isVirtual === 1, variantsWithStock: stockOffices.get(String(o.id)) ?? 0 })),
     documentTypes: docTypes.filter((d) => d.state !== 1).map((d) => ({ id: d.id, name: d.name, codeSii: d.codeSii ?? d.code, kind: docKindFor(settings, d.id, d.codeSii ?? d.code, d.name), count90d: countByType.get(String(d.id)) ?? 0 })),
-    priceLists: activePL.map((p) => ({ id: p.id, name: p.name })),
+    priceLists: activePL.map((p) => ({ id: Number(p.id), name: p.name })),
     productTypes: productTypes.map((t) => ({ id: t.id, name: t.name, products: products.filter((p) => String(p.product_type?.id) === String(t.id)).length })),
     products: products.length,
     variants: variants.length,
@@ -222,7 +227,7 @@ export async function runDiagnostic(api: BsaleApi, by: string): Promise<Diagnost
     topVariants90d: [...top.entries()].sort((a, b) => b[1].totalCLP - a[1].totalCLP).slice(0, 25).map(([v, t]) => ({ variantId: v, label: variantLabel.get(v) ?? v, quantity: Math.round(t.quantity * 100) / 100, totalCLP: Math.round(t.totalCLP) })),
     mapping: { suggested, confirmed, unmatched },
     warnings,
-    suggestedSettings: { factoryOfficeId: factoryGuess?.id, storeOfficeId: storeGuess?.id, priceListId },
+    suggestedSettings: stripUndefined({ factoryOfficeId: factoryGuess?.id, storeOfficeId: storeGuess?.id, priceListId, transferShippingTypeId: shippingTypes.find((t) => t.useDestinationOffice === 1 && t.state !== 1)?.id }) as DiagnosticSummary['suggestedSettings'],
   };
   await db.doc('bsale/meta').set({ diagnostic: summary }, { merge: true });
   // Only fill blanks: never override a choice made in Configuración.
@@ -230,6 +235,7 @@ export async function runDiagnostic(api: BsaleApi, by: string): Promise<Diagnost
     factoryOfficeId: settings.factoryOfficeId ?? factoryGuess?.id,
     storeOfficeId: settings.storeOfficeId ?? storeGuess?.id,
     priceListId: settings.priceListId ?? priceListId,
+    transferShippingTypeId: settings.transferShippingTypeId ?? shippingTypes.find((t) => t.useDestinationOffice === 1 && t.state !== 1)?.id,
   }));
   return summary;
 }

@@ -31,8 +31,8 @@ const h = (v: number | null) => (v == null ? '—' : v < 1 ? `${Math.round(v * 6
 const pct = (v: number | null) => (v == null ? '—' : `${v.toFixed(0)}%`);
 
 export default function Panel() {
-  const { nameOf, byRole } = useUsers();
-  const VENDEDORES = useMemo(() => byRole('vendedor').map((u) => ({ uid: u.uid, name: u.displayName })), [byRole]);
+  const { nameOf, sellers } = useUsers();
+  const VENDEDORES = useMemo(() => sellers.map((u) => ({ uid: u.uid, name: u.displayName })), [sellers]);
   const [tab, setTab] = useState<Tab>('ventas');
   const [rangeKey, setRangeKey] = useState<RangeKey>('30');
   const [orders, setOrders] = useState<Order[]>([]);

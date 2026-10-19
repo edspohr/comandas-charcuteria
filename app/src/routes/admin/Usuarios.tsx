@@ -10,7 +10,7 @@ import DataTable, { Pill } from '@/components/ui/DataTable';
 import Button from '@/components/ui/Button';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { ModalShell } from '@/components/orders/OrderDialogs';
-import { ROLES, ROLE_DESCRIPTION, ROLE_LABEL, can } from '@/domain/permissions';
+import { ROLES, ROLE_DESCRIPTION, ROLE_LABEL, can, isSeller } from '@/domain/permissions';
 import { addDaysIso, formatDateShort, todayInSantiago } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
 import type { AppUser, Order, Role } from '@/domain/types';
@@ -113,7 +113,7 @@ export default function Usuarios() {
         columns={[
           { key: 'name', label: 'Usuario', mobile: true, render: (r) => <div><p className="font-semibold text-charcoal-900">{r.displayName}{r.active === false && <span className="ml-2 text-[10px] uppercase text-red-700">desactivado</span>}{r.placeholder && <span className="ml-2 text-[10px] uppercase text-brass-700">sin cuenta</span>}</p><p className="text-[11px] text-charcoal-300 truncate">{r.placeholder ? 'Aparece en el historial de WhatsApp' : r.email}</p></div> },
           { key: 'role', label: 'Perfil', mobile: true, render: (r) => <Pill tone={ROLE_TONE[r.role]}>{ROLE_LABEL[r.role]}</Pill> },
-          { key: 'cartera', label: 'Cartera', align: 'right', render: (r) => r.role === 'vendedor' ? r.cartera : '—', muted: true },
+          { key: 'cartera', label: 'Cartera', align: 'right', render: (r) => isSeller(r.role) ? r.cartera : '—', muted: true },
           { key: 'creados', label: 'Pedidos 30 d', align: 'right', render: (r) => r.creados30 || '—' },
           { key: 'ventas', label: 'Ventas 30 d', align: 'right', mobile: true, render: (r) => r.ventas30 ? <span className="font-semibold">{formatCLP(r.ventas30)}</span> : '—' },
           { key: 'armados', label: 'Armados 30 d', align: 'right', render: (r) => r.armados30 || '—' },
@@ -123,7 +123,7 @@ export default function Usuarios() {
         expand={(r) => (
           <div className="text-xs text-charcoal-500 flex flex-wrap items-center gap-x-6 gap-y-2">
             <span>{ROLE_DESCRIPTION[r.role]}</span>
-            {r.role === 'vendedor' && <Link to={`/tablero?vendedor=${r.uid}`} className="underline hover:text-charcoal-900">Ver sus pedidos →</Link>}
+            {isSeller(r.role) && <Link to={`/tablero?vendedor=${r.uid}`} className="underline hover:text-charcoal-900">Ver sus pedidos →</Link>}
             {manage && r.placeholder && (
               <Button size="sm" onClick={(e) => { e.stopPropagation(); setAdding({ displayName: r.displayName, role: r.role, legacyUid: r.uid }); }}>Invitar con su historial</Button>
             )}

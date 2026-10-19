@@ -2,6 +2,7 @@ import { useMemo, useSyncExternalStore } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 import type { AppUser, Role } from '@/domain/types';
+import { isSeller } from '@/domain/permissions';
 
 // Directorio de usuarios (users/*), compartido por todas las pantallas que
 // muestran nombres (tablero, fichas, panel). Una sola suscripción por sesión.
@@ -38,7 +39,7 @@ export function resetUsersDirectory() {
   state = { users: [], loading: true };
 }
 
-export function useUsers(): State & { nameOf: (uid: string | undefined) => string; byRole: (role: Role) => AppUser[] } {
+export function useUsers(): State & { nameOf: (uid: string | undefined) => string; byRole: (role: Role) => AppUser[]; sellers: AppUser[] } {
   const s = useSyncExternalStore(subscribe, () => state);
   // Stable per snapshot so callers can put nameOf in useMemo deps.
   return useMemo(() => {
@@ -47,6 +48,7 @@ export function useUsers(): State & { nameOf: (uid: string | undefined) => strin
       ...s,
       nameOf: (uid: string | undefined) => (uid ? names.get(uid) ?? uid : ''),
       byRole: (role: Role) => s.users.filter((u) => u.role === role && u.active !== false),
+      sellers: s.users.filter((u) => isSeller(u.role) && u.active !== false),
     };
   }, [s]);
 }

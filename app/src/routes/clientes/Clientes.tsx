@@ -11,7 +11,7 @@ import { useCurrentUser } from '@/data/auth';
 import { useClients } from '@/data/clients';
 import { useSettings } from '@/data/settings';
 import { useUsers } from '@/data/users';
-import { ROLE_LABEL, can } from '@/domain/permissions';
+import { ROLE_LABEL, can, isSeller } from '@/domain/permissions';
 import { clientRows, rangeFor, HEALTH_LABEL, DEFAULT_CLIENT_HEALTH, type ClientHealth, type ClientRow } from '@/domain/analytics';
 import { formatDateShort } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
@@ -31,7 +31,7 @@ export default function Clientes() {
   const { settings } = useSettings();
   const [orders, setOrders] = useState<Order[]>([]);
   const [q, setQ] = useState('');
-  const [filter, setFilter] = useState<Filter>(role === 'vendedor' ? 'cartera' : 'todos');
+  const [filter, setFilter] = useState<Filter>(isSeller(role) ? 'cartera' : 'todos');
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const isAdmin = can(role, 'client.edit');

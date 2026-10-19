@@ -108,16 +108,17 @@ export function apiFromSecret(): BsaleApi {
 
 export interface RawRef { id: number | string; href?: string }
 
-export interface RawOffice { id: number; name: string; address?: string; municipality?: string; city?: string; isVirtual?: number; state?: number }
+export interface RawOffice { id: number; name: string; address?: string; municipality?: string; city?: string; isVirtual?: number; state?: number; store?: number; defaultPriceList?: number }
 export interface RawDocumentType { id: number; name: string; code?: string; codeSii?: string; isElectronicDocument?: number; state?: number; use?: number }
-export interface RawPriceList { id: number; name: string; state?: number; coin?: RawRef }
+export interface RawPriceList { id: number | string; name: string; state?: number; coin?: RawRef }
 export interface RawPriceDetail { id: number; variantValue: number; variantValueWithTaxes: number; variant: RawRef }
 export interface RawProductType { id: number; name: string; state?: number }
-export interface RawProduct { id: number; name: string; description?: string; state?: number; stockControl?: number; classification?: number; product_type?: RawRef & { name?: string } }
-export interface RawVariant { id: number; description?: string; code?: string; barCode?: string; state?: number; unlimitedStock?: number; allowDecimal?: number; product?: RawRef & { name?: string } }
+export interface RawProduct { id: number; name: string; description?: string; state?: number; stockControl?: number; classification?: number; allowDecimal?: number; product_type?: RawRef & { name?: string } }
+// allowDecimal lives on the product, not the variant (verified 19-10-2026).
+export interface RawVariant { id: number; description?: string; code?: string; barCode?: string; state?: number; unlimitedStock?: number; allowDecimal?: number; product?: RawRef & { name?: string; allowDecimal?: number; state?: number } }
 export interface RawStock { id: number; quantity: number; quantityReserved?: number; quantityAvailable?: number; variant: RawRef & { code?: string; description?: string }; office: RawRef }
 export interface RawClient {
-  id: number; firstName?: string; lastName?: string; email?: string; code?: string; phone?: string;
+  id: number; firstName?: string; lastName?: string; email?: string; code?: string; phone?: string; createdAt?: number | string;
   company?: string; activity?: string; address?: string; city?: string; municipality?: string;
   companyOrPerson?: number; state?: number; updatedAt?: number;
 }

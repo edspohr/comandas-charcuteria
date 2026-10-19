@@ -230,21 +230,42 @@ export function customerFromRaw(c: RawClient) {
 const slug = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
 const cleanRut = (r?: string) => (r ?? '').replace(/[^0-9kK]/g, '').toUpperCase();
 
+// The account has ~6.000 clients since 2022; the app only needs the ones
+// that buy. Mirrored: clients with a document in the mirror (last months),
+// clients created in Bsale in the last year, and any already linked.
 export async function syncClients(api: BsaleApi): Promise<{ updated: number; total: number }> {
   const db = getFirestore();
-  const remote = (await api.getAll<RawClient>('/clients.json', { state: 0 })).map(customerFromRaw);
+  const all = await api.getAll<RawClient>('/clients.json', { state: 0 });
+  const buyers = new Set<string>();
+  (await db.collection('bsale').doc('sales').collection('documents').select('bsaleClientId').get())
+    .forEach((d) => { const id = d.get('bsaleClientId'); if (id) buyers.add(String(id)); });
   const snap = await db.collection('clients').get();
   const byBsale = new Map<string, AppClient>();
   const byRut = new Map<string, AppClient>();
+  // Clients that came from the WhatsApp history have no RUT: match by name,
+  // only when the name is unique on both sides.
+  const byName = new Map<string, AppClient | null>();
+  const nameKey = (s?: string) => slug(s ?? '');
   snap.forEach((d) => {
     const c = d.data() as AppClient;
     if (c.bsaleClientId) byBsale.set(c.bsaleClientId, c);
     if (c.rut) byRut.set(cleanRut(c.rut), c);
+    if (!c.bsaleClientId && !c.isInternalShop) {
+      for (const k of new Set([nameKey(c.name), nameKey(c.fantasyName)])) {
+        if (!k || k.startsWith('sin-cliente')) continue;
+        byName.set(k, byName.has(k) ? null : c);
+      }
+    }
   });
+  const yearAgoS = Math.floor(Date.now() / 1000) - 365 * 86400;
+  const remote = all.filter((c) => buyers.has(String(c.id)) || byBsale.has(String(c.id)) || Number(c.createdAt || 0) >= yearAgoS).map(customerFromRaw);
+  const remoteNameCount = new Map<string, number>();
+  for (const r of remote) for (const k of new Set([nameKey(r.name), nameKey(r.fantasyName)])) if (k) remoteNameCount.set(k, (remoteNameCount.get(k) ?? 0) + 1);
   const now = Date.now();
   const writes: WriteOp[] = [];
   for (const r of remote) {
-    const local = byBsale.get(r.id) ?? (r.rut ? byRut.get(cleanRut(r.rut)) : undefined);
+    const nameMatch = [nameKey(r.name), nameKey(r.fantasyName)].map((k) => (k && remoteNameCount.get(k) === 1 ? byName.get(k) : undefined)).find(Boolean) ?? undefined;
+    const local = byBsale.get(r.id) ?? (r.rut ? byRut.get(cleanRut(r.rut)) : undefined) ?? nameMatch;
     const invoicingComplete = !!(r.rut && r.name && r.address && r.giro);
     const merged: AppClient = {
       ...(local ?? {}),
@@ -325,7 +346,24 @@ export function documentFromRaw(d: RawDocument, s: BsaleSettings, skuOf: (varian
   };
 }
 
-const DOC_EXPAND = '[details,client,document_type,sellers,office,references]';
+export const DOC_EXPAND = '[details,client,document_type,sellers,office,references]';
+
+// Documents in an emission-date window. The account has ~47.000 documents:
+// if Bsale ever ignored the range filter we would page through years of
+// history, so the first page is checked and the call aborts if it's off.
+export async function fetchDocumentsInRange(api: BsaleApi, fromS: number, toS: number): Promise<RawDocument[]> {
+  const out: RawDocument[] = [];
+  for (let offset = 0, page = 0; page < 400; page++, offset += 50) {
+    const res = await api.get<{ items?: RawDocument[]; count?: number }>('/documents.json', { emissiondaterange: `[${fromS},${toS}]`, expand: DOC_EXPAND, limit: 50, offset });
+    const items = res.items ?? [];
+    if (page === 0 && items.some((d) => Number(d.emissionDate) < fromS - 86400 || Number(d.emissionDate) > toS + 86400)) {
+      throw new Error('Bsale ignoró el filtro de fecha de documentos; se detuvo la consulta para no recorrer todo el historial.');
+    }
+    out.push(...items);
+    if (items.length < 50 || (res.count != null && out.length >= res.count)) break;
+  }
+  return out;
+}
 
 export async function syncDocuments(api: BsaleApi, settings: BsaleSettings, opts: { sinceS?: number; ids?: string[] } = {}): Promise<number> {
   const db = getFirestore();
@@ -339,7 +377,7 @@ export async function syncDocuments(api: BsaleApi, settings: BsaleSettings, opts
     // Desde la última corrida menos un día de margen (documentos con fecha
     // de emisión anterior a su generación); la primera vez, 30 días.
     const from = opts.sinceS ?? (settings.documentsSyncedUntil ? settings.documentsSyncedUntil - 86400 : nowS - 30 * 86400);
-    raws.push(...await api.getAll<RawDocument>('/documents.json', { emissiondaterange: `[${from},${nowS}]`, expand: DOC_EXPAND }));
+    raws.push(...await fetchDocumentsInRange(api, from, nowS));
     await patchSettings({ documentsSyncedUntil: nowS });
   }
   const docs = raws.filter(Boolean).map((r) => documentFromRaw(r, settings, skuOf));

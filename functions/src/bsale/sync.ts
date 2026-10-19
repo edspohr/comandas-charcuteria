@@ -105,7 +105,20 @@ export async function syncStock(api: BsaleApi, settings: BsaleSettings, opts: { 
     agg.set(k, a);
   }
 
-  const stockSnaps = await db.getAll(...[...agg.keys()].map((k) => db.doc(`stock/${k}`)).concat(db.doc('stock/__none__')));
+  // Guard against malformed mappings (empty ids, '/' in an id): skip and say
+  // which, instead of failing the whole sync.
+  const validKey = (k: string) => /^[^/]+__[^/]+$/.test(k) && !k.startsWith('__') && !k.endsWith('__');
+  const invalid = [...agg.keys()].filter((k) => !validKey(k));
+  if (invalid.length) {
+    logger.warn(`[bsale] ${invalid.length} cruces con id inválido omitidos`, { keys: invalid.slice(0, 20), variants: invalid.slice(0, 20).map((k) => agg.get(k)?.variantIds) });
+    invalid.forEach((k) => agg.delete(k));
+  }
+  const keys = [...agg.keys()];
+  const stockSnaps = [];
+  for (let i = 0; i < keys.length; i += 200) {
+    const refs = keys.slice(i, i + 200).map((k) => db.doc(`stock/${k}`));
+    if (refs.length) stockSnaps.push(...await db.getAll(...refs));
+  }
   const prevByKey = new Map(stockSnaps.filter((s) => s.exists).map((s) => [s.id, s.data() as { onHand: number; reserved: number }]));
   const writes: WriteOp[] = [];
   const compromised: string[] = [];

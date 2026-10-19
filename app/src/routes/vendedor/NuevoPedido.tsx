@@ -60,7 +60,14 @@ export default function NuevoPedido() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { clients } = useClients();
+  const { clients: allClients } = useClients();
+  // Tienda solo pide reposición para la tienda propia: el cliente viene dado.
+  const isTienda = current!.appUser.role === 'tienda';
+  const clients = useMemo(() => (isTienda ? allClients.filter((c) => c.isInternalShop) : allClients), [allClients, isTienda]);
+  useEffect(() => {
+    if (!isTienda || draft.clientId || clients.length === 0) return;
+    setDraft((d) => ({ ...d, clientId: clients[0].id, deliveryMode: 'despacho', step: Math.max(d.step, 2) }));
+  }, [isTienda, clients, draft.clientId]);
   const { products } = useProducts();
   const { stock } = useAllStock();
   const client = useMemo(
@@ -104,8 +111,8 @@ export default function NuevoPedido() {
     <div className="max-w-2xl mx-auto">
       <header className="mb-6 flex items-end justify-between">
         <div>
-          <p className="eyebrow">Vendedor</p>
-          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Nuevo pedido</h1>
+          <p className="eyebrow">{isTienda ? 'Tienda' : 'Vendedor'}</p>
+          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">{isTienda ? 'Pedir reposición' : 'Nuevo pedido'}</h1>
         </div>
         <button
           onClick={() => { if (confirm('¿Descartar borrador?')) { clearDraft(uid); setDraft(emptyDraft(settings.cutoffHour)); } }}

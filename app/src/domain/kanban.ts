@@ -79,11 +79,12 @@ export function cardTone(
 
 // ---------- Next action per role ----------
 
-export type ActionKind = 'take' | 'arm' | 'link' | 'dispatch' | 'deliver' | 'anular' | 'none';
+export type ActionKind = 'take' | 'arm' | 'link' | 'transfer' | 'dispatch' | 'deliver' | 'anular' | 'none';
 
 export interface NextAction { kind: ActionKind; label: string; }
 
-export function nextAction(order: Order, role: Role, uid: string): NextAction {
+export function nextAction(order: Order, role: Role, uid: string, opts: { isShop?: boolean } = {}): NextAction {
+  const shop = opts.isShop || order.kind === 'reposicion';
   // Supervisores (administración) pueden mover cualquier tarjeta; el resto
   // solo las propias o las que les tocan por función.
   const supervisor = can(role, 'order.cancelAny');
@@ -103,10 +104,13 @@ export function nextAction(order: Order, role: Role, uid: string): NextAction {
       if (canCancel && !supervisor) return { kind: 'anular', label: 'Anular' };
       return { kind: 'none', label: '' };
     case 'armado':
+      // La reposición de tienda no se factura: se registra como traslado.
+      if (shop) return can(role, 'order.pack') || can(role, 'order.link') ? { kind: 'transfer', label: 'Registrar traslado' } : { kind: 'none', label: '' };
       return can(role, 'order.link') ? { kind: 'link', label: 'Vincular doc.' } : { kind: 'none', label: '' };
     case 'facturado':
       return can(role, 'order.dispatch') ? { kind: 'dispatch', label: 'Despachar' } : { kind: 'none', label: '' };
     case 'despachado':
+      if (shop && can(role, 'transfer.receive')) return { kind: 'deliver', label: 'Recibir en tienda' };
       return can(role, 'order.deliver') ? { kind: 'deliver', label: 'Entregar' } : { kind: 'none', label: '' };
     default:
       return { kind: 'none', label: '' };
@@ -114,14 +118,14 @@ export function nextAction(order: Order, role: Role, uid: string): NextAction {
 }
 
 // Which action a drop on `target` means, if any. Only adjacent forward moves.
-export function actionForDrop(order: Order, target: ColumnId, role: Role, uid: string): ActionKind | null {
+export function actionForDrop(order: Order, target: ColumnId, role: Role, uid: string, opts: { isShop?: boolean } = {}): ActionKind | null {
   const from = columnFor(order.status);
   if (!from || from === target) return null;
   const idx = COLUMNS.findIndex((c) => c.id === from);
   if (COLUMNS[idx + 1]?.id !== target) return null;
-  const a = nextAction(order, role, uid);
-  const expected: Record<ColumnId, ActionKind | null> = {
-    pendiente: null, en_armado: 'take', por_facturar: 'arm', por_despachar: 'link', cerrado: 'dispatch',
+  const a = nextAction(order, role, uid, opts);
+  const expected: Record<ColumnId, ActionKind[]> = {
+    pendiente: [], en_armado: ['take'], por_facturar: ['arm'], por_despachar: ['link', 'transfer'], cerrado: ['dispatch'],
   };
-  return a.kind === expected[target] ? a.kind : null;
+  return expected[target].includes(a.kind) ? a.kind : null;
 }

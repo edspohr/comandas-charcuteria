@@ -116,6 +116,7 @@ export async function createOrder(
 
     const order: Order = {
       id: orderId,
+      kind: input.client.isInternalShop ? 'reposicion' : 'venta',
       createdBy: createdByUid,
       clientId: input.client.id,
       clientSnapshot: {
@@ -421,6 +422,57 @@ export async function vincularDocumento(
       statusHistory: [...order.statusHistory, { status: 'facturado', by, at: now, note: number }],
     });
   });
+}
+
+export const isReposicion = (o: Pick<Order, 'kind'> & { clientId?: string }, shopIds?: Set<string>) =>
+  o.kind === 'reposicion' || (!!shopIds && !!o.clientId && shopIds.has(o.clientId));
+
+// Reposición de tienda armada → traslado. Registra el movimiento en Bsale
+// (consumo en fábrica + recepción en tienda, o guía, según configuración)
+// con las cantidades empacadas, libera la reserva y deja el pedido listo para
+// salir. Reemplaza a "Vincular documento": a la tienda propia no se le factura.
+export async function registrarTraslado(order: Order, by: string): Promise<{ dryRun: boolean; skipped?: boolean }> {
+  if (order.status !== 'armado') throw new Error(`No se puede trasladar un pedido en estado ${order.status}`);
+  const { registerTransfer } = await import('./bsaleOps');
+  const lines = order.lines
+    .map((l) => ({ productId: l.productId, formatId: l.formatId, qty: l.packedQty ?? l.reservedQty }))
+    .filter((l) => l.qty > 0);
+  const result = await registerTransfer(order.id, lines);
+  const ref = `TR-${order.id}`;
+  const orderRef = doc(db, 'orders', order.id);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(orderRef);
+    if (!snap.exists()) throw new Error('Pedido no encontrado');
+    const fresh = snap.data() as Order;
+    if (fresh.status !== 'armado') throw new Error('El pedido cambió de estado mientras se registraba el traslado');
+    const reads: Array<{ ref: ReturnType<typeof doc>; prev: StockDoc | null; line: OrderLine }> = [];
+    for (const line of fresh.lines) {
+      if (line.reservedQty <= 0) continue;
+      const r = doc(db, 'stock', stockDocId(line.productId, line.formatId));
+      const s = await tx.get(r);
+      reads.push({ ref: r, prev: s.exists() ? (s.data() as StockDoc) : null, line });
+    }
+    const now = Date.now();
+    for (const { ref: r, prev, line } of reads) {
+      if (!prev) continue;
+      tx.update(r, { reserved: Math.max(0, prev.reserved - line.reservedQty) });
+      const mvRef = doc(collection(db, 'stockMovements'));
+      const mv: StockMovement = {
+        id: mvRef.id, productId: line.productId, formatId: line.formatId, qty: line.packedQty ?? line.reservedQty,
+        type: 'traslado_tienda', orderId: order.id, by, at: now,
+        reason: result.dryRun ? `${ref} (Bsale en simulacro)` : ref,
+      };
+      tx.set(mvRef, mv);
+    }
+    tx.update(orderRef, {
+      kind: 'reposicion',
+      status: 'facturado',
+      invoiceRef: ref,
+      updatedAt: now,
+      statusHistory: [...fresh.statusHistory, { status: 'facturado', by, at: now, note: result.skipped ? `${ref} · solo en la app` : result.dryRun ? `${ref} · simulacro` : `${ref} · registrado en Bsale` }],
+    });
+  });
+  return result;
 }
 
 export async function despacharOrder(

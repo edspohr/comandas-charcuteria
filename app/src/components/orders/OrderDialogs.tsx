@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
-import { anularOrder, despacharOrder, entregarOrder, vincularDocumento } from '@/data/orders';
+import { anularOrder, despacharOrder, entregarOrder, registrarTraslado, vincularDocumento } from '@/data/orders';
 import { useBsaleDocuments } from '@/data/bsale';
 import { emitDocumentForOrder } from '@/integrations/bsale/mockAdmin';
 import { syncStockFromBsale } from '@/data/stock';
@@ -78,7 +78,7 @@ export function DeliverDialog({ order, uid, onClose }: { order: Order; uid: stri
     catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
   }
   return (
-    <ModalShell title="Marcar entregado" eyebrow={order.id} onClose={onClose}>
+    <ModalShell title={order.kind === 'reposicion' ? 'Recibir en tienda' : 'Marcar entregado'} eyebrow={order.id} onClose={onClose}>
       <div className="space-y-4">
         <div>
           <label className="eyebrow block mb-1.5">Confirmación de entrega</label>
@@ -89,6 +89,51 @@ export function DeliverDialog({ order, uid, onClose }: { order: Order; uid: stri
           <Button variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
           <Button onClick={submit} disabled={busy} className="flex-1">{busy ? '…' : 'Confirmar entrega'}</Button>
         </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+// Reposición de tienda armada → traslado en Bsale (consumo + recepción o
+// guía, según Bsale → Configuración). Muestra lo que se va a mover.
+export function TrasladoDialog({ order, uid, onClose }: { order: Order; uid: string; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const lines = order.lines.filter((l) => (l.packedQty ?? l.reservedQty) > 0);
+  async function submit() {
+    setBusy(true); setError(null);
+    try {
+      const r = await registrarTraslado(order, uid);
+      setDone(r.skipped ? 'Traslado registrado en la app (Bsale simulado).' : r.dryRun ? 'Traslado registrado. Bsale está en simulacro: quedó en la bitácora sin enviarse.' : 'Traslado registrado en Bsale.');
+    } catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
+  }
+  return (
+    <ModalShell title="Registrar traslado a tienda" eyebrow={order.id} onClose={onClose}>
+      <div className="space-y-4">
+        {done ? (
+          <>
+            <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm">{done}</div>
+            <Button onClick={onClose} className="w-full">Listo</Button>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-charcoal-700">Sale de la fábrica y entra a la tienda con lo empacado. No se factura.</p>
+            <ul className="card divide-y divide-charcoal-100 text-sm">
+              {lines.map((l) => (
+                <li key={`${l.productId}-${l.formatId}`} className="px-3 py-2 flex justify-between gap-3">
+                  <span className="text-charcoal-700">{l.productName} · {l.formatLabel}</span>
+                  <span className="font-semibold text-charcoal-900 tabular-nums">{l.packedQty ?? l.reservedQty}{l.unit === 'kg' ? ' kg' : ''}</span>
+                </li>
+              ))}
+            </ul>
+            {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-2 text-sm">{error}</div>}
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
+              <Button onClick={submit} disabled={busy || lines.length === 0} className="flex-1">{busy ? 'Registrando…' : 'Registrar traslado'}</Button>
+            </div>
+          </>
+        )}
       </div>
     </ModalShell>
   );

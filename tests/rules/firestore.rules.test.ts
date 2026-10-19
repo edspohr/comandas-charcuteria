@@ -99,6 +99,19 @@ describe('pedidos', () => {
   });
 });
 
+describe('reposición de tienda', () => {
+  it('despacho registers the transfer only for a reposición, and tienda receives it', async () => {
+    await seedOrder('PED-R1', 'u-lucy', { kind: 'reposicion', status: 'armado' });
+    await seedOrder('PED-V1', 'u-alice', { kind: 'venta', status: 'armado' });
+    await seedOrder('PED-R2', 'u-lucy', { kind: 'reposicion', status: 'despachado' });
+    const edu = as('u-edu', 'despacho');
+    await assertSucceeds(updateDoc(doc(edu, 'orders', 'PED-R1'), { status: 'facturado', invoiceRef: 'TR-PED-R1' }));
+    await assertFails(updateDoc(doc(edu, 'orders', 'PED-V1'), { status: 'facturado', invoiceRef: 'TR-PED-V1' }));
+    await assertSucceeds(updateDoc(doc(as('u-lucy', 'tienda'), 'orders', 'PED-R2'), { status: 'entregado' }));
+    await assertFails(updateDoc(doc(as('u-lucy', 'tienda'), 'orders', 'PED-V1'), { status: 'entregado' }));
+  });
+});
+
 describe('consultor (auditor)', () => {
   it('reads everything but writes nothing', async () => {
     await seedOrder('PED-8', 'u-alice');

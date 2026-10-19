@@ -162,6 +162,23 @@ service cloud.firestore {
           && unchanged('createdBy') && unchanged('invoiceRef')
         )
         || (
+          // Reposición de tienda: despacho registra el traslado (no se factura).
+          canPack()
+          && resource.data.get('kind', '') == 'reposicion'
+          && resource.data.status == 'armado'
+          && request.resource.data.status == 'facturado'
+          && request.resource.data.invoiceRef.matches('^TR-.*')
+          && unchanged('createdBy') && unchanged('lines') && unchanged('kind')
+        )
+        || (
+          // La tienda confirma que recibió su reposición.
+          role() == 'tienda'
+          && resource.data.get('kind', '') == 'reposicion'
+          && resource.data.status == 'despachado'
+          && request.resource.data.status == 'entregado'
+          && unchanged('createdBy') && unchanged('invoiceRef') && unchanged('lines')
+        )
+        || (
           canDispatch()
           && resource.data.status == 'facturado'
           && request.resource.data.status == 'despachado'

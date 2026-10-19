@@ -146,8 +146,13 @@ export interface DeliveryProof {
   note?: string;
 }
 
+// venta = a cliente (se factura). reposicion = a la tienda propia: no se
+// factura, se registra como traslado fábrica → tienda en Bsale.
+export type OrderKind = 'venta' | 'reposicion';
+
 export interface Order {
   id: string;
+  kind?: OrderKind;
   createdBy: string;
   clientId: string;
   clientSnapshot: Pick<Client, 'name' | 'fantasyName' | 'rut' | 'address'>;

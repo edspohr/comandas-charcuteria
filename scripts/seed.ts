@@ -39,6 +39,7 @@ const shiftMs = (ms: number) => Math.min(ms + SHIFT_DAYS * DAY_MS, Date.now());
 function shiftOrder(o: Order): Order {
   return {
     ...o,
+    kind: o.clientId === 'tienda' ? 'reposicion' : 'venta',
     requestedDate: shiftIso(o.requestedDate),
     createdAt: shiftMs(o.createdAt),
     updatedAt: shiftMs(o.updatedAt),

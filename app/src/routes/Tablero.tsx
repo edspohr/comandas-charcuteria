@@ -11,7 +11,7 @@ import { useUsers } from '@/data/users';
 import { ROLE_LABEL, can, canAny, isReadOnly } from '@/domain/permissions';
 import Button from '@/components/ui/Button';
 import ErrorBanner from '@/components/ui/ErrorBanner';
-import { AnularDialog, DeliverDialog, DispatchDialog, VincularDocumentoDialog } from '@/components/orders/OrderDialogs';
+import { AnularDialog, DeliverDialog, DispatchDialog, TrasladoDialog, VincularDocumentoDialog } from '@/components/orders/OrderDialogs';
 import { COLUMNS, actionForDrop, cardTone, columnFor, nextAction, type ActionKind, type ColumnId, type Tone } from '@/domain/kanban';
 import { DEFAULT_KANBAN_THRESHOLDS, ORDER_STATUS_LABEL, type Order, type OrderStatus, type Role } from '@/domain/types';
 import { addDaysIso, formatDateShort, todayInSantiago } from '@/lib/format';
@@ -150,6 +150,7 @@ export default function Tablero() {
         case 'take': await assignPacker(order.id, uid); break;
         case 'arm': navigate(`/despacho/cola/${order.id}`); break;
         case 'link':
+        case 'transfer':
         case 'dispatch':
         case 'deliver':
         case 'anular':
@@ -275,7 +276,7 @@ export default function Tablero() {
         {COLUMNS.map((c) => {
           const list = byColumn.columns.get(c.id) ?? [];
           const isCerrado = c.id === 'cerrado';
-          const dropOk = dragOrder ? actionForDrop(dragOrder, c.id, role, uid) : null;
+          const dropOk = dragOrder ? actionForDrop(dragOrder, c.id, role, uid, { isShop: internalShopIds.has(dragOrder.clientId) }) : null;
           const sumCLP = list.reduce((s, o) => s + (o.totalCLP ?? 0), 0);
           return (
             <section
@@ -288,7 +289,7 @@ export default function Tablero() {
                 e.preventDefault();
                 const o = dragOrder; setDragId(null); setOverCol(null);
                 if (!o) return;
-                const kind = actionForDrop(o, c.id, role, uid);
+                const kind = actionForDrop(o, c.id, role, uid, { isShop: internalShopIds.has(o.clientId) });
                 if (kind) void run(kind, o);
               }}
             >
@@ -307,10 +308,10 @@ export default function Tablero() {
                     key={o.id}
                     order={o}
                     tone={cardTone(o, stock, thresholds, now, today)}
-                    action={nextAction(o, role, uid)}
+                    action={nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId) })}
                     onAction={(kind) => run(kind, o)}
                     detailTo={detailPath(o, role, uid)}
-                    draggable={dragEnabled && !isCerrado && nextAction(o, role, uid).kind !== 'none' && nextAction(o, role, uid).kind !== 'anular'}
+                    draggable={dragEnabled && !isCerrado && nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId) }).kind !== 'none' && nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId) }).kind !== 'anular'}
                     onDragStart={() => setDragId(o.id)}
                     onDragEnd={() => { setDragId(null); setOverCol(null); }}
                     compact={isCerrado}
@@ -335,6 +336,7 @@ export default function Tablero() {
         </section>
       )}
 
+      {dialog?.kind === 'transfer' && <TrasladoDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'link' && <VincularDocumentoDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'dispatch' && <DispatchDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'deliver' && <DeliverDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}

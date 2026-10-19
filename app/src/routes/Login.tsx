@@ -29,10 +29,11 @@ function TopBar() {
   return (
     <div className="bg-charcoal-900 text-cream-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <Logo size={30} />
-          <span className="font-semibold tracking-display uppercase text-sm">Comandas</span>
-        </div>
+        {/* Solo la palabra: la marca completa va en el hero, dos logos competían. */}
+        <span className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.32em] text-brass-300">
+          <span aria-hidden className="h-4 w-[3px] rounded-full bg-brass-500" />
+          Comandas
+        </span>
         <a href="#ingresar" className="lg:hidden text-[11px] uppercase tracking-display border border-cream-100/30 rounded-md px-3 py-1.5 hover:border-cream-100/60">Ingresar</a>
       </div>
     </div>

@@ -44,6 +44,32 @@
       ],
       "cwd": "app",
       "port": 5174
+    },
+    {
+      "name": "fake-bsale",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "tsx",
+        "scripts/fake-bsale.ts"
+      ],
+      "port": 4010
+    },
+    {
+      "name": "app-emulators-real",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "VITE_USE_EMULATORS=true",
+        "VITE_DEMO_LOGIN=true",
+        "VITE_BSALE_MODE=real",
+        "VITE_FIREBASE_PROJECT_ID=comandas-charcuteria-demo",
+        "npx",
+        "vite",
+        "--port",
+        "5175",
+        "--strictPort"
+      ],
+      "cwd": "app",
+      "port": 5175
     }
   ]
 }

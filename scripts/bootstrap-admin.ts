@@ -30,20 +30,24 @@ initializeApp({ projectId: emulated ? 'comandas-charcuteria-demo' : 'comandas-ch
 const db = getFirestore();
 const auth = getAuth();
 
-for (let i = 0; i < args.length; i += 3) {
-  const email = args[i].trim().toLowerCase();
-  const displayName = args[i + 1].trim();
-  const role = args[i + 2];
-  if (!ROLES.includes(role)) { console.error(`✗ ${email}: perfil "${role}" no existe`); continue; }
+async function main() {
+  for (let i = 0; i < args.length; i += 3) {
+    const email = args[i].trim().toLowerCase();
+    const displayName = args[i + 1].trim();
+    const role = args[i + 2];
+    if (!ROLES.includes(role)) { console.error(`✗ ${email}: perfil "${role}" no existe`); continue; }
 
-  let uid: string | null = null;
-  try { uid = (await auth.getUserByEmail(email)).uid; } catch { /* aún no entra */ }
-  if (uid && (await db.doc(`users/${uid}`).get()).exists) {
-    await auth.setCustomUserClaims(uid, { role });
-    await db.doc(`users/${uid}`).update({ role, displayName, active: true });
-    console.log(`✓ ${email}: perfil actualizado a ${role}`);
-  } else {
-    await db.doc(`invites/${email}`).set({ email, displayName, role, createdAt: Date.now(), createdBy: 'bootstrap' });
-    console.log(`✓ ${email}: invitado como ${role} (entra con Google)`);
+    let uid: string | null = null;
+    try { uid = (await auth.getUserByEmail(email)).uid; } catch { /* aún no entra */ }
+    if (uid && (await db.doc(`users/${uid}`).get()).exists) {
+      await auth.setCustomUserClaims(uid, { role });
+      await db.doc(`users/${uid}`).update({ role, displayName, active: true });
+      console.log(`✓ ${email}: perfil actualizado a ${role}`);
+    } else {
+      await db.doc(`invites/${email}`).set({ email, displayName, role, createdAt: Date.now(), createdBy: 'bootstrap' });
+      console.log(`✓ ${email}: invitado como ${role} (entra con Google)`);
+    }
   }
 }
+
+main().catch((e) => { console.error(e); process.exit(1); });

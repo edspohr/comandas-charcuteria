@@ -81,9 +81,10 @@ export interface BsaleClient {
   // GET /v1/clients.json (paginated) — full client list for the mirror.
   getClients(): Promise<BsaleCustomer[]>;
   // POST /v1/clients.json — alta rápida desde la app crea el cliente en Bsale.
-  createClient(input: BsaleCustomerInput): Promise<BsaleCustomer>;
+  // null → Bsale en simulacro: el alta quedó registrada pero no se envió.
+  createClient(input: BsaleCustomerInput): Promise<BsaleCustomer | null>;
   // PUT /v1/clients/{id}.json — administración completa datos de facturación.
-  updateClient(id: string, patch: Partial<BsaleCustomerInput>): Promise<BsaleCustomer>;
+  updateClient(id: string, patch: Partial<BsaleCustomerInput>): Promise<BsaleCustomer | null>;
   // Pure — the payload a real integration would POST to /v1/documents.json.
   // Kept so stakeholders can see the contract from the app.
   buildPayload(order: Order, invoiceRef?: string): unknown;

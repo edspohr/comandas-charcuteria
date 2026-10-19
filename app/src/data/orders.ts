@@ -14,6 +14,7 @@ import type { Client, Order, OrderLine, OrderStatus, ProductFormat, StockDoc, St
 import { stockDocId } from '@/domain/types';
 import { describeFirestoreError } from '@/lib/errors';
 import { computeLineSubtotal } from '@/lib/pricing';
+import { DOCUMENTS_PATH } from '@/integrations/bsale/client';
 
 export interface DraftLine {
   productId: string;
@@ -366,7 +367,7 @@ export async function vincularDocumento(
   by: string,
 ): Promise<void> {
   const orderRef = doc(db, 'orders', orderId);
-  const docRef = doc(db, 'bsaleDocuments', document.id);
+  const docRef = doc(db, DOCUMENTS_PATH.join('/'), document.id);
   const number = document.number.trim().toUpperCase();
   if (!DOC_NUMBER_RE.test(number)) throw new Error('Número de documento inválido. Formato esperado: FA-000824, BO-004102 o GD-000310.');
   const { getDocs } = await import('firebase/firestore');

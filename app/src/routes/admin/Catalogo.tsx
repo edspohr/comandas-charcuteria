@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import CruceBsale from '@/components/catalog/CruceBsale';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import DataTable, { Pill } from '@/components/ui/DataTable';
 import { useProducts } from '@/data/products';
@@ -25,9 +26,24 @@ interface FormatRow {
   available: number;
 }
 
-// One row per product+format so a single scroll shows price, Bsale stock,
-// reservations and availability for the whole catalog. Row click → bitácora.
+// Two tabs: Stock (one row per product+format: price, Bsale stock per office,
+// reservations, availability; row click → bitácora) and Cruce con Bsale.
 export default function Catalogo() {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') === 'cruce' ? 'cruce' : 'stock';
+  return (
+    <div>
+      <nav className="mb-4 flex gap-1 border-b border-charcoal-100">
+        {([['stock', 'Stock y precios'], ['cruce', 'Cruce con Bsale']] as const).map(([t, label]) => (
+          <button key={t} onClick={() => setParams(t === 'stock' ? {} : { tab: t }, { replace: true })} className={'px-4 py-2.5 text-xs uppercase tracking-display font-medium border-b-2 transition -mb-px ' + (t === tab ? 'border-brass-500 text-charcoal-900' : 'border-transparent text-charcoal-300 hover:text-charcoal-500')}>{label}</button>
+        ))}
+      </nav>
+      {tab === 'cruce' ? <CruceBsale /> : <CatalogoStock />}
+    </div>
+  );
+}
+
+function CatalogoStock() {
   const { products, loading, error: productsError } = useProducts();
   const { stock, error: stockError } = useAllStock();
   const sync = useSyncState();
@@ -92,7 +108,8 @@ export default function Catalogo() {
           ) : <span className="text-charcoal-200">↳</span> },
           { key: 'format', label: 'Formato', mobile: true, render: (r) => <span className="text-charcoal-700">{r.format.label}</span> },
           { key: 'price', label: 'Precio', align: 'right', render: (r) => <span className="text-xs">{unitPriceLabel(r.format) || '—'}</span>, muted: true },
-          { key: 'bsale', label: 'Bsale', align: 'right', render: (r) => formatQty(r.stock?.onHand ?? 0, r.format.unit) },
+          { key: 'bsale', label: 'Fábrica', align: 'right', render: (r) => formatQty(r.stock?.onHand ?? 0, r.format.unit) },
+          { key: 'store', label: 'Tienda', align: 'right', render: (r) => r.stock?.storeOnHand != null ? formatQty(r.stock.storeOnHand, r.format.unit) : <span className="text-charcoal-300">—</span>, muted: true },
           { key: 'reserved', label: 'Reserv.', align: 'right', render: (r) => formatQty(r.stock?.reserved ?? 0, r.format.unit), muted: true },
           { key: 'available', label: 'Disp.', align: 'right', mobile: true, render: (r) => {
             const comp = !!r.stock && r.stock.onHand < r.stock.reserved;

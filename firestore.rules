@@ -79,6 +79,11 @@ service cloud.firestore {
       allow read:  if canRead();
       allow write: if false;
     }
+    // Excepción: al vincular un documento la app marca linkedOrderId (y nada más).
+    match /bsale/sales/documents/{id} {
+      allow update: if isSupervisor()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['linkedOrderId']);
+    }
     // Cruce variante Bsale ↔ producto/formato de la app.
     match /catalogMap/{variantId} {
       allow read:  if canRead();

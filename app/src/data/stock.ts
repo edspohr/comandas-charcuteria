@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { collection, doc, getDocs, onSnapshot, query, runTransaction, where } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, functions } from './firebase';
+import { httpsCallable } from 'firebase/functions';
 import { describeFirestoreError } from '@/lib/errors';
 import { stockDocId, type Order, type StockDoc, type StockMovement } from '@/domain/types';
-import { bsale } from '@/integrations/bsale/MockBsaleClient';
+import { bsale, isRealBsale } from '@/integrations/bsale/client';
 import { absorbPendingForKey } from './produccion';
 import { syncClientsFromBsale } from './clients';
 
@@ -91,7 +92,12 @@ export function useSyncState(): SyncState | null | undefined {
 // sku that now has room, absorb pending production FIFO (promoting orders
 // whose lines are fully covered). Bsale is the source of truth: the app never
 // pushes stock the other way.
+const syncNowFn = httpsCallable<{ clients?: boolean }, { summary: SyncSummary }>(functions, 'bsaleSyncNow');
+
 export async function syncStockFromBsale(by: string, officeId?: number): Promise<SyncSummary> {
+  // Real Bsale: the server owns the sync (token, FIFO, mirrors). The browser
+  // only asks for a run; cron + webhooks keep it fresh in between.
+  if (isRealBsale) return (await syncNowFn({})).data.summary;
   const remote = await bsale.getStocks(officeId);
   const remoteBySku = new Map(remote.map((r) => [r.sku, r]));
 

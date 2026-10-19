@@ -3,16 +3,17 @@ import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestor
 import { db } from './firebase';
 import { describeFirestoreError } from '@/lib/errors';
 import type { BsaleDocument, BsaleReception } from '@/integrations/bsale/BsaleClient';
+import { DOCUMENTS_PATH } from '@/integrations/bsale/client';
 
-// Live view of the (simulated) Bsale document feed. In production this would
-// be a polling hook over bsale.getDocuments(); here the mock keeps them in
-// Firestore so every screen updates in real time.
+// Live view of the Bsale document feed: the simulated one in mock mode, the
+// server-side mirror (bsale/sales/documents, fed by cron + webhooks) in real
+// mode. Either way it's Firestore, so every screen updates in real time.
 export function useBsaleDocuments(opts: { limit?: number } = {}): { documents: BsaleDocument[]; loading: boolean; error: string | null } {
   const [documents, setDocuments] = useState<BsaleDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    const q = query(collection(db, 'bsaleDocuments'), orderBy('emittedAt', 'desc'), limit(opts.limit ?? 100));
+    const q = query(collection(db, DOCUMENTS_PATH.join('/')), orderBy('emittedAt', 'desc'), limit(opts.limit ?? 100));
     const unsub = onSnapshot(
       q,
       (snap) => { const l: BsaleDocument[] = []; snap.forEach((d) => l.push(d.data() as BsaleDocument)); setDocuments(l); setError(null); setLoading(false); },

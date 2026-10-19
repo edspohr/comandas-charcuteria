@@ -4,7 +4,7 @@ import { anularOrder, despacharOrder, entregarOrder, vincularDocumento } from '@
 import { useBsaleDocuments } from '@/data/bsale';
 import { emitDocumentForOrder } from '@/integrations/bsale/mockAdmin';
 import { syncStockFromBsale } from '@/data/stock';
-import { bsale } from '@/integrations/bsale/MockBsaleClient';
+import { bsale, isRealBsale } from '@/integrations/bsale/client';
 import { describeFirestoreError } from '@/lib/errors';
 import { formatCLP } from '@/lib/pricing';
 import type { Order } from '@/domain/types';
@@ -229,7 +229,7 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
           <Button variant="secondary" onClick={linkManual} disabled={busy != null || !manualValid || !!manualLinkedElsewhere}>Vincular</Button>
         </div>
 
-        <div className="rounded-md border border-dashed border-charcoal-200 p-3">
+        {!isRealBsale && <div className="rounded-md border border-dashed border-charcoal-200 p-3">
           <p className="eyebrow mb-1">Demo · Bsale simulado</p>
           <p className="text-xs text-charcoal-500 mb-2">Emite el documento en el POS simulado con las cantidades empacadas y lo vincula en un paso.</p>
           <div className="flex gap-2">
@@ -241,7 +241,7 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
 {JSON.stringify(bsale.buildPayload(order), null, 2)}
             </pre>
           )}
-        </div>
+        </div>}
 
         {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-2 text-sm">{error}</div>}
       </div>

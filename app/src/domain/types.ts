@@ -64,6 +64,10 @@ export interface StockDoc {
   onHand: number;
   reserved: number;
   bsaleVariantId?: string;
+  // Bsale real: todas las variantes que respaldan este formato y el stock de
+  // la sucursal tienda (solo informativo; los pedidos usan la fábrica).
+  bsaleVariantIds?: string[];
+  storeOnHand?: number;
   syncedAt?: number;
 }
 

@@ -14,7 +14,8 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 // The role travels as the custom claim `role`, exactly like production
 // (functions/src/users.ts sets it), so each context passes it as a token claim.
 
-const PROJECT = 'comandas-charcuteria-demo';
+// Own project id: running against the dev emulator must not wipe its data.
+const PROJECT = 'comandas-rules-test';
 
 let env: RulesTestEnvironment;
 
@@ -128,3 +129,21 @@ describe('usuarios', () => {
     await assertFails(getDoc(doc(as('u-new', 'vendedor'), 'invites', 'x@y.cl')));
   });
 });
+
+describe('bsale real (espejos del servidor)', () => {
+  it('admin only marks linkedOrderId on a mirrored document; nobody else writes mirrors', async () => {
+    await seed('bsale/sales/documents/d1', { id: 'd1', number: 'FA-000001', totalCLP: 1000 });
+    const miguel = as('u-miguel', 'admin');
+    await assertSucceeds(updateDoc(doc(miguel, 'bsale/sales/documents/d1'), { linkedOrderId: 'PED-1' }));
+    await assertFails(updateDoc(doc(miguel, 'bsale/sales/documents/d1'), { totalCLP: 1 }));
+    await assertFails(updateDoc(doc(as('u-edu', 'despacho'), 'bsale/sales/documents/d1'), { linkedOrderId: 'PED-2' }));
+    await assertFails(setDoc(doc(as('u-ciro', 'superAdmin'), 'bsale/stock/byVariant/1'), { offices: {} }));
+    await assertSucceeds(getDoc(doc(as('u-ed', 'consultor'), 'bsale/sales/documents/d1')));
+  });
+
+  it('webhook key is unreadable from the client', async () => {
+    await seed('bsaleSecrets/webhook', { key: 'x' });
+    await assertFails(getDoc(doc(as('u-ciro', 'superAdmin'), 'bsaleSecrets/webhook')));
+  });
+});
+

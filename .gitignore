@@ -14,3 +14,4 @@ ui-debug.log*
 .DS_Store
 *.log
 functions/lib
+functions/.secret.local

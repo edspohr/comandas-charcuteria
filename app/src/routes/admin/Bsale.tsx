@@ -1,226 +1,259 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Button from '@/components/ui/Button';
-import Stepper from '@/components/ui/Stepper';
+import ErrorBanner from '@/components/ui/ErrorBanner';
+import { Pill } from '@/components/ui/DataTable';
 import { useCurrentUser } from '@/data/auth';
-import { useProducts } from '@/data/products';
-import { useBsaleDocuments, useBsaleMockStock, useBsaleReceptions } from '@/data/bsale';
-import { syncStockFromBsale, useAllStock, useSyncState } from '@/data/stock';
-import { emitDocument, receiveProduction } from '@/integrations/bsale/mockAdmin';
-import { describeFirestoreError } from '@/lib/errors';
-import { formatQty } from '@/lib/format';
+import { syncStockFromBsale, useSyncState } from '@/data/stock';
+import {
+  runDiagnostic, saveBsaleSettings, useBsaleSettings, useDiagnostic, useWebhookLog, useWriteLog, webhookInfo,
+  type BsaleSettings, type DiagnosticSummary, type DocKind,
+} from '@/data/bsaleAdmin';
+import { BSALE_MODE, isRealBsale } from '@/integrations/bsale/client';
+import { can } from '@/domain/permissions';
+import { callableMessage } from '@/data/userAdmin';
 import { formatCLP } from '@/lib/pricing';
-import type { ProductFormat } from '@/domain/types';
+import BsaleConsolaMock from './BsaleConsolaMock';
 
-// "Consola Bsale (simulada)" — the Bsale side of the demo. Lets the presenter
-// do what in real life happens inside Bsale: the factory receives finished
-// goods, the cashier sells at the counter. superAdmin only.
-export default function BsaleConsola() {
-  const { current } = useCurrentUser();
-  const uid = current!.appUser.uid;
-  const { products } = useProducts();
-  const bsaleStock = useBsaleMockStock();
-  const { stock } = useAllStock();
-  const { documents } = useBsaleDocuments({ limit: 15 });
-  const receptions = useBsaleReceptions(10);
-  const sync = useSyncState();
-  const [tab, setTab] = useState<'recepcion' | 'venta' | 'documentos'>('recepcion');
-  const [flash, setFlash] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+type Tab = 'conexion' | 'bitacora' | 'consola';
 
-  const active = useMemo(() => products.filter((p) => p.active && !p.discontinued), [products]);
+const KIND_LABEL: Record<DocKind, string> = { factura: 'Factura', boleta: 'Boleta', guia: 'Guía', nota_credito: 'Nota de crédito', otro: 'Otro' };
+const when = (ms?: number) => (ms ? new Date(ms).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' }) : '—');
 
-  // Recepción
-  const [productId, setProductId] = useState('');
-  const product = active.find((p) => p.id === productId) ?? active[0];
-  const [formatId, setFormatId] = useState('');
-  const format: ProductFormat | undefined = product?.formats.find((f) => f.formatId === formatId) ?? product?.formats[0];
-  const [qty, setQty] = useState(0);
-  const [note, setNote] = useState('');
-
-  async function doReceive(andSync: boolean) {
-    if (!product || !format || qty <= 0) { setError('Elija producto, formato y cantidad'); return; }
-    setBusy(true); setError(null); setFlash(null);
-    try {
-      const sku = `${product.id}__${format.formatId}`;
-      await receiveProduction(sku, qty, uid, note || undefined);
-      let msg = `Bsale recibió ${formatQty(qty, format.unit)} de ${product.name} · ${format.label}.`;
-      if (andSync) {
-        const r = await syncStockFromBsale(uid);
-        msg += r.promoted.length ? ` Sync: promovidos ${r.promoted.join(', ')}.` : r.absorbed > 0 ? ` Sync: reasignadas ${r.absorbed}.` : ' Sync OK.';
-      }
-      setFlash(msg); setQty(0); setNote('');
-    } catch (e) { setError(describeFirestoreError(e)); } finally { setBusy(false); }
-  }
-
-  // Venta mostrador
-  const [saleProductId, setSaleProductId] = useState('');
-  const saleProduct = active.find((p) => p.id === saleProductId) ?? active[0];
-  const [saleFormatId, setSaleFormatId] = useState('');
-  const saleFormat = saleProduct?.formats.find((f) => f.formatId === saleFormatId) ?? saleProduct?.formats[0];
-  const [saleQty, setSaleQty] = useState(0);
-  const [saleClient, setSaleClient] = useState('Cliente mostrador');
-
-  async function doSale(andSync: boolean) {
-    if (!saleProduct || !saleFormat || saleQty <= 0) { setError('Elija producto, formato y cantidad'); return; }
-    setBusy(true); setError(null); setFlash(null);
-    try {
-      const unit = saleFormat.priceCLP ?? ((saleFormat.pricePerKgCLP ?? 0) * (saleFormat.unit === 'kg' ? 1 : (saleFormat.avgWeightKg ?? 1)));
-      const d = await emitDocument({
-        type: 'boleta',
-        clientName: saleClient || 'Cliente mostrador',
-        lines: [{ sku: `${saleProduct.id}__${saleFormat.formatId}`, description: `${saleProduct.name} · ${saleFormat.label}`, quantity: saleQty, subtotalCLP: unit * saleQty }],
-      });
-      let msg = `Boleta ${d.number} emitida en el POS por ${formatCLP(d.totalCLP)}.`;
-      if (andSync) {
-        const r = await syncStockFromBsale(uid);
-        msg += r.compromised.length ? ` ⚠ Stock comprometido en ${r.compromised.length} formato${r.compromised.length === 1 ? '' : 's'}.` : ' Sync OK.';
-      }
-      setFlash(msg); setSaleQty(0);
-    } catch (e) { setError(describeFirestoreError(e)); } finally { setBusy(false); }
-  }
-
-  const skuLabel = (sku: string) => {
-    const [pid, fid] = sku.split('__');
-    const p = products.find((x) => x.id === pid);
-    const f = p?.formats.find((x) => x.formatId === fid);
-    return p && f ? `${p.name} · ${f.label}` : sku;
-  };
-
+// Bsale → Configuración y salud de la integración (superAdmin). En modo
+// mock agrega la consola que simula lo que pasa dentro de Bsale.
+export default function Bsale() {
+  const [tab, setTab] = useState<Tab>('conexion');
+  const tabs: Array<[Tab, string]> = [['conexion', 'Conexión'], ['bitacora', 'Bitácora'], ...(isRealBsale ? [] : [['consola', 'Consola simulada'] as [Tab, string]])];
   return (
     <div>
-      <header className="mb-5">
-        <p className="eyebrow">Solo Super Administrador · Simulado</p>
-        <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Consola Bsale</h1>
-        <p className="text-xs text-charcoal-300 mt-1 max-w-2xl">
-          Reemplaza a Bsale durante la demo. Acá pasa lo que en la operación real ocurre dentro de Bsale: la fábrica carga producción terminada y el POS emite boletas/facturas que descuentan stock. La app solo lee el resultado al sincronizar.
-          {sync?.at && <> Última sincronización {new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}.</>}
-        </p>
+      <header className="mb-4">
+        <p className="eyebrow">Super Administración · modo {BSALE_MODE === 'real' ? 'Bsale real' : 'Bsale simulado'}</p>
+        <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Bsale</h1>
       </header>
-
       <nav className="mb-4 flex gap-1 border-b border-charcoal-100">
-        {([['recepcion', 'Recepción de producción'], ['venta', 'Venta en mostrador'], ['documentos', 'Documentos emitidos']] as const).map(([t, label]) => (
+        {tabs.map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} className={'px-4 py-2.5 text-xs uppercase tracking-display font-medium border-b-2 transition -mb-px ' + (t === tab ? 'border-brass-500 text-charcoal-900' : 'border-transparent text-charcoal-300 hover:text-charcoal-500')}>{label}</button>
         ))}
       </nav>
+      {tab === 'conexion' && <Conexion />}
+      {tab === 'bitacora' && <Bitacora />}
+      {tab === 'consola' && <BsaleConsolaMock />}
+    </div>
+  );
+}
 
-      {flash && <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-4">{flash}</div>}
-      {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-3 text-sm mb-4">{error}</div>}
+function Conexion() {
+  const { current } = useCurrentUser();
+  const role = current!.appUser.role;
+  const uid = current!.appUser.uid;
+  const editable = can(role, 'bsale.configure');
+  const { settings } = useBsaleSettings();
+  const diagnostic = useDiagnostic();
+  const sync = useSyncState();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [webhook, setWebhook] = useState<{ url: string; topics: string[] } | null>(null);
 
-      {tab === 'recepcion' && product && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="card p-4 space-y-4">
-            <p className="eyebrow">Fábrica → bodega Bsale</p>
-            <div>
-              <label className="eyebrow block mb-1.5">Producto</label>
-              <select value={product.id} onChange={(e) => { setProductId(e.target.value); setFormatId(''); }} className="field">
-                {active.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="eyebrow block mb-1.5">Formato</label>
-              <select value={format?.formatId ?? ''} onChange={(e) => setFormatId(e.target.value)} className="field">
-                {product.formats.map((f) => <option key={f.formatId} value={f.formatId}>{f.label} · Bsale {formatQty(bsaleStock[`${product.id}__${f.formatId}`] ?? 0, f.unit)}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="eyebrow block mb-1.5">Cantidad recibida</label>
-              <Stepper value={qty} onChange={setQty} step={format?.unit === 'kg' ? 0.5 : 1} decimals={format?.unit === 'kg' ? 2 : 0} quick={format?.unit === 'kg' ? [1, 5, 10] : [1, 5, 10, 25]} />
-            </div>
-            <div>
-              <label className="eyebrow block mb-1.5">Lote / nota</label>
-              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: turno mañana" className="field h-10 text-sm" />
-            </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => doReceive(false)} disabled={busy || qty <= 0} className="flex-1">Cargar en Bsale</Button>
-              <Button onClick={() => doReceive(true)} disabled={busy || qty <= 0} className="flex-1">Cargar y sincronizar</Button>
-            </div>
+  async function act(key: string, fn: () => Promise<string | void>) {
+    setBusy(key); setError(null); setFlash(null);
+    try { const m = await fn(); if (m) setFlash(m); } catch (e) { setError(callableMessage(e)); } finally { setBusy(null); }
+  }
+  const save = (patch: Partial<BsaleSettings>) => act('save', async () => { await saveBsaleSettings(patch); });
+
+  const steps: Array<{ done: boolean; text: React.ReactNode }> = [
+    { done: isRealBsale, text: <>App compilada en modo real (<code>VITE_BSALE_MODE=real</code>)</> },
+    { done: !!diagnostic, text: 'Token cargado y diagnóstico corrido' },
+    { done: !!settings.factoryOfficeId && !!settings.storeOfficeId && !!settings.priceListId, text: 'Sucursal de fábrica, tienda y lista de precios elegidas' },
+    { done: (diagnostic?.mapping.confirmed ?? 0) > 0, text: <>Catálogo cruzado con Bsale (<Link className="underline" to="/admin/catalogo?tab=cruce">Catálogo → Cruce</Link>)</> },
+    { done: settings.enabled, text: 'Sincronización encendida (cada 10 min + webhooks)' },
+    { done: settings.writesEnabled && !settings.dryRun, text: 'Escrituras hacia Bsale en vivo (primero probar en simulacro)' },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {flash && <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm">{flash}</div>}
+      {error && <ErrorBanner message={error} />}
+
+      <section className="card p-4">
+        <p className="eyebrow mb-2">Puesta en marcha</p>
+        <ol className="space-y-1.5 text-sm">
+          {steps.map((s, i) => (
+            <li key={i} className="flex gap-2 items-start">
+              <span className={'mt-0.5 w-5 h-5 rounded-full text-[11px] flex items-center justify-center shrink-0 ' + (s.done ? 'bg-emerald-600 text-white' : 'bg-charcoal-100 text-charcoal-500')}>{s.done ? '✓' : i + 1}</span>
+              <span className={s.done ? 'text-charcoal-500' : 'text-charcoal-900'}>{s.text}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="card p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <div>
+            <p className="eyebrow">Diagnóstico de la cuenta Bsale</p>
+            <p className="text-xs text-charcoal-500 mt-0.5">{diagnostic ? `Último: ${when(diagnostic.at)} · ${diagnostic.apiCalls} llamadas · ${Math.round(diagnostic.durationMs / 1000)} s` : 'Aún no se corre. Lee sucursales, catálogo, precios, stock, clientes, vendedores y 90 días de documentos.'}</p>
           </div>
-          <div className="card p-4">
-            <p className="eyebrow mb-2">Últimas recepciones</p>
-            {receptions.length === 0 && <p className="text-xs text-charcoal-300">Sin recepciones simuladas todavía.</p>}
-            <ul className="divide-y divide-charcoal-100 text-xs">
-              {receptions.map((r) => (
-                <li key={r.id} className="py-2 flex justify-between gap-2">
-                  <span className="text-charcoal-700 truncate">{skuLabel(r.sku)}{r.note ? <span className="text-charcoal-300"> · {r.note}</span> : null}</span>
-                  <span className="shrink-0 text-charcoal-500">+{r.quantity} · {new Date(r.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</span>
-                </li>
-              ))}
-            </ul>
+          <Button size="sm" disabled={!isRealBsale || busy != null} onClick={() => act('diag', async () => { const d = await runDiagnostic(); return `Diagnóstico listo: ${d.variants} variantes, ${d.clients} clientes, ${d.documents90d} documentos en 90 días.`; })}>
+            {busy === 'diag' ? 'Leyendo Bsale…' : diagnostic ? 'Volver a diagnosticar' : 'Correr diagnóstico'}
+          </Button>
+        </div>
+        {!isRealBsale && <p className="text-xs text-brass-700">En modo simulado el diagnóstico no aplica: se corre contra la API real.</p>}
+        {diagnostic && <DiagnosticView d={diagnostic} />}
+      </section>
+
+      <section className="card p-4 space-y-3">
+        <p className="eyebrow">Configuración</p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <OfficeSelect label="Sucursal de fábrica (stock de pedidos)" value={settings.factoryOfficeId} options={diagnostic?.offices ?? []} disabled={!editable} onChange={(v) => save({ factoryOfficeId: v })} />
+          <OfficeSelect label="Tienda (recibe traslados)" value={settings.storeOfficeId} options={diagnostic?.offices ?? []} disabled={!editable} onChange={(v) => save({ storeOfficeId: v })} />
+          <label className="block text-xs text-charcoal-500">Lista de precios
+            <select className="field mt-1 h-10 text-sm" disabled={!editable} value={settings.priceListId ?? ''} onChange={(e) => save({ priceListId: Number(e.target.value) || undefined })}>
+              <option value="">—</option>
+              {(diagnostic?.priceLists ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <Toggle label="Sincronización encendida" hint="Cron cada 10 min (06–23 h) y webhooks." checked={settings.enabled} disabled={!editable} onChange={(v) => save({ enabled: v })} />
+          <Toggle label="Escrituras hacia Bsale" hint="Recepciones de producción, traslados y clientes." checked={settings.writesEnabled} disabled={!editable} onChange={(v) => save({ writesEnabled: v })} />
+          <Toggle label="Simulacro" hint="Registra lo que se enviaría, sin enviarlo." checked={settings.dryRun} disabled={!editable} onChange={(v) => save({ dryRun: v })} />
+        </div>
+        <label className="block text-xs text-charcoal-500 max-w-md">Cómo registrar el traslado a tienda
+          <select className="field mt-1 h-10 text-sm" disabled={!editable} value={settings.transferMode ?? 'consumo_recepcion'} onChange={(e) => save({ transferMode: e.target.value as BsaleSettings['transferMode'] })}>
+            <option value="consumo_recepcion">Consumo en fábrica + recepción en tienda</option>
+            <option value="guia">Guía de despacho de traslado interno</option>
+          </select>
+        </label>
+      </section>
+
+      <section className="card p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p className="eyebrow">Sincronización</p>
+            <p className="text-xs text-charcoal-500 mt-0.5">
+              {sync?.at ? <>Última: {when(sync.at)} · {sync.updated} formatos cambiaron{sync.promoted?.length ? ` · ${sync.promoted.length} pedidos promovidos` : ''}{(sync as { unmappedVariantsWithStock?: number }).unmappedVariantsWithStock ? ` · ${(sync as { unmappedVariantsWithStock?: number }).unmappedVariantsWithStock} variantes con stock sin cruce` : ''}</> : 'Nunca.'}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" disabled={busy != null || (isRealBsale && !settings.enabled)} onClick={() => act('sync', async () => { const r = await syncStockFromBsale(uid); return `Sincronizado: ${r.updated} formatos cambiaron, ${r.promoted.length} pedidos promovidos.`; })}>{busy === 'sync' ? 'Sincronizando…' : 'Sincronizar ahora'}</Button>
+            {isRealBsale && editable && <Button size="sm" variant="ghost" disabled={busy != null} onClick={() => act('wh', async () => setWebhook(await webhookInfo()))}>Webhook</Button>}
           </div>
         </div>
-      )}
+        {webhook && (
+          <div className="mt-3 rounded-md bg-cream-100 p-3 text-xs space-y-1">
+            <p>Pídale a soporte de Bsale registrar esta URL para los tópicos <strong>{webhook.topics.join(', ')}</strong>:</p>
+            <code className="block break-all bg-white rounded border border-charcoal-100 p-2 select-all">{webhook.url}</code>
+            <p className="text-charcoal-500">La URL lleva una clave: no la comparta por canales abiertos.</p>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
 
-      {tab === 'venta' && saleProduct && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="card p-4 space-y-4">
-            <p className="eyebrow">POS tienda → boleta</p>
-            <p className="text-xs text-charcoal-500">Una venta de mostrador descuenta stock en Bsale. Si toca producto que la app tenía reservado, al sincronizar el pedido queda en rojo (“stock comprometido”).</p>
-            <div>
-              <label className="eyebrow block mb-1.5">Producto</label>
-              <select value={saleProduct.id} onChange={(e) => { setSaleProductId(e.target.value); setSaleFormatId(''); }} className="field">
-                {active.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="eyebrow block mb-1.5">Formato</label>
-              <select value={saleFormat?.formatId ?? ''} onChange={(e) => setSaleFormatId(e.target.value)} className="field">
-                {saleProduct.formats.map((f) => {
-                  const s = stock.get(`${saleProduct.id}__${f.formatId}`);
-                  return <option key={f.formatId} value={f.formatId}>{f.label} · Bsale {formatQty(bsaleStock[`${saleProduct.id}__${f.formatId}`] ?? 0, f.unit)} · reservado app {formatQty(s?.reserved ?? 0, f.unit)}</option>;
-                })}
-              </select>
-            </div>
-            <div>
-              <label className="eyebrow block mb-1.5">Cantidad vendida</label>
-              <Stepper value={saleQty} onChange={setSaleQty} step={saleFormat?.unit === 'kg' ? 0.5 : 1} decimals={saleFormat?.unit === 'kg' ? 2 : 0} quick={saleFormat?.unit === 'kg' ? [0.5, 1, 5] : [1, 5, 10]} />
-            </div>
-            <div>
-              <label className="eyebrow block mb-1.5">Cliente</label>
-              <input value={saleClient} onChange={(e) => setSaleClient(e.target.value)} className="field h-10 text-sm" />
-            </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => doSale(false)} disabled={busy || saleQty <= 0} className="flex-1">Emitir boleta</Button>
-              <Button onClick={() => doSale(true)} disabled={busy || saleQty <= 0} className="flex-1">Emitir y sincronizar</Button>
-            </div>
-          </div>
-          <div className="card p-4">
-            <p className="eyebrow mb-2">Stock Bsale vs. reservas app</p>
-            <ul className="divide-y divide-charcoal-100 text-xs max-h-[28rem] overflow-y-auto">
-              {[...stock.values()].filter((s) => s.reserved > 0).sort((a, b) => (a.onHand - a.reserved) - (b.onHand - b.reserved)).map((s) => {
-                const sku = `${s.productId}__${s.formatId}`;
-                const remote = bsaleStock[sku];
-                const comp = (remote ?? s.onHand) < s.reserved;
-                return (
-                  <li key={sku} className="py-2 flex justify-between gap-2">
-                    <span className="text-charcoal-700 truncate">{skuLabel(sku)}</span>
-                    <span className={'shrink-0 ' + (comp ? 'text-red-700 font-semibold' : 'text-charcoal-500')}>Bsale {remote ?? '—'} · reserv. {s.reserved}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+function DiagnosticView({ d }: { d: DiagnosticSummary }) {
+  return (
+    <div className="space-y-4 text-sm">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <Kpi label="Productos / variantes" value={`${d.products} / ${d.variants}`} />
+        <Kpi label="Clientes" value={String(d.clients)} />
+        <Kpi label="Documentos 90 días" value={String(d.documents90d)} />
+        <Kpi label="Ventas 90 días" value={formatCLP(d.sales90dCLP)} />
+      </div>
+      {d.warnings.length > 0 && (
+        <ul className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 p-3 text-xs space-y-1">
+          {d.warnings.map((w) => <li key={w}>⚠︎ {w}</li>)}
+        </ul>
+      )}
+      <div className="grid gap-4 md:grid-cols-2">
+        <MiniTable title="Sucursales" rows={d.offices.map((o) => [o.name + (o.isVirtual ? ' (virtual)' : ''), `${o.variantsWithStock} variantes con stock`])} />
+        <MiniTable title="Tipos de documento (90 días)" rows={d.documentTypes.map((t) => [`${t.name}${t.codeSii ? ` · SII ${t.codeSii}` : ''}`, `${KIND_LABEL[t.kind]} · ${t.count90d}`])} />
+        <MiniTable title="Usuarios / vendedores Bsale" rows={d.users.map((u) => [u.name || `#${u.id}`, `${u.documents90d} doc.`])} />
+        <MiniTable title="Más vendido (90 días)" rows={d.topVariants90d.slice(0, 10).map((t) => [t.label, formatCLP(t.totalCLP)])} />
+      </div>
+      <p className="text-xs text-charcoal-500">
+        Cruce de catálogo: <Pill tone="ok">{d.mapping.confirmed} confirmadas</Pill> <Pill tone="warn">{d.mapping.suggested} sugeridas</Pill> <Pill tone="bad">{d.mapping.unmatched} sin match</Pill>{' '}
+        <Link to="/admin/catalogo?tab=cruce" className="underline">Revisar cruce →</Link>
+      </p>
+    </div>
+  );
+}
+
+function Bitacora() {
+  const writes = useWriteLog(40);
+  const hooks = useWebhookLog(20);
+  return (
+    <div className="space-y-5">
+      <section>
+        <p className="eyebrow mb-2">Escrituras hacia Bsale</p>
+        <div className="card divide-y divide-charcoal-100/70">
+          {writes.length === 0 && <p className="p-3 text-xs text-charcoal-300">Sin escrituras todavía.</p>}
+          {writes.map((w) => (
+            <details key={w.id} className="p-3 text-xs">
+              <summary className="cursor-pointer flex flex-wrap gap-2 items-center">
+                <Pill tone={w.status === 'ok' ? 'ok' : w.status === 'simulado' ? 'muted' : 'bad'}>{w.status}</Pill>
+                <span className="font-semibold text-charcoal-900">{w.kind.replace(/_/g, ' ')}</span>
+                <span className="text-charcoal-500">{w.method} {w.path}{w.ref ? ` · ${w.ref}` : ''}</span>
+                <span className="text-charcoal-300 ml-auto">{when(w.at)}</span>
+              </summary>
+              <pre className="mt-2 rounded bg-charcoal-900 text-cream-100 p-2 overflow-auto max-h-48 text-[11px]">{JSON.stringify({ body: w.body, error: w.error, responseId: w.responseId }, null, 2)}</pre>
+            </details>
+          ))}
         </div>
-      )}
-
-      {tab === 'documentos' && (
-        <div className="card divide-y divide-charcoal-100">
-          {documents.length === 0 && <p className="p-4 text-xs text-charcoal-300">Sin documentos.</p>}
-          {documents.map((d) => (
-            <div key={d.id} className="p-3 flex items-center justify-between gap-3 text-xs">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-sm text-charcoal-900">{d.number}</span>
-                  <span className="text-[10px] uppercase tracking-display text-charcoal-300">{d.type}</span>
-                  {d.linkedOrderId ? <span className="text-[10px] uppercase tracking-display bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 rounded">{d.linkedOrderId}</span> : <span className="text-[10px] uppercase tracking-display bg-brass-50 text-brass-700 border border-brass-300 px-1.5 rounded">Sin vincular</span>}
-                </div>
-                <p className="text-charcoal-500 truncate">{d.clientName}{d.clientRut ? ` · ${d.clientRut}` : ''} · {new Date(d.emittedAt).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}{d.reference ? ` · ref ${d.reference}` : ''}</p>
-              </div>
-              <span className="font-semibold text-charcoal-900 shrink-0">{formatCLP(d.totalCLP)}</span>
+      </section>
+      <section>
+        <p className="eyebrow mb-2">Webhooks recibidos</p>
+        <div className="card divide-y divide-charcoal-100/70">
+          {hooks.length === 0 && <p className="p-3 text-xs text-charcoal-300">Sin avisos de Bsale todavía.</p>}
+          {hooks.map((h) => (
+            <div key={h.id} className="p-2.5 text-xs flex gap-2 flex-wrap">
+              <Pill tone={h.status === 'ok' ? 'ok' : h.status === 'error' ? 'bad' : 'muted'}>{h.status ?? 'recibido'}</Pill>
+              <span className="text-charcoal-900">{h.topic} {h.action}</span>
+              <span className="text-charcoal-500">#{h.resourceId}</span>
+              {h.error && <span className="text-red-700">{h.error}</span>}
+              <span className="text-charcoal-300 ml-auto">{when(h.at)}</span>
             </div>
           ))}
         </div>
-      )}
+      </section>
     </div>
+  );
+}
+
+function Kpi({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-md border border-charcoal-100 p-2.5"><p className="text-[10px] uppercase tracking-display text-charcoal-300">{label}</p><p className="text-base font-semibold text-charcoal-900">{value}</p></div>;
+}
+
+function MiniTable({ title, rows }: { title: string; rows: Array<[string, string]> }) {
+  return (
+    <div>
+      <p className="eyebrow mb-1">{title}</p>
+      <ul className="rounded-md border border-charcoal-100 divide-y divide-charcoal-100/70 text-xs">
+        {rows.length === 0 && <li className="p-2 text-charcoal-300">—</li>}
+        {rows.map(([a, b], i) => <li key={i} className="px-2.5 py-1.5 flex justify-between gap-3"><span className="text-charcoal-700 truncate">{a}</span><span className="text-charcoal-500 shrink-0">{b}</span></li>)}
+      </ul>
+    </div>
+  );
+}
+
+function OfficeSelect({ label, value, options, disabled, onChange }: { label: string; value?: number; options: Array<{ id: number; name: string }>; disabled: boolean; onChange: (v: number | undefined) => void }) {
+  return (
+    <label className="block text-xs text-charcoal-500">{label}
+      <select className="field mt-1 h-10 text-sm" disabled={disabled} value={value ?? ''} onChange={(e) => onChange(Number(e.target.value) || undefined)}>
+        <option value="">—</option>
+        {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+        {value && !options.some((o) => o.id === value) && <option value={value}>Sucursal #{value}</option>}
+      </select>
+    </label>
+  );
+}
+
+function Toggle({ label, hint, checked, disabled, onChange }: { label: string; hint: string; checked: boolean; disabled: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className={'flex gap-2 items-start rounded-md border p-2.5 ' + (checked ? 'border-charcoal-700 bg-white' : 'border-charcoal-100')}>
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} className="mt-0.5" />
+      <span><span className="text-sm font-semibold text-charcoal-900 block">{label}</span><span className="text-[11px] text-charcoal-500">{hint}</span></span>
+    </label>
   );
 }

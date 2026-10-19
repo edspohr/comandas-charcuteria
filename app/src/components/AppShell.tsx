@@ -22,7 +22,7 @@ const NAV: NavItem[] = [
   { to: '/admin/panel',    label: 'Panel',        route: 'panel',         primaryFor: ['admin', 'superAdmin', 'consultor'] },
   { to: '/admin/catalogo', label: 'Catálogo',     route: 'catalogo',      primaryFor: ['admin', 'superAdmin'] },
   { to: '/admin/usuarios', label: 'Usuarios',     route: 'usuarios',      primaryFor: ['superAdmin'] },
-  { to: '/admin/bsale',    label: 'Consola Bsale', route: 'bsaleConsola' },
+  { to: '/admin/bsale',    label: 'Conexión Bsale', route: 'bsaleConsola' },
 ];
 
 export default function AppShell({ current, children }: { current: CurrentUser; children: React.ReactNode }) {

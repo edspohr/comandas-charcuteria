@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { collection, doc, getDocs, onSnapshot, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { bsale } from '@/integrations/bsale/MockBsaleClient';
+import { bsale, isRealBsale } from '@/integrations/bsale/client';
 import type { BsaleCustomer } from '@/integrations/bsale/BsaleClient';
 import { db } from './firebase';
 import { describeFirestoreError } from '@/lib/errors';
@@ -80,6 +80,8 @@ function sameClient(a: Client, b: Client): boolean {
 }
 
 export async function syncClientsFromBsale(): Promise<{ updated: number; total: number }> {
+  // Real Bsale: the server mirrors clients (bsaleSyncNow / cron).
+  if (isRealBsale) return { updated: 0, total: 0 };
   const remote = await bsale.getClients();
   const snap = await getDocs(collection(db, 'clients'));
   const localByBsaleId = new Map<string, Client>();
@@ -138,11 +140,13 @@ export async function createClientQuick(input: QuickClientInput, by: string): Pr
     phone: input.contactPhone?.trim() || undefined,
     email: input.email?.trim() || undefined,
   });
-  const id = `${slugify(fantasyName)}-${remote.id.slice(-4).toLowerCase()}`;
+  // remote null = Bsale en simulacro: el cliente queda solo en la app,
+  // pendiente de revisión, hasta que administración lo cree en Bsale.
+  const id = `${slugify(fantasyName)}-${(remote?.id ?? Date.now().toString(36)).slice(-4).toLowerCase()}`;
   const client: Client = {
     id,
-    bsaleClientId: remote.id,
-    bsaleSyncedAt: Date.now(),
+    bsaleClientId: remote?.id,
+    bsaleSyncedAt: remote ? Date.now() : undefined,
     name,
     fantasyName,
     rut: rutClean ? formatRut(rutClean) : undefined,
@@ -154,7 +158,7 @@ export async function createClientQuick(input: QuickClientInput, by: string): Pr
     notes: input.notes?.trim() || undefined,
     deliveryMode: input.deliveryMode,
     invoicingComplete,
-    needsReview: !invoicingComplete,
+    needsReview: !invoicingComplete || !remote,
     source: 'app',
     createdBy: by,
     createdAt: Date.now(),

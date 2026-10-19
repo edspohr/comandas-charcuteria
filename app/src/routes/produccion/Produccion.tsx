@@ -7,7 +7,7 @@ import { useCurrentUser } from '@/data/auth';
 import { useProducts } from '@/data/products';
 import { needsProduction, useProduccionData, type DemandRow } from '@/data/produccion';
 import { syncStockFromBsale, useSyncState } from '@/data/stock';
-import { receiveProduction } from '@/integrations/bsale/mockAdmin';
+import { registerProduction, writeOutcomeText } from '@/data/bsaleOps';
 import { parseLocal, type ParsedLine } from '@/domain/parse/local';
 import { geminiEnabled, parseWithGemini } from '@/domain/parse/gemini';
 import { formatDateShort, formatQty } from '@/lib/format';
@@ -174,9 +174,8 @@ function ProduccionIA({ uid, onDone }: { uid: string; onDone: (msg: string) => v
     if (usable.length === 0) return;
     setBusy(true); setError(null);
     try {
-      for (const l of usable) await receiveProduction(`${l.productId}__${l.formatId}`, l.qty, uid, note || undefined);
-      const r = await syncStockFromBsale(uid);
-      onDone(`Cargadas ${usable.length} línea${usable.length === 1 ? '' : 's'} en Bsale.` + (r.absorbed > 0 ? ` Reasignadas ${r.absorbed} u/kg a pedidos pendientes.` : '') + (r.promoted.length > 0 ? ` Promovidos: ${r.promoted.join(', ')}.` : ''));
+      const r = await registerProduction(usable.map((l) => ({ productId: l.productId, formatId: l.formatId, qty: l.qty })), uid, note || undefined);
+      onDone(writeOutcomeText(r, `Cargadas ${usable.length} línea${usable.length === 1 ? '' : 's'}`));
     } catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
   }
 

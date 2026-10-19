@@ -24,6 +24,13 @@ const PATHS = [
   '/v1/users.json',
   '/v1/shipping_types.json',
   '/v1/documents.json?expand=[details,client,document_type,sellers,office,references]',
+  // Write targets: read existing records to mirror their shape when posting.
+  '/v1/taxes.json',
+  '/v1/stocks/receptions.json?expand=[details,office]',
+  '/v1/stocks/consumptions.json?expand=[details,office]',
+  '/v1/shippings.json?expand=[details,office,shipping_type]',
+  '/v1/products/204/variants.json',
+  '/v1/variants/229/costs.json',
 ];
 
 async function get(path: string) {

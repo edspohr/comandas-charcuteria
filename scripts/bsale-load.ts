@@ -61,6 +61,11 @@ async function main() {
   console.log(`    sucursales: ${d.offices.map((o) => `${o.id} ${o.name}`).join(' · ')}`);
   console.log(`    sugerido → fábrica ${d.suggestedSettings.factoryOfficeId}, tienda ${d.suggestedSettings.storeOfficeId}, lista ${d.suggestedSettings.priceListId}`);
   d.warnings.forEach((w) => console.log(`    ⚠ ${w}`));
+  // Safety stop: without Bsale's catalog every app product would look
+  // orphaned and get deactivated (happened once, 19-10-2026).
+  if (d.activeVariants === 0 || d.warnings.some((w) => w.startsWith('No se pudo leer variantes') || w.startsWith('No se pudo leer productos'))) {
+    throw new Error('Bsale no devolvió el catálogo (variantes). Se detiene la carga sin tocar productos ni cruces.');
+  }
 
   const variants = (await db.collection('bsale').doc('catalog').collection('variants').get()).docs.map((x) => x.data() as Variant);
   const vById = new Map(variants.map((v) => [v.variantId, v]));
@@ -128,6 +133,10 @@ async function main() {
   console.log(`    ${priced} formatos con precio de Bsale`);
 
   console.log('5/6 Productos sin cruce con Bsale…');
+  // Undo earlier runs first, then decide again with the current catalog.
+  const prevInactive = [...refreshed.values()].filter((p) => (p as Product & { inactiveReason?: string }).inactiveReason?.includes('bsale-load'));
+  for (const p of prevInactive) { await db.doc(`products/${p.id}`).update({ active: true, inactiveReason: null }); p.active = true; }
+  if (prevInactive.length) console.log(`    ${prevInactive.length} reactivados de una corrida anterior`);
   // Only products Bsale doesn't know at all: a pending suggestion keeps the
   // product active until someone reviews it in Catálogo → Cruce.
   const mappedProducts = new Set(map.filter((m) => m.productId && m.status !== 'ignorado' && vById.get(m.variantId)?.active).map((m) => m.productId!));

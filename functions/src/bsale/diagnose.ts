@@ -75,6 +75,28 @@ function guessFormat(p: AppProduct, variantLabel: string): { formatId: string; c
   return null;
 }
 
+// /variants.json?expand=[product]&limit=50 answered 404 on the real account
+// (19-10-2026) while limit=2 worked. Try lighter shapes, then per product.
+// Without expand the variant still carries product.id; names come from the
+// products list fetched separately.
+async function fetchVariants(api: BsaleApi, products: RawProduct[]): Promise<RawVariant[]> {
+  const attempts: Array<[Record<string, string>, number]> = [[{ expand: '[product]' }, 50], [{}, 50], [{}, 25], [{}, 10]];
+  let lastError: unknown;
+  for (const [params, size] of attempts) {
+    try {
+      const v = await api.getAll<RawVariant>('/variants.json', params, size);
+      if (v.length) { logger.info(`[diagnose] variantes con ${JSON.stringify(params)} limit=${size}: ${v.length}`); return v; }
+    } catch (e) { lastError = e; logger.warn(`[diagnose] variantes ${JSON.stringify(params)} limit=${size} falló`, (e as Error).message); }
+  }
+  const out: RawVariant[] = [];
+  for (const p of products.filter((x) => x.state !== 1)) {
+    try { out.push(...(await api.getAll<RawVariant>(`/products/${p.id}/variants.json`, {}, 25)).map((v) => ({ ...v, product: { ...(v.product ?? { id: p.id }), id: p.id, name: p.name } }))); }
+    catch (e) { lastError = e; }
+  }
+  if (!out.length && lastError) throw lastError;
+  return out;
+}
+
 export async function runDiagnostic(api: BsaleApi, by: string): Promise<DiagnosticSummary> {
   const t0 = Date.now();
   const db = getFirestore();
@@ -89,7 +111,7 @@ export async function runDiagnostic(api: BsaleApi, by: string): Promise<Diagnost
   const priceLists = await safe('listas de precio', () => api.getAll<RawPriceList>('/price_lists.json'));
   const productTypes = await safe('tipos de producto', () => api.getAll<RawProductType>('/product_types.json'));
   const products = await safe('productos', () => api.getAll<RawProduct>('/products.json', { expand: '[product_type]' }));
-  const variants = await safe('variantes', () => api.getAll<RawVariant>('/variants.json', { expand: '[product]' }));
+  const variants = await safe('variantes', () => fetchVariants(api, products));
   const users = await safe('usuarios', () => api.getAll<RawUser>('/users.json'));
   const shippingTypes = await safe('tipos de despacho', () => api.getAll<{ id: number; name: string; useDestinationOffice?: number; state?: number }>('/shipping_types.json'));
   const stock = await safe('stock', () => api.getAll<RawStock>('/stocks.json'));

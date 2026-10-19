@@ -73,15 +73,15 @@ export class BsaleApi {
 
   // Walks a paginated list. Follows `next` when Bsale gives it and falls
   // back to offset arithmetic otherwise.
-  async getAll<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T[]> {
+  async getAll<T>(path: string, params: Record<string, string | number | undefined> = {}, pageSize = PAGE): Promise<T[]> {
     const out: T[] = [];
     let offset = 0;
     for (let page = 0; page < MAX_PAGES; page++) {
-      const res = await this.get<BsaleList<T>>(path, { ...params, limit: PAGE, offset });
+      const res = await this.get<BsaleList<T>>(path, { ...params, limit: pageSize, offset });
       const items = res?.items ?? [];
       out.push(...items);
-      if (items.length < PAGE || (res.count != null && out.length >= res.count)) break;
-      offset += PAGE;
+      if (items.length < pageSize || (res.count != null && out.length >= res.count)) break;
+      offset += pageSize;
     }
     return out;
   }

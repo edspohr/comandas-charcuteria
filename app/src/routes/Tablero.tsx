@@ -8,6 +8,7 @@ import { useClients } from '@/data/clients';
 import { syncStockFromBsale, useAllStock, useSyncState } from '@/data/stock';
 import { useSettings } from '@/data/settings';
 import { useUsers } from '@/data/users';
+import { CompactRow, OrderDrawer, OrderList, SummaryStrip, type BoardView } from '@/components/orders/BoardViews';
 import { ROLE_LABEL, can, canAny, isReadOnly } from '@/domain/permissions';
 import Button from '@/components/ui/Button';
 import ErrorBanner from '@/components/ui/ErrorBanner';
@@ -181,6 +182,19 @@ export default function Tablero() {
 
   // Mobile column tabs
   const scroller = useRef<HTMLDivElement | null>(null);
+  // Vista y etapa en la URL (volver atrás conserva el contexto); la vista
+  // preferida se recuerda por dispositivo.
+  const VIEW_KEY = 'comandas.tablero.vista';
+  const storedView = (() => { try { return localStorage.getItem(VIEW_KEY) as BoardView | null; } catch { return null; } })();
+  const view: BoardView = (params.get('vista') as BoardView | null) ?? storedView ?? 'tarjetas';
+  const setView = (v: BoardView) => { try { localStorage.setItem(VIEW_KEY, v); } catch { /* sin storage */ } setParam('vista', v); };
+  const etapa = (params.get('etapa') as ColumnId | null) ?? null;
+  const [drawerId, setDrawerId] = useState<string | null>(null);
+  const drawerOrder = drawerId ? orders.find((o) => o.id === drawerId) ?? null : null;
+  const wide = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+  const openOrder = (o: Order) => { if (wide) setDrawerId(o.id); else navigate(detailPath(o, role, uid)); };
+  const toneOf = (o: Order) => cardTone(o, stock, thresholds, now, today);
+  const actionOf = (o: Order) => nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId) });
   const [activeCol, setActiveCol] = useState<ColumnId>(can(role, 'order.link') ? 'por_facturar' : role === 'reparto' ? 'por_despachar' : 'pendiente');
   function scrollToCol(id: ColumnId) {
     setActiveCol(id);
@@ -227,6 +241,12 @@ export default function Tablero() {
       {actionError && <div className="mx-4 sm:mx-6 mb-3"><ErrorBanner message={actionError} /></div>}
       {error && <div className="mx-4 sm:mx-6 mb-3"><ErrorBanner message={error} /></div>}
 
+      {/* Visión general */}
+      <div className="px-4 sm:px-6 mb-3">
+        <SummaryStrip byColumn={byColumn.columns} toneOf={toneOf} showMoney={isAdmin} active={etapa}
+          onPick={(c) => { setParam('etapa', c); if (c && view === 'tarjetas') scrollToCol(c); }} />
+      </div>
+
       {/* Filters */}
       <div className="px-4 sm:px-6 mb-3 flex flex-wrap items-center gap-2">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar pedido, cliente, documento…" className="field h-9 text-sm w-full sm:w-64" />
@@ -237,6 +257,11 @@ export default function Tablero() {
           <Chip active={date === 'atrasados'} onClick={() => setDate('atrasados')} tone="red">Atrasados</Chip>
           <Chip active={mine} onClick={() => setMine(!mine)}>Míos</Chip>
           <Chip active={showAnulados} onClick={() => setShowAnulados(!showAnulados)}>Anulados</Chip>
+        </div>
+        <div className="flex rounded-md border border-charcoal-200 overflow-hidden ml-auto" role="group" aria-label="Vista">
+          {(['tarjetas', 'compacta', 'lista'] as BoardView[]).map((v) => (
+            <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className={'px-2.5 py-1.5 text-[11px] uppercase tracking-display ' + (view === v ? 'bg-charcoal-900 text-cream-50' : 'bg-white text-charcoal-500 hover:text-charcoal-900')}>{v}</button>
+          ))}
         </div>
         {isAdmin && (
           <select value={vendedor} onChange={(e) => setVendedor(e.target.value)} className="field h-9 text-xs w-auto">
@@ -260,8 +285,18 @@ export default function Tablero() {
 
       {loading && <p className="px-4 sm:px-6 text-sm text-charcoal-300">Cargando…</p>}
 
+      {view === 'lista' && (
+        <div className="px-4 sm:px-6 pb-4">
+          <OrderList
+            orders={visible.filter((o) => o.status !== 'anulado' && (etapa ? columnFor(o.status) === etapa : columnFor(o.status) !== 'cerrado'))}
+            toneOf={toneOf} actionOf={actionOf} onAction={(k, o) => run(k, o)} onOpen={openOrder} showMoney={isAdmin}
+          />
+          {!etapa && <p className="text-[11px] text-charcoal-300 mt-1.5">Pedidos abiertos. Toque "Cerrado" en el resumen para ver los cerrados.</p>}
+        </div>
+      )}
+
       {/* Board */}
-      <div
+      {view !== 'lista' && <div
         ref={scroller}
         className="flex gap-3 overflow-x-auto snap-x snap-mandatory px-4 sm:px-6 pb-4 lg:grid lg:grid-cols-5 lg:overflow-visible lg:snap-none"
         onScroll={(e) => {
@@ -281,7 +316,7 @@ export default function Tablero() {
             <section
               key={c.id}
               data-col={c.id}
-              className={'snap-start shrink-0 w-[86vw] sm:w-[60vw] lg:w-auto rounded-lg border bg-cream-100/50 flex flex-col min-h-[40vh] lg:min-h-[60vh] transition ' + (overCol === c.id && dropOk ? 'border-brass-500 bg-brass-50' : overCol === c.id && dragOrder ? 'border-red-300' : 'border-charcoal-100')}
+              className={'snap-start shrink-0 w-[86vw] sm:w-[60vw] lg:w-auto rounded-lg border bg-cream-100/50 flex flex-col min-h-[40vh] lg:min-h-[60vh] transition ' + (etapa && etapa !== c.id ? 'lg:opacity-50 ' : '') + (overCol === c.id && dropOk ? 'border-brass-500 bg-brass-50' : overCol === c.id && dragOrder ? 'border-red-300' : 'border-charcoal-100')}
               onDragOver={(e) => { if (!dragOrder) return; e.preventDefault(); if (overCol !== c.id) setOverCol(c.id); }}
               onDragLeave={() => { if (overCol === c.id) setOverCol(null); }}
               onDrop={(e) => {
@@ -302,8 +337,12 @@ export default function Tablero() {
               </header>
               <div className="px-2 pb-2 space-y-2 flex-1">
                 {list.length === 0 && <p className="text-[11px] text-charcoal-300 px-1 py-3">—</p>}
-                {(isCerrado ? list.slice(0, 30) : list).map((o) => (
+                {view === 'compacta' && (isCerrado ? list.slice(0, 60) : list).map((o) => (
+                  <CompactRow key={o.id} order={o} tone={toneOf(o)} action={actionOf(o)} onAction={(kind) => run(kind, o)} onOpen={() => openOrder(o)} />
+                ))}
+                {view === 'tarjetas' && (isCerrado ? list.slice(0, 30) : list).map((o) => (
                   <KanbanCard
+                    onOpen={() => openOrder(o)}
                     key={o.id}
                     order={o}
                     tone={cardTone(o, stock, thresholds, now, today)}
@@ -322,7 +361,7 @@ export default function Tablero() {
             </section>
           );
         })}
-      </div>
+      </div>}
 
       {showAnulados && byColumn.anulados.length > 0 && (
         <section className="px-4 sm:px-6 mt-2">
@@ -333,6 +372,14 @@ export default function Tablero() {
             ))}
           </div>
         </section>
+      )}
+
+      {drawerOrder && (
+        <>
+          <div className="fixed inset-0 z-20 bg-charcoal-900/20" onClick={() => setDrawerId(null)} />
+          <OrderDrawer order={drawerOrder} tone={toneOf(drawerOrder)} action={actionOf(drawerOrder)} showMoney={isAdmin}
+            onAction={(k) => { setDrawerId(null); void run(k, drawerOrder); }} onClose={() => setDrawerId(null)} detailTo={detailPath(drawerOrder, role, uid)} />
+        </>
       )}
 
       {dialog?.kind === 'transfer' && <TrasladoDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
@@ -360,7 +407,8 @@ function Chip({ active, onClick, children, tone }: { active: boolean; onClick: (
   );
 }
 
-function KanbanCard({ order, tone, action, onAction, detailTo, draggable, onDragStart, onDragEnd, compact, isShop }: {
+function KanbanCard({ order, tone, action, onAction, onOpen, detailTo, draggable, onDragStart, onDragEnd, compact, isShop }: {
+  onOpen?: () => void;
   order: Order;
   tone: { tone: Tone; reasons: string[] };
   action: { kind: ActionKind; label: string };
@@ -392,7 +440,7 @@ function KanbanCard({ order, tone, action, onAction, detailTo, draggable, onDrag
           <span className={'w-2 h-2 rounded-full ' + TONE_DOT[tone.tone]} />
         </span>
       </div>
-      <Link to={detailTo} className="block font-semibold text-charcoal-900 text-sm leading-tight mt-0.5 truncate">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</Link>
+      <Link to={detailTo} onClick={(e) => { if (onOpen) { e.preventDefault(); onOpen(); } }} className="block font-semibold text-charcoal-900 text-sm leading-tight mt-0.5 truncate">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</Link>
       <div className="flex items-center justify-between gap-2 mt-1 text-[11px] text-charcoal-500">
         <span className={'first-letter:uppercase ' + (late ? 'text-red-700 font-semibold' : '')}>{formatDateShort(order.requestedDate)} · {order.deliveryMode === 'retiro' ? 'retiro' : 'despacho'}</span>
         <span className="font-semibold text-charcoal-700">{order.totalCLP ? formatCLP(order.totalCLP) : `${order.lines.length} lín.`}</span>
@@ -425,7 +473,7 @@ function KanbanCard({ order, tone, action, onAction, detailTo, draggable, onDrag
           {action.kind !== 'none' && action.kind !== 'anular' ? (
             <Button size="sm" className="!py-1 !px-2.5 text-[11px]" onClick={() => onAction(action.kind)}>{action.label}</Button>
           ) : (
-            <Link to={detailTo} className="rounded-md border border-charcoal-200 px-2.5 py-1 text-[11px] uppercase tracking-display text-charcoal-700 hover:border-brass-500">Ver</Link>
+            <Link to={detailTo} onClick={(e) => { if (onOpen) { e.preventDefault(); onOpen(); } }} className="rounded-md border border-charcoal-200 px-2.5 py-1 text-[11px] uppercase tracking-display text-charcoal-700 hover:border-brass-500">Ver</Link>
           )}
         </span>
       </div>

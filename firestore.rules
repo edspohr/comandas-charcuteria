@@ -3,170 +3,177 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // -------- Helpers
-    function isAuth() { return request.auth != null; }
+    // -------- Perfiles (custom claim `role`, escrito solo por las Cloud
+    // Functions de usuarios). Esta matriz replica app/src/domain/permissions.ts;
+    // si se toca una, tocar la otra.
+    function isAuth()  { return request.auth != null; }
+    function role()    { return isAuth() && ('role' in request.auth.token) ? request.auth.token.role : null; }
+    function hasRole() { return role() != null; }
+    function roleIn(list) { return role() in list; }
 
-    function role() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    function isSuperAdmin()   { return role() == 'superAdmin'; }
+    function isSupervisor()   { return roleIn(['admin', 'superAdmin']); }
+    function canCreateOrder() { return roleIn(['vendedor', 'tienda', 'admin', 'superAdmin']); }
+    function canPack()        { return roleIn(['despacho', 'admin', 'superAdmin']); }
+    function canDispatch()    { return roleIn(['despacho', 'reparto', 'admin', 'superAdmin']); }
+    function canDeliver()     { return roleIn(['reparto', 'admin', 'superAdmin']); }
+    function canSync()        { return roleIn(['despacho', 'produccion', 'admin', 'superAdmin']); }
+    function canReceiveProd() { return roleIn(['produccion', 'admin', 'superAdmin']); }
+    function canQuickClient() { return roleIn(['vendedor', 'admin', 'superAdmin']); }
+    // Lectura: cualquier perfil (el consultor ve todo, sin escribir nada).
+    function canRead()        { return hasRole(); }
+
+    function unchanged(field) {
+      return request.resource.data.get(field, null) == resource.data.get(field, null);
     }
-
-    function isSuperAdmin()  { return isAuth() && role() == 'superAdmin'; }
-    function isAdminOrSup()  { return isAuth() && (role() == 'admin' || role() == 'superAdmin'); }
-    function isVendedor()    { return isAuth() && role() == 'vendedor'; }
-    function isDespacho()    { return isAuth() && role() == 'despacho'; }
-    function isProduccion()  { return isAuth() && role() == 'produccion'; }
 
     // -------- Reference data
     match /products/{id} {
-      allow read:  if isAuth();
-      allow write: if isAdminOrSup();
+      allow read:  if canRead();
+      allow write: if isSupervisor();
     }
 
     match /clients/{id} {
-      allow read:  if isAuth();
-      // Alta rápida desde el wizard / parser: el vendedor crea el cliente
-      // marcado needsReview; administración lo completa después.
-      allow create: if isAdminOrSup()
-        || (isVendedor() && request.resource.data.createdBy == request.auth.uid);
-      // sync mirrors Bsale into clients/*: any role that can run the sync.
-      allow update: if isAdminOrSup() || isDespacho() || isProduccion();
-      allow delete: if isAdminOrSup();
+      allow read:  if canRead();
+      // Alta rápida desde el wizard / parser: queda needsReview y
+      // administración la completa después.
+      allow create: if isSupervisor()
+        || (canQuickClient() && request.resource.data.createdBy == request.auth.uid);
+      // El sync espeja Bsale en clients/*: cualquier perfil que sincroniza.
+      allow update: if isSupervisor() || canSync();
+      allow delete: if isSupervisor();
     }
 
     match /settings/{doc} {
-      allow read:  if isAuth();
-      // bsaleSync is the "last sync" summary written by whoever ran the sync.
-      allow write: if isSuperAdmin() || (doc == 'bsaleSync' && isAuth() && !isVendedor());
+      allow read:  if canRead();
+      // bsaleSync es el resumen de la última sincronización.
+      allow write: if isSuperAdmin() || (doc == 'bsaleSync' && canSync());
     }
 
-    // -------- Bsale mirror (simulated Bsale side for the demo)
-    // In production these collections disappear: the app reads Bsale's API.
+    // -------- Bsale simulado (solo modo mock / desarrollo)
     match /bsaleMock/{doc} {
-      allow read:  if isAuth();
-      // Producción IA registra recepciones (POST /v1/stocks/receptions.json
-      // en la API real) → producción también escribe el stock simulado.
-      allow write: if isAdminOrSup() || isProduccion();
+      allow read:  if canRead();
+      allow write: if isSupervisor() || canReceiveProd();
     }
     match /bsaleDocuments/{id} {
-      allow read:   if isAuth();
-      allow create: if isAdminOrSup();
-      // linking a document to an order only sets linkedOrderId
-      allow update: if isAdminOrSup();
+      allow read:   if canRead();
+      allow create: if isSupervisor();
+      allow update: if isSupervisor();
       allow delete: if isSuperAdmin();
     }
-    // Client master in Bsale. Alta rápida = POST /v1/clients.json, so
-    // vendedores may create; edits happen in Bsale (admin here for the demo).
     match /bsaleClients/{id} {
-      allow read:   if isAuth();
-      allow create: if isVendedor() || isAdminOrSup();
-      allow update: if isAdminOrSup();
+      allow read:   if canRead();
+      allow create: if canQuickClient();
+      allow update: if isSupervisor();
       allow delete: if isSuperAdmin();
     }
     match /bsaleReceptions/{id} {
-      allow read:   if isAuth();
-      allow create: if isAdminOrSup() || isProduccion();
+      allow read:   if canRead();
+      allow create: if canReceiveProd();
       allow update, delete: if false;
     }
 
+    // -------- Bsale real: espejos y diagnósticos que escriben solo las
+    // Cloud Functions (Admin SDK, salta reglas). El cliente solo lee.
+    match /bsale/{doc=**} {
+      allow read:  if canRead();
+      allow write: if false;
+    }
+    // Cruce variante Bsale ↔ producto/formato de la app.
+    match /catalogMap/{variantId} {
+      allow read:  if canRead();
+      allow write: if isSupervisor();
+    }
+
+    // -------- Usuarios: solo las Cloud Functions escriben.
     match /users/{uid} {
-      allow read:  if isAuth();
-      allow write: if isSuperAdmin();
+      // El propio doc se puede leer antes de tener claim (primer ingreso).
+      allow read:  if canRead() || (isAuth() && request.auth.uid == uid);
+      allow write: if false;
+    }
+    match /invites/{email} {
+      allow read:  if isSuperAdmin() || role() == 'consultor';
+      allow write: if false;
     }
 
     // -------- Counters
-    // orders-YYYY is bumped by createOrder → any role that can create orders.
-    // bsale-YYYY is bumped by facturarOrder → admin/superAdmin only.
-    // Read is allowed to any authenticated user so the transaction preview
-    // step doesn't need extra permissions.
     match /counters/{id} {
-      allow read: if isAuth();
-      // orders-YYYY: any authenticated user with an order-creating role.
-      allow write: if id.matches('orders-.*') && (isVendedor() || isAdminOrSup());
-      // bsale-YYYY: only invoice-creating roles.
-      allow write: if id.matches('bsale-.*') && isAdminOrSup();
+      allow read: if canRead();
+      allow write: if id.matches('orders-.*') && canCreateOrder();
+      allow write: if id.matches('bsale-.*') && isSupervisor();
     }
 
-    // -------- Stock mirror of Bsale (mutated only by transactions in code)
-    // - Vendedor can touch reserved only (createOrder / anular releases). onHand
-    //   must NOT change.
-    // - Despacho / Producción / Admin run syncStockFromBsale, which overwrites
-    //   onHand with what Bsale reports and moves reserved when absorbing
-    //   pending production. Admin also releases reservations on
-    //   vincularDocumento.
-    // Rules always enforce non-negative onHand and reserved.
+    // -------- Stock: espejo de Bsale (onHand) + reservas de la app.
     match /stock/{id} {
-      allow read: if isAuth();
+      allow read: if canRead();
 
-      allow create: if (isAdminOrSup() || isDespacho() || isProduccion())
+      allow create: if (isSupervisor() || canSync())
         && request.resource.data.onHand >= 0
         && request.resource.data.reserved >= 0;
 
-      allow update: if isAuth()
+      allow update: if hasRole()
         && request.resource.data.onHand >= 0
         && request.resource.data.reserved >= 0
         && (
-          isAdminOrSup()
-          // Vendedor: cannot move onHand.
-          || (isVendedor() && request.resource.data.onHand == resource.data.onHand)
-          // Despacho + Producción: sync writes (onHand ← Bsale, reserved ←
-          // FIFO absorption). The invariants above still apply.
-          || isDespacho()
-          || isProduccion()
+          isSupervisor()
+          // Sync: onHand ← Bsale, reserved ← reasignación FIFO.
+          || canSync()
+          // Quien toma pedidos solo mueve reservas.
+          || (canCreateOrder() && request.resource.data.onHand == resource.data.onHand)
         );
 
-      allow delete: if isAdminOrSup();
+      allow delete: if isSupervisor();
     }
 
-    // -------- Stock movements (append-only audit log)
+    // -------- Bitácora de stock (append-only, firmada por quien la escribe)
     match /stockMovements/{id} {
-      allow read:   if isAuth();
-      allow create: if isAuth();
+      allow read:   if canRead();
+      allow create: if hasRole() && role() != 'consultor' && request.resource.data.by == request.auth.uid;
       allow update, delete: if false;
     }
 
     // -------- Orders
     match /orders/{id} {
-      allow read: if isAuth();
+      allow read: if canRead();
 
-      // Create: vendedor/admin/superAdmin; must own the order (createdBy = uid),
-      // must start in a legal initial state.
-      allow create: if isAuth()
-        && (isVendedor() || isAdminOrSup())
+      allow create: if canCreateOrder()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.status in ['recibido', 'confirmado', 'confirmado_parcial'];
 
-      // Update: split by role.
-      // Admin/SuperAdmin can update anything on an order.
-      // Vendedor: only own orders, only to transition to 'anulado' from a
-      //   pre-invoice state. Cannot set invoiceRef, cannot change createdBy.
-      // Despacho: cannot set invoiceRef; can only push order forward through
-      //   pack states (en_armado / armado).
-      // Producción: reassigns pending → reserved on lines and may transition
-      //   confirmado_parcial → confirmado. Cannot set invoiceRef.
-      allow update: if isAuth() && (
-        isAdminOrSup()
+      allow update: if hasRole() && (
+        isSupervisor()
         || (
-          isVendedor()
+          // Quien lo creó puede anularlo antes de facturar.
+          canCreateOrder()
           && resource.data.createdBy == request.auth.uid
           && resource.data.status in ['recibido', 'confirmado', 'confirmado_parcial', 'en_armado']
           && request.resource.data.status == 'anulado'
-          && request.resource.data.createdBy == resource.data.createdBy
-          && request.resource.data.get('invoiceRef', null) == resource.data.get('invoiceRef', null)
+          && unchanged('createdBy') && unchanged('invoiceRef')
         )
         || (
-          isDespacho()
+          canPack()
           && resource.data.status in ['confirmado', 'confirmado_parcial', 'en_armado']
           && request.resource.data.status in ['en_armado', 'armado']
-          && request.resource.data.get('invoiceRef', null) == resource.data.get('invoiceRef', null)
-          && request.resource.data.createdBy == resource.data.createdBy
+          && unchanged('createdBy') && unchanged('invoiceRef')
         )
         || (
-          // Sync promotes partial orders; despacho can trigger it too.
-          (isProduccion() || isDespacho())
+          canDispatch()
+          && resource.data.status == 'facturado'
+          && request.resource.data.status == 'despachado'
+          && unchanged('createdBy') && unchanged('invoiceRef') && unchanged('lines')
+        )
+        || (
+          canDeliver()
+          && resource.data.status == 'despachado'
+          && request.resource.data.status == 'entregado'
+          && unchanged('createdBy') && unchanged('invoiceRef') && unchanged('lines')
+        )
+        || (
+          // La sincronización promueve pedidos parciales.
+          canSync()
           && resource.data.status in ['confirmado_parcial', 'recibido']
           && request.resource.data.status in ['confirmado_parcial', 'confirmado']
-          && request.resource.data.get('invoiceRef', null) == resource.data.get('invoiceRef', null)
-          && request.resource.data.createdBy == resource.data.createdBy
+          && unchanged('createdBy') && unchanged('invoiceRef')
         )
       );
 

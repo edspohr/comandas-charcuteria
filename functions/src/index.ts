@@ -1,3 +1,4 @@
+import './common';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 
 // Milestone 10 will replace this stub with the real Anthropic call + fallback.
@@ -8,3 +9,4 @@ export const parseOrder = onCall({ region: 'us-central1' }, async (req) => {
 });
 
 export { bsaleProxy } from './bsaleProxy';
+export { claimInvite, adminInviteUser, adminUpdateUser, adminDeleteInvite } from './users';

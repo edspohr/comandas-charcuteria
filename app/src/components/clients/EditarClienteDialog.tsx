@@ -2,17 +2,17 @@ import { useState } from 'react';
 import Button from '@/components/ui/Button';
 import { ModalShell } from '@/components/orders/OrderDialogs';
 import { updateClientAdmin } from '@/data/clients';
-import { demoUsers } from '@/data/demo-users';
+import { useUsers } from '@/data/users';
 import { describeFirestoreError } from '@/lib/errors';
 import { isValidRut } from '@/lib/rut';
 import type { Client, DeliveryMode } from '@/domain/types';
 
-const VENDEDORES = demoUsers.filter((u) => u.role === 'vendedor');
 
 // Administración corrige/completa la ficha. Datos de facturación → Bsale
 // (maestro) y espejo; campos propios (modalidad, horario, notas, vendedor)
 // solo al espejo.
 export default function EditarClienteDialog({ client, uid, onClose }: { client: Client; uid: string; onClose: () => void }) {
+  const VENDEDORES = useUsers().byRole('vendedor');
   const [fantasyName, setFantasyName] = useState(client.fantasyName ?? '');
   const [name, setName] = useState(client.name);
   const [rut, setRut] = useState(client.rut ?? '');

@@ -7,7 +7,8 @@ import EditarClienteDialog from '@/components/clients/EditarClienteDialog';
 import { useCurrentUser } from '@/data/auth';
 import { useClient, useClientOrders } from '@/data/clients';
 import { useProducts } from '@/data/products';
-import { demoUsers } from '@/data/demo-users';
+import { useUsers } from '@/data/users';
+import { can } from '@/domain/permissions';
 import { clientHealth, gramsMap, lineKg, HEALTH_LABEL, DEFAULT_CLIENT_HEALTH } from '@/domain/analytics';
 import { saveDraft } from '@/lib/draft';
 import { defaultRequestedDate } from '@/domain/cutoff';
@@ -15,17 +16,17 @@ import { useSettings } from '@/data/settings';
 import { formatDateShort, formatQty, todayInSantiago } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
 
-const NAME: Record<string, string> = Object.fromEntries(demoUsers.map((u) => [u.uid, u.displayName]));
 const INVOICED = ['facturado', 'despachado', 'entregado'];
 const DAY = 24 * 60 * 60 * 1000;
 
 export default function FichaCliente() {
+  const { nameOf } = useUsers();
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
   const role = current!.appUser.role;
-  const isAdmin = role === 'admin' || role === 'superAdmin';
+  const isAdmin = can(role, 'client.edit');
   const { client, loading, error } = useClient(clientId ?? null);
   const { orders } = useClientOrders(clientId ?? null);
   const { products } = useProducts();
@@ -90,7 +91,7 @@ export default function FichaCliente() {
           {client.fantasyName && client.fantasyName !== client.name && <p className="text-sm text-charcoal-500">{client.name}</p>}
         </div>
         <div className="flex gap-2 shrink-0">
-          {(role === 'vendedor' || isAdmin) && <Button size="sm" onClick={nuevoPedido}>Nuevo pedido</Button>}
+          {can(role, 'order.create') && <Button size="sm" onClick={nuevoPedido}>Nuevo pedido</Button>}
           {isAdmin && <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>Editar</Button>}
         </div>
       </header>
@@ -104,12 +105,12 @@ export default function FichaCliente() {
             <Row k="Dirección" v={client.address ?? '—'} warn={!client.address} />
             <Row k="Entrega" v={`${client.deliveryMode === 'retiro' ? 'Retiro en tienda' : 'Despacho'}${client.receivingHours ? ` · ${client.receivingHours}` : ''}`} />
             <Row k="Contacto" v={[client.contactPhone, client.email].filter(Boolean).join(' · ') || '—'} />
-            <Row k="Vendedor" v={client.ownerUid ? NAME[client.ownerUid] ?? client.ownerUid : 'Sin asignar'} />
+            <Row k="Vendedor" v={client.ownerUid ? nameOf(client.ownerUid) : 'Sin asignar'} />
             {client.notes && <Row k="Notas" v={client.notes} />}
           </dl>
           <p className="text-[10px] uppercase tracking-display text-charcoal-300 mt-3">
             {client.bsaleClientId ? `Bsale · sincronizado ${client.bsaleSyncedAt ? new Date(client.bsaleSyncedAt).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' }) : ''}` : 'Solo local'}
-            {client.source === 'app' && client.createdBy ? ` · creado por ${NAME[client.createdBy] ?? client.createdBy}` : ''}
+            {client.source === 'app' && client.createdBy ? ` · creado por ${nameOf(client.createdBy)}` : ''}
           </p>
         </section>
         <section className="card p-4 md:col-span-2 grid grid-cols-2 gap-3 content-start">
@@ -151,7 +152,7 @@ export default function FichaCliente() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xs text-charcoal-700 first-letter:uppercase">{formatDateShort(o.requestedDate)}</p>
-                  <p className="text-xs text-charcoal-300">{NAME[o.createdBy] ?? o.createdBy}{o.totalCLP ? ` · ${formatCLP(o.totalCLP)}` : ''}</p>
+                  <p className="text-xs text-charcoal-300">{nameOf(o.createdBy)}{o.totalCLP ? ` · ${formatCLP(o.totalCLP)}` : ''}</p>
                 </div>
               </Link>
             </li>

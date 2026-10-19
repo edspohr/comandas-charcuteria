@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button';
 import { useProducts } from '@/data/products';
 import { useClients } from '@/data/clients';
 import { useAllStock, useSyncState } from '@/data/stock';
-import { demoUsers } from '@/data/demo-users';
+import { useUsers } from '@/data/users';
 import { categoryLabel } from '@/domain/categories';
 import {
   anulados, backlog, byCategory, byClient, byPacker, byProduct, byVendedor, clientRows, gramsMap, inRange, leadTimes,
@@ -20,9 +20,6 @@ import { formatDateShort, formatQty, todayInSantiago } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
 import type { Order } from '@/domain/types';
 
-const NAME: Record<string, string> = Object.fromEntries(demoUsers.map((u) => [u.uid, u.displayName]));
-const nameOf = (uid: string) => NAME[uid] ?? uid;
-const VENDEDORES = demoUsers.filter((u) => u.role === 'vendedor').map((u) => ({ uid: u.uid, name: u.displayName }));
 
 type Tab = 'ventas' | 'fuerza' | 'operacion' | 'stock' | 'clientes';
 const TABS: Array<[Tab, string]> = [['ventas', 'Ventas'], ['fuerza', 'Fuerza de ventas'], ['operacion', 'Operación'], ['stock', 'Stock'], ['clientes', 'Clientes']];
@@ -34,6 +31,8 @@ const h = (v: number | null) => (v == null ? '—' : v < 1 ? `${Math.round(v * 6
 const pct = (v: number | null) => (v == null ? '—' : `${v.toFixed(0)}%`);
 
 export default function Panel() {
+  const { nameOf, byRole } = useUsers();
+  const VENDEDORES = useMemo(() => byRole('vendedor').map((u) => ({ uid: u.uid, name: u.displayName })), [byRole]);
   const [tab, setTab] = useState<Tab>('ventas');
   const [rangeKey, setRangeKey] = useState<RangeKey>('30');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -71,20 +70,20 @@ export default function Panel() {
   const prevSales = useMemo(() => excludeShop(prev), [prev, internalShopIds]);
   const shopOrdersCur = cur.length - curSales.length;
 
-  const totals = useMemo(() => salesTotals(curSales, grams), [curSales, grams]);
+  const totals = useMemo(() => salesTotals(curSales, grams), [curSales, grams, nameOf]);
   const prevTotals = useMemo(() => salesTotals(prevSales, grams), [prevSales, grams]);
   const series = useMemo(() => seriesByDay(curSales, current, grams), [curSales, current, grams]);
-  const vend = useMemo(() => byVendedor(curSales, grams, nameOf), [curSales, grams]);
-  const cli = useMemo(() => byClient(curSales, grams), [curSales, grams]);
+  const vend = useMemo(() => byVendedor(curSales, grams, nameOf), [curSales, grams, nameOf]);
+  const cli = useMemo(() => byClient(curSales, grams), [curSales, grams, nameOf]);
   const prod = useMemo(() => byProduct(curSales, products, grams), [curSales, products, grams]);
   const cats = useMemo(() => byCategory(prod, categoryLabel), [prod]);
   const lt = useMemo(() => leadTimes(cur), [cur]);
   const svc = useMemo(() => serviceLevel(orders), [orders]);
   const bl = useMemo(() => backlog(orders), [orders]);
-  const packers = useMemo(() => byPacker(cur, grams, nameOf), [cur, grams]);
-  const anul = useMemo(() => anulados(cur, nameOf), [cur]);
+  const packers = useMemo(() => byPacker(cur, grams, nameOf), [cur, grams, nameOf]);
+  const anul = useMemo(() => anulados(cur, nameOf), [cur, nameOf]);
   const stRows = useMemo(() => stockRows(products, stock, orders, grams), [products, stock, orders, grams]);
-  const cRows = useMemo(() => clientRows(clients, orders, current, nameOf, undefined, settings.clientHealth ?? DEFAULT_CLIENT_HEALTH), [clients, orders, current, settings.clientHealth]);
+  const cRows = useMemo(() => clientRows(clients, orders, current, nameOf, undefined, settings.clientHealth ?? DEFAULT_CLIENT_HEALTH), [clients, orders, current, settings.clientHealth, nameOf]);
   const today = todayInSantiago();
   const hoy = useMemo(() => {
     const t = orders.filter((o) => o.requestedDate === today && o.status !== 'anulado');
@@ -92,7 +91,7 @@ export default function Panel() {
     return { pedidos: t.length, ventas, atrasados: svc.lateNow, quiebres: stRows.filter((r) => r.pending > 0).length };
   }, [orders, today, svc.lateNow, stRows]);
   const par = useMemo(() => pareto(cRows), [cRows]);
-  const force = useMemo(() => salesForce(cur, cRows, grams, nameOf, VENDEDORES), [cur, cRows, grams]);
+  const force = useMemo(() => salesForce(cur, cRows, grams, nameOf, VENDEDORES), [cur, cRows, grams, nameOf, VENDEDORES]);
 
   const rangeLabel = rangeKey === 'all' ? 'todo el historial' : `últimos ${rangeKey} días`;
   const prevLabel = rangeKey === 'all' ? '(sin comparación)' : `vs. ${rangeKey} días anteriores`;

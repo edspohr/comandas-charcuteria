@@ -4,17 +4,17 @@ import Button from '@/components/ui/Button';
 import StatusPill from '@/components/ui/StatusPill';
 import { useCurrentUser } from '@/data/auth';
 import { anularOrder, useOrder } from '@/data/orders';
-import { demoUsers } from '@/data/demo-users';
+import { useUsers } from '@/data/users';
 import { formatDateLong, formatQty } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
 import { describeFirestoreError } from '@/lib/errors';
 import ErrorBannerLazy from '@/components/ui/ErrorBanner';
 import { ORDER_STATUS_LABEL, type OrderStatus } from '@/domain/types';
 
-const NAME_BY_UID: Record<string, string> = Object.fromEntries(demoUsers.map((u) => [u.uid, u.displayName]));
 const CANCELLABLE: OrderStatus[] = ['recibido', 'confirmado', 'confirmado_parcial', 'en_armado'];
 
 export default function DetallePedido() {
+  const { nameOf } = useUsers();
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const { current } = useCurrentUser();
@@ -117,7 +117,7 @@ export default function DetallePedido() {
                 {ORDER_STATUS_LABEL[h.status]}
               </span>
               <span className="text-charcoal-300 text-right">
-                {NAME_BY_UID[h.by] ?? h.by} · {new Date(h.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}
+                {nameOf(h.by)} · {new Date(h.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}
                 {h.note && <span className="block text-charcoal-500 italic">{h.note}</span>}
               </span>
             </li>

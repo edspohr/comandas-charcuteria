@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import DataTable, { Pill } from '@/components/ui/DataTable';
+import { can } from '@/domain/permissions';
 import { useCurrentUser } from '@/data/auth';
 import { useProducts } from '@/data/products';
 import { needsProduction, useProduccionData, type DemandRow } from '@/data/produccion';
@@ -20,6 +21,8 @@ type Tab = 'demanda' | 'ia';
 export default function Produccion() {
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
+  const role = current!.appUser.role;
+  const canReceive = can(role, 'production.receive');
   const { rows, loading, error } = useProduccionData();
   const sync = useSyncState();
   const [tab, setTab] = useState<Tab>('demanda');
@@ -50,11 +53,11 @@ export default function Produccion() {
             La producción terminada se carga en Bsale. {sync?.at ? `Última sincronización ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}.` : 'Aún sin sincronizar.'}
           </p>
         </div>
-        <Button size="sm" variant="secondary" onClick={doSync} disabled={syncing}>{syncing ? 'Consultando Bsale…' : 'Sincronizar con Bsale'}</Button>
+        {can(role, 'stock.sync') && <Button size="sm" variant="secondary" onClick={doSync} disabled={syncing}>{syncing ? 'Consultando Bsale…' : 'Sincronizar con Bsale'}</Button>}
       </header>
 
       <nav className="mb-4 flex gap-1 border-b border-charcoal-100">
-        {([['demanda', `Demanda y stock${urgentCount ? ` · ${urgentCount} a producir` : ''}`], ['ia', 'Producción IA']] as Array<[Tab, string]>).map(([t, label]) => (
+        {([['demanda', `Demanda y stock${urgentCount ? ` · ${urgentCount} a producir` : ''}`], ...(canReceive ? [['ia', 'Producción IA']] : [])] as Array<[Tab, string]>).map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} className={'px-4 py-2.5 text-xs uppercase tracking-display font-medium border-b-2 transition -mb-px ' + (t === tab ? 'border-brass-500 text-charcoal-900' : 'border-transparent text-charcoal-300 hover:text-charcoal-500')}>{label}</button>
         ))}
       </nav>

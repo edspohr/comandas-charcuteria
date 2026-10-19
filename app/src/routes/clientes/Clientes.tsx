@@ -10,19 +10,20 @@ import EditarClienteDialog from '@/components/clients/EditarClienteDialog';
 import { useCurrentUser } from '@/data/auth';
 import { useClients } from '@/data/clients';
 import { useSettings } from '@/data/settings';
-import { demoUsers } from '@/data/demo-users';
+import { useUsers } from '@/data/users';
+import { ROLE_LABEL, can } from '@/domain/permissions';
 import { clientRows, rangeFor, HEALTH_LABEL, DEFAULT_CLIENT_HEALTH, type ClientHealth, type ClientRow } from '@/domain/analytics';
 import { formatDateShort } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
 import type { Client, Order } from '@/domain/types';
 
-const NAME: Record<string, string> = Object.fromEntries(demoUsers.map((u) => [u.uid, u.displayName]));
 const HEALTH_TONE: Record<ClientHealth, 'ok' | 'warn' | 'bad' | 'muted'> = { nuevo: 'ok', activo: 'ok', en_riesgo: 'warn', inactivo: 'bad', sin_pedidos: 'muted' };
 const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 type Filter = 'todos' | 'cartera' | 'riesgo' | 'revision';
 
 export default function Clientes() {
+  const { nameOf } = useUsers();
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
   const role = current!.appUser.role;
@@ -33,7 +34,7 @@ export default function Clientes() {
   const [filter, setFilter] = useState<Filter>(role === 'vendedor' ? 'cartera' : 'todos');
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
-  const isAdmin = role === 'admin' || role === 'superAdmin';
+  const isAdmin = can(role, 'client.edit');
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'orders'), (snap) => { const l: Order[] = []; snap.forEach((d) => l.push(d.data() as Order)); setOrders(l); });
@@ -41,7 +42,7 @@ export default function Clientes() {
   }, []);
 
   const byId = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
-  const rows = useMemo(() => clientRows(clients, orders, rangeFor('90').current, (u) => NAME[u] ?? u, undefined, settings.clientHealth ?? DEFAULT_CLIENT_HEALTH), [clients, orders, settings.clientHealth]);
+  const rows = useMemo(() => clientRows(clients, orders, rangeFor('90').current, nameOf, undefined, settings.clientHealth ?? DEFAULT_CLIENT_HEALTH), [clients, orders, settings.clientHealth, nameOf]);
   const reviewCount = useMemo(() => rows.filter((r) => r.needsReview || !r.invoicingComplete).length, [rows]);
   const riskCount = useMemo(() => rows.filter((r) => r.health === 'en_riesgo' || r.health === 'inactivo').length, [rows]);
 
@@ -75,11 +76,11 @@ export default function Clientes() {
     <div>
       <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <p className="eyebrow">{role === 'vendedor' ? 'Vendedor' : 'Administración'}</p>
+          <p className="eyebrow">{ROLE_LABEL[role]}</p>
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Clientes</h1>
           <p className="text-xs text-charcoal-300 mt-1">{filtered.length} de {rows.length} · datos desde Bsale · salud según pedidos de los últimos 90 días · tocá una fila para ver el detalle</p>
         </div>
-        <Button size="sm" onClick={() => setCreating(true)}>+ Nuevo cliente</Button>
+        {can(role, 'client.quickCreate') && <Button size="sm" onClick={() => setCreating(true)}>+ Nuevo cliente</Button>}
       </header>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">

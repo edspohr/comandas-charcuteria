@@ -71,10 +71,10 @@ function assertTarget() {
     }
     return;
   }
-  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    throw new Error('Seed against real Firebase requires GOOGLE_APPLICATION_CREDENTIALS pointing to a service account JSON.');
-  }
-  console.warn(`⚠️  Running against REAL project ${PROJECT_ID}. This will wipe products/clients/users/orders/stock. Ctrl-C to abort.`);
+  // Since the real rollout (Oct 2026) the real project holds real people and
+  // real orders: demo data goes to emulators only. Use scripts/reset-real.ts
+  // to clean the real project and scripts/bootstrap-admin.ts for first users.
+  throw new Error('La seed de demo ya no corre contra el proyecto real. Use los emuladores.');
 }
 
 if (!getApps().length) initializeApp({ projectId: PROJECT_ID });
@@ -86,7 +86,7 @@ db.settings({ ignoreUndefinedProperties: true });
 
 async function wipeFirestore() {
   // Note: `counters` is included so a re-seed resets both orders-YYYY and bsale-YYYY.
-  const collections = ['products', 'clients', 'orders', 'stock', 'stockMovements', 'users', 'settings', 'counters', 'bsaleMock', 'bsaleDocuments', 'bsaleReceptions', 'bsaleClients'];
+  const collections = ['products', 'clients', 'orders', 'stock', 'stockMovements', 'users', 'invites', 'catalogMap', 'settings', 'counters', 'bsaleMock', 'bsaleDocuments', 'bsaleReceptions', 'bsaleClients'];
   for (const name of collections) {
     const snap = await db.collection(name).get();
     let batch = db.batch();
@@ -113,11 +113,16 @@ async function seedUsers() {
       const code = (err as { code?: string }).code;
       if (code !== 'auth/uid-already-exists' && code !== 'auth/email-already-exists') throw err;
     }
+    // Same pair the admin functions write: claim for rules, doc for the UI.
+    await auth.setCustomUserClaims(u.uid, { role: u.role });
     await db.collection('users').doc(u.uid).set({
       uid: u.uid,
       email: u.email,
       displayName: u.displayName,
       role: u.role,
+      active: true,
+      createdAt: Date.now(),
+      createdBy: 'seed',
     });
   }
 }

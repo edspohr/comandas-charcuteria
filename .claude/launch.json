@@ -4,9 +4,46 @@
     {
       "name": "app-real-firebase",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "--mode", "production", "--port", "5173", "--strictPort"],
+      "runtimeArgs": [
+        "vite",
+        "--mode",
+        "production",
+        "--port",
+        "5173",
+        "--strictPort"
+      ],
       "cwd": "app",
       "port": 5173
+    },
+    {
+      "name": "emulators",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "PATH=/opt/homebrew/opt/openjdk@21/bin:/Users/espohr/.nvm/versions/node/v22.19.0/bin:/opt/homebrew/bin:/usr/bin:/bin",
+        "firebase",
+        "emulators:start",
+        "--only",
+        "auth,firestore,functions",
+        "--project",
+        "comandas-charcuteria-demo"
+      ],
+      "port": 4000
+    },
+    {
+      "name": "app-emulators",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "VITE_USE_EMULATORS=true",
+        "VITE_DEMO_LOGIN=true",
+        "VITE_FIREBASE_PROJECT_ID=comandas-charcuteria-demo",
+        "npx",
+        "vite",
+        "--port",
+        "5174",
+        "--strictPort"
+      ],
+      "cwd": "app",
+      "port": 5174
     }
   ]
 }

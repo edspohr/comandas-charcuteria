@@ -2,6 +2,7 @@ import type { KanbanThresholds, Order, OrderStatus, Role, StockDoc } from './typ
 import { DEFAULT_KANBAN_THRESHOLDS } from './types';
 import { orderHasCompromisedStock } from '@/data/stock';
 import { todayInSantiago } from '@/lib/format';
+import { can } from './permissions';
 
 // ---------- Columns ----------
 
@@ -83,27 +84,30 @@ export type ActionKind = 'take' | 'arm' | 'link' | 'dispatch' | 'deliver' | 'anu
 export interface NextAction { kind: ActionKind; label: string; }
 
 export function nextAction(order: Order, role: Role, uid: string): NextAction {
-  const isAdmin = role === 'admin' || role === 'superAdmin';
+  // Supervisores (administración) pueden mover cualquier tarjeta; el resto
+  // solo las propias o las que les tocan por función.
+  const supervisor = can(role, 'order.cancelAny');
+  const canCancel = (supervisor || (can(role, 'order.cancelOwn') && order.createdBy === uid));
   const anyPending = order.lines.some((l) => l.pendingProductionQty > 0);
   switch (order.status) {
     case 'recibido':
     case 'confirmado':
     case 'confirmado_parcial':
-      if ((role === 'despacho' || isAdmin) && !anyPending && (!order.assignedPackerId || order.assignedPackerId === uid)) {
+      if (can(role, 'order.pack') && !anyPending && (!order.assignedPackerId || order.assignedPackerId === uid || supervisor)) {
         return { kind: 'take', label: order.assignedPackerId ? 'Comenzar armado' : 'Tomar' };
       }
-      if (role === 'vendedor' && order.createdBy === uid) return { kind: 'anular', label: 'Anular' };
+      if (canCancel && !supervisor) return { kind: 'anular', label: 'Anular' };
       return { kind: 'none', label: '' };
     case 'en_armado':
-      if ((role === 'despacho' && order.assignedPackerId === uid) || isAdmin) return { kind: 'arm', label: 'Armar' };
-      if (role === 'vendedor' && order.createdBy === uid) return { kind: 'anular', label: 'Anular' };
+      if (can(role, 'order.pack') && (order.assignedPackerId === uid || supervisor)) return { kind: 'arm', label: 'Armar' };
+      if (canCancel && !supervisor) return { kind: 'anular', label: 'Anular' };
       return { kind: 'none', label: '' };
     case 'armado':
-      return isAdmin ? { kind: 'link', label: 'Vincular doc.' } : { kind: 'none', label: '' };
+      return can(role, 'order.link') ? { kind: 'link', label: 'Vincular doc.' } : { kind: 'none', label: '' };
     case 'facturado':
-      return isAdmin ? { kind: 'dispatch', label: 'Despachar' } : { kind: 'none', label: '' };
+      return can(role, 'order.dispatch') ? { kind: 'dispatch', label: 'Despachar' } : { kind: 'none', label: '' };
     case 'despachado':
-      return isAdmin ? { kind: 'deliver', label: 'Entregar' } : { kind: 'none', label: '' };
+      return can(role, 'order.deliver') ? { kind: 'deliver', label: 'Entregar' } : { kind: 'none', label: '' };
     default:
       return { kind: 'none', label: '' };
   }

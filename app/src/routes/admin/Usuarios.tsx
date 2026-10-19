@@ -2,15 +2,23 @@ import { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import { db } from '@/data/firebase';
-import { ROLE_LABEL } from '@/data/auth';
+import { useCurrentUser } from '@/data/auth';
 import { useClients } from '@/data/clients';
+import { useUsers } from '@/data/users';
+import { callableMessage, deleteInvite, inviteUser, resendPasswordEmail, updateUser, useInvites } from '@/data/userAdmin';
 import DataTable, { Pill } from '@/components/ui/DataTable';
+import Button from '@/components/ui/Button';
+import ErrorBanner from '@/components/ui/ErrorBanner';
+import { ModalShell } from '@/components/orders/OrderDialogs';
+import { ROLES, ROLE_DESCRIPTION, ROLE_LABEL, can } from '@/domain/permissions';
 import { addDaysIso, formatDateShort, todayInSantiago } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
 import type { AppUser, Order, Role } from '@/domain/types';
 
-const ROLE_ORDER: Role[] = ['superAdmin', 'admin', 'produccion', 'despacho', 'vendedor'];
-const ROLE_TONE: Record<Role, 'ok' | 'warn' | 'bad' | 'muted' | 'info'> = { superAdmin: 'bad', admin: 'warn', produccion: 'info', despacho: 'info', vendedor: 'ok' };
+const ROLE_ORDER: Role[] = ['superAdmin', 'admin', 'consultor', 'produccion', 'despacho', 'reparto', 'tienda', 'vendedor'];
+const ROLE_TONE: Record<Role, 'ok' | 'warn' | 'bad' | 'muted' | 'info'> = {
+  superAdmin: 'bad', admin: 'warn', consultor: 'muted', produccion: 'info', despacho: 'info', reparto: 'info', tienda: 'ok', vendedor: 'ok',
+};
 
 interface UserRow extends AppUser {
   cartera: number;
@@ -22,16 +30,19 @@ interface UserRow extends AppUser {
 }
 
 export default function Usuarios() {
-  const [users, setUsers] = useState<AppUser[]>([]);
+  const { current } = useCurrentUser();
+  const me = current!.appUser;
+  const manage = can(me.role, 'users.manage');
+  const { users, loading } = useUsers();
+  const invites = useInvites();
   const [orders, setOrders] = useState<Order[]>([]);
   const { clients } = useClients();
-  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<AppUser | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const u1 = onSnapshot(collection(db, 'users'), (snap) => { const l: AppUser[] = []; snap.forEach((d) => l.push(d.data() as AppUser)); setUsers(l); setLoading(false); });
-    const u2 = onSnapshot(collection(db, 'orders'), (snap) => { const l: Order[] = []; snap.forEach((d) => l.push(d.data() as Order)); setOrders(l); });
-    return () => { u1(); u2(); };
-  }, []);
+  useEffect(() => onSnapshot(collection(db, 'orders'), (snap) => { const l: Order[] = []; snap.forEach((d) => l.push(d.data() as Order)); setOrders(l); }), []);
 
   const rows = useMemo<UserRow[]>(() => {
     const since = addDaysIso(todayInSantiago(), -30);
@@ -50,25 +61,58 @@ export default function Usuarios() {
         anulados30: created.filter((o) => o.requestedDate >= since && o.status === 'anulado').length,
         lastActivity: lastAt ? new Date(lastAt).toISOString().slice(0, 10) : null,
       };
-    }).sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.displayName.localeCompare(b.displayName, 'es'));
+    }).sort((a, b) => Number(a.active === false) - Number(b.active === false) || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.displayName.localeCompare(b.displayName, 'es'));
   }, [users, orders, clients]);
+
+  const byRole = useMemo(() => ROLE_ORDER.map((r) => [r, users.filter((u) => u.role === r && u.active !== false).length] as const), [users]);
+
+  async function act(fn: () => Promise<string | void>) {
+    setError(null); setFlash(null);
+    try { const m = await fn(); if (m) setFlash(m); } catch (e) { setError(callableMessage(e)); }
+  }
 
   return (
     <div>
-      <header className="mb-4">
-        <p className="eyebrow">Super Administración</p>
-        <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Usuarios</h1>
-        <p className="text-xs text-charcoal-300 mt-1">{users.length} usuarios · actividad de los últimos 30 días · los permisos se gestionan en Firebase Console mientras esté en demo</p>
+      <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <p className="eyebrow">{manage ? 'Super Administración' : 'Consulta'}</p>
+          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Usuarios</h1>
+          <p className="text-xs text-charcoal-300 mt-1">
+            {users.filter((u) => u.active !== false).length} activos · {byRole.filter(([, n]) => n > 0).map(([r, n]) => `${n} ${ROLE_LABEL[r].toLowerCase()}`).join(' · ')}
+          </p>
+        </div>
+        {manage && <Button size="sm" onClick={() => setAdding(true)}>+ Agregar persona</Button>}
       </header>
 
+      {flash && <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-3">{flash}</div>}
+      {error && <div className="mb-3"><ErrorBanner message={error} /></div>}
       {loading && <p className="text-sm text-charcoal-300">Cargando…</p>}
+
+      {invites.length > 0 && (
+        <section className="mb-4">
+          <p className="eyebrow mb-2">Invitaciones pendientes</p>
+          <div className="card divide-y divide-charcoal-100/70">
+            {invites.map((inv) => (
+              <div key={inv.email} className="px-3 py-2 flex items-center justify-between gap-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-semibold text-charcoal-900">{inv.displayName} <Pill tone={ROLE_TONE[inv.role]}>{ROLE_LABEL[inv.role]}</Pill></p>
+                  <p className="text-[11px] text-charcoal-300 truncate">{inv.email} · aún no entra · {formatDateShort(new Date(inv.createdAt).toISOString().slice(0, 10))}</p>
+                </div>
+                {manage && <Button size="sm" variant="ghost" onClick={() => act(async () => { await deleteInvite(inv.email); return 'Invitación eliminada.'; })}>Quitar</Button>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <DataTable<UserRow>
         rows={rows}
         rowKey={(r) => r.uid}
+        rowTone={(r) => (r.active === false ? 'bad' : undefined)}
+        emptyText="Todavía no hay usuarios. Agregue a la primera persona."
         columns={[
-          { key: 'name', label: 'Usuario', mobile: true, render: (r) => <div><p className="font-semibold text-charcoal-900">{r.displayName}</p><p className="text-[11px] text-charcoal-300 truncate">{r.email}</p></div> },
-          { key: 'role', label: 'Rol', mobile: true, render: (r) => <Pill tone={ROLE_TONE[r.role]}>{ROLE_LABEL[r.role]}</Pill> },
+          { key: 'name', label: 'Usuario', mobile: true, render: (r) => <div><p className="font-semibold text-charcoal-900">{r.displayName}{r.active === false && <span className="ml-2 text-[10px] uppercase text-red-700">desactivado</span>}</p><p className="text-[11px] text-charcoal-300 truncate">{r.email}</p></div> },
+          { key: 'role', label: 'Perfil', mobile: true, render: (r) => <Pill tone={ROLE_TONE[r.role]}>{ROLE_LABEL[r.role]}</Pill> },
           { key: 'cartera', label: 'Cartera', align: 'right', render: (r) => r.role === 'vendedor' ? r.cartera : '—', muted: true },
           { key: 'creados', label: 'Pedidos 30 d', align: 'right', render: (r) => r.creados30 || '—' },
           { key: 'ventas', label: 'Ventas 30 d', align: 'right', mobile: true, render: (r) => r.ventas30 ? <span className="font-semibold">{formatCLP(r.ventas30)}</span> : '—' },
@@ -77,14 +121,116 @@ export default function Usuarios() {
           { key: 'last', label: 'Última actividad', align: 'right', render: (r) => r.lastActivity ? <span className="first-letter:uppercase whitespace-nowrap">{formatDateShort(r.lastActivity)}</span> : '—', muted: true },
         ]}
         expand={(r) => (
-          <div className="text-xs text-charcoal-500 flex flex-wrap gap-x-6 gap-y-1">
-            <span>uid <span className="font-mono text-charcoal-700">{r.uid}</span></span>
-            {r.role === 'vendedor' && <Link to={`/tablero?vendedor=${r.uid}`} className="underline hover:text-charcoal-900">Ver sus pedidos en el tablero →</Link>}
-            {r.role === 'vendedor' && <Link to="/clientes" className="underline hover:text-charcoal-900">Ver clientes →</Link>}
-            <span>Cambio de rol: Firebase Console → Firestore → users/{r.uid}</span>
+          <div className="text-xs text-charcoal-500 flex flex-wrap items-center gap-x-6 gap-y-2">
+            <span>{ROLE_DESCRIPTION[r.role]}</span>
+            {r.role === 'vendedor' && <Link to={`/tablero?vendedor=${r.uid}`} className="underline hover:text-charcoal-900">Ver sus pedidos →</Link>}
+            {manage && (
+              <span className="flex gap-2">
+                <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); setEditing(r); }}>Editar</Button>
+                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void act(async () => { await resendPasswordEmail(r.email); return `Se envió a ${r.email} el correo para crear o cambiar su contraseña.`; }); }}>Enviar correo de contraseña</Button>
+              </span>
+            )}
           </div>
         )}
       />
+
+      <section className="mt-6">
+        <p className="eyebrow mb-2">Perfiles</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {ROLES.map((r) => (
+            <div key={r} className="card p-3 text-xs">
+              <p className="font-semibold text-charcoal-900 mb-0.5">{ROLE_LABEL[r]}</p>
+              <p className="text-charcoal-500">{ROLE_DESCRIPTION[r]}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {adding && <AgregarDialog onClose={() => setAdding(false)} onDone={(m) => { setAdding(false); setFlash(m); }} />}
+      {editing && <EditarDialog user={editing} isSelf={editing.uid === me.uid} onClose={() => setEditing(null)} onDone={(m) => { setEditing(null); setFlash(m); }} />}
     </div>
+  );
+}
+
+function RoleSelect({ value, onChange }: { value: Role; onChange: (r: Role) => void }) {
+  return (
+    <div className="space-y-1.5">
+      {ROLES.map((r) => (
+        <label key={r} className={'flex gap-2 items-start rounded-md border p-2 cursor-pointer ' + (value === r ? 'border-charcoal-700 bg-white' : 'border-charcoal-100')}>
+          <input type="radio" name="role" checked={value === r} onChange={() => onChange(r)} className="mt-0.5" />
+          <span><span className="text-sm font-semibold text-charcoal-900">{ROLE_LABEL[r]}</span><span className="block text-[11px] text-charcoal-500">{ROLE_DESCRIPTION[r]}</span></span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function AgregarDialog({ onClose, onDone }: { onClose: () => void; onDone: (msg: string) => void }) {
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<Role>('vendedor');
+  const [withPassword, setWithPassword] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const valid = displayName.trim().length >= 2 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
+
+  async function submit() {
+    setBusy(true); setError(null);
+    try { onDone(await inviteUser({ email, displayName, role, withPassword })); } catch (e) { setError(callableMessage(e)); setBusy(false); }
+  }
+
+  return (
+    <ModalShell eyebrow="Usuarios" title="Agregar persona" onClose={onClose} wide>
+      <div className="space-y-3">
+        <label className="block"><span className="text-xs text-charcoal-500">Nombre</span><input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="field mt-1 w-full" autoFocus /></label>
+        <label className="block"><span className="text-xs text-charcoal-500">Correo</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="field mt-1 w-full" /></label>
+        <div>
+          <p className="text-xs text-charcoal-500 mb-1">Cómo va a entrar</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setWithPassword(false)} className={'flex-1 rounded-md border p-2 text-xs text-left ' + (!withPassword ? 'border-charcoal-700 bg-white' : 'border-charcoal-100')}><strong className="block text-sm">Con Google</strong>Su correo es Gmail o Google Workspace.</button>
+            <button type="button" onClick={() => setWithPassword(true)} className={'flex-1 rounded-md border p-2 text-xs text-left ' + (withPassword ? 'border-charcoal-700 bg-white' : 'border-charcoal-100')}><strong className="block text-sm">Con contraseña</strong>Le llega un correo para crearla.</button>
+          </div>
+        </div>
+        <div><p className="text-xs text-charcoal-500 mb-1">Perfil</p><RoleSelect value={role} onChange={setRole} /></div>
+        {error && <ErrorBanner message={error} />}
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={submit} disabled={!valid || busy}>{busy ? 'Guardando…' : 'Agregar'}</Button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function EditarDialog({ user, isSelf, onClose, onDone }: { user: AppUser; isSelf: boolean; onClose: () => void; onDone: (msg: string) => void }) {
+  const [displayName, setDisplayName] = useState(user.displayName);
+  const [role, setRole] = useState<Role>(user.role);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const active = user.active !== false;
+
+  async function save(patch: { role?: Role; active?: boolean; displayName?: string }, msg: string) {
+    setBusy(true); setError(null);
+    try { await updateUser(user.uid, patch); onDone(msg); } catch (e) { setError(callableMessage(e)); setBusy(false); }
+  }
+
+  return (
+    <ModalShell eyebrow={user.email} title={user.displayName} onClose={onClose} wide>
+      <div className="space-y-3">
+        <label className="block"><span className="text-xs text-charcoal-500">Nombre</span><input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="field mt-1 w-full" /></label>
+        <div><p className="text-xs text-charcoal-500 mb-1">Perfil</p><RoleSelect value={role} onChange={setRole} /></div>
+        <p className="text-[11px] text-charcoal-300">El cambio de perfil se aplica de inmediato en la sesión abierta de la persona.</p>
+        {error && <ErrorBanner message={error} />}
+        <div className="flex justify-between gap-2 pt-1 flex-wrap">
+          {!isSelf
+            ? <Button variant={active ? 'danger' : 'secondary'} disabled={busy} onClick={() => save({ active: !active }, active ? `${user.displayName} ya no puede entrar.` : `${user.displayName} puede entrar de nuevo.`)}>{active ? 'Desactivar' : 'Reactivar'}</Button>
+            : <span />}
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            <Button disabled={busy || (role === user.role && displayName.trim() === user.displayName)} onClick={() => save({ role, displayName: displayName.trim() }, 'Cambios guardados.')}>{busy ? 'Guardando…' : 'Guardar'}</Button>
+          </div>
+        </div>
+      </div>
+    </ModalShell>
   );
 }

@@ -3,23 +3,26 @@ import { Link, useLocation } from 'react-router-dom';
 import { ROLE_LABEL, signOut, type CurrentUser } from '@/data/auth';
 import Logo from '@/components/ui/Logo';
 import type { Role } from '@/domain/types';
+import { ROUTE_ACCESS, type RouteKey } from '@/domain/permissions';
 
-interface NavItem { to: string; label: string; primaryFor?: Role[]; roles: Role[]; }
+interface NavItem { to: string; label: string; route: RouteKey; primaryFor?: Role[]; }
 
 // `primaryFor` lists the roles where this item is that user's "own" work
 // (the wizard for a vendedor, the queue for despacho, etc.). The shell
 // puts those first in the nav so they're immediately reachable on mobile,
-// with the shared admin/reporting items after.
+// with the shared admin/reporting items after. Visibility comes from
+// ROUTE_ACCESS so the menu never offers a screen the guard would bounce.
 const NAV: NavItem[] = [
-  { to: '/tablero',           label: 'Tablero',          roles: ['vendedor', 'despacho', 'produccion', 'admin', 'superAdmin'], primaryFor: ['despacho', 'admin', 'superAdmin'] },
-  { to: '/vendedor/nuevo',    label: 'Nuevo pedido',     roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor'] },
-  { to: '/vendedor/pegar',    label: 'Pedido IA',     roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor'] },
-  { to: '/clientes',          label: 'Clientes',         roles: ['vendedor', 'admin', 'superAdmin'], primaryFor: ['vendedor', 'admin', 'superAdmin'] },
-  { to: '/produccion',        label: 'Producción',       roles: ['produccion', 'admin', 'superAdmin'], primaryFor: ['produccion'] },
-  { to: '/admin/panel',       label: 'Panel',            roles: ['admin', 'superAdmin'], primaryFor: ['admin', 'superAdmin'] },
-  { to: '/admin/catalogo',    label: 'Catálogo',         roles: ['admin', 'superAdmin'], primaryFor: ['admin', 'superAdmin'] },
-  { to: '/admin/usuarios',    label: 'Usuarios',         roles: ['superAdmin'], primaryFor: ['superAdmin'] },
-  { to: '/admin/bsale',       label: 'Bsale',            roles: ['superAdmin'], primaryFor: ['superAdmin'] },
+  { to: '/tablero',        label: 'Tablero',      route: 'tablero',       primaryFor: ['despacho', 'reparto', 'admin', 'superAdmin'] },
+  { to: '/vendedor/nuevo', label: 'Nuevo pedido', route: 'nuevoPedido',   primaryFor: ['vendedor', 'tienda'] },
+  { to: '/vendedor/pegar', label: 'Pedido IA',    route: 'pedidoIA',      primaryFor: ['vendedor'] },
+  { to: '/clientes',       label: 'Clientes',     route: 'clientes',      primaryFor: ['vendedor', 'admin', 'superAdmin'] },
+  { to: '/produccion',     label: 'Producción',   route: 'produccion',    primaryFor: ['produccion'] },
+  { to: '/bsale',          label: 'Bsale',        route: 'bsaleExplorer', primaryFor: ['consultor'] },
+  { to: '/admin/panel',    label: 'Panel',        route: 'panel',         primaryFor: ['admin', 'superAdmin', 'consultor'] },
+  { to: '/admin/catalogo', label: 'Catálogo',     route: 'catalogo',      primaryFor: ['admin', 'superAdmin'] },
+  { to: '/admin/usuarios', label: 'Usuarios',     route: 'usuarios',      primaryFor: ['superAdmin'] },
+  { to: '/admin/bsale',    label: 'Consola Bsale', route: 'bsaleConsola' },
 ];
 
 export default function AppShell({ current, children }: { current: CurrentUser; children: React.ReactNode }) {
@@ -27,7 +30,7 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
   const role = current.appUser.role;
 
   const items = useMemo(() => {
-    const visible = NAV.filter((n) => n.roles.includes(role));
+    const visible = NAV.filter((n) => ROUTE_ACCESS[n.route](role));
     // Primary items (owned by this role) first, then the rest, preserving
     // NAV order within each group.
     return [

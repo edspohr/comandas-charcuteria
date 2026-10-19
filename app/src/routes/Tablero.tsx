@@ -7,18 +7,17 @@ import { assignPacker } from '@/data/orders';
 import { useClients } from '@/data/clients';
 import { syncStockFromBsale, useAllStock, useSyncState } from '@/data/stock';
 import { useSettings } from '@/data/settings';
-import { demoUsers } from '@/data/demo-users';
+import { useUsers } from '@/data/users';
+import { ROLE_LABEL, can, canAny, isReadOnly } from '@/domain/permissions';
 import Button from '@/components/ui/Button';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { AnularDialog, DeliverDialog, DispatchDialog, VincularDocumentoDialog } from '@/components/orders/OrderDialogs';
 import { COLUMNS, actionForDrop, cardTone, columnFor, nextAction, type ActionKind, type ColumnId, type Tone } from '@/domain/kanban';
-import { DEFAULT_KANBAN_THRESHOLDS, ORDER_STATUS_LABEL, type Order, type OrderStatus } from '@/domain/types';
+import { DEFAULT_KANBAN_THRESHOLDS, ORDER_STATUS_LABEL, type Order, type OrderStatus, type Role } from '@/domain/types';
 import { addDaysIso, formatDateShort, todayInSantiago } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
 import { describeFirestoreError } from '@/lib/errors';
 
-const NAME_BY_UID: Record<string, string> = Object.fromEntries(demoUsers.map((u) => [u.uid, u.displayName]));
-const VENDEDORES = demoUsers.filter((u) => u.role === 'vendedor');
 
 type DateFilter = 'todos' | 'hoy' | 'manana' | 'atrasados';
 
@@ -34,10 +33,12 @@ export default function Tablero() {
   const { current } = useCurrentUser();
   const role = current!.appUser.role;
   const uid = current!.appUser.uid;
-  const isAdmin = role === 'admin' || role === 'superAdmin';
-  const canSync = role !== 'vendedor';
+  const { byRole } = useUsers();
+  const VENDEDORES = byRole('vendedor');
+  const isAdmin = can(role, 'order.cancelAny') || isReadOnly(role);
+  const canSync = can(role, 'stock.sync');
   // Auto-refresh only for roles that act on the board; producción syncs by hand.
-  const autoSync = role === 'despacho' || isAdmin;
+  const autoSync = can(role, 'order.pack') || can(role, 'order.link');
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -74,7 +75,7 @@ export default function Tablero() {
   // several cards in a row during the demo).
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
-  const mine = params.has('mios') ? params.get('mios') === '1' : role === 'vendedor';
+  const mine = params.has('mios') ? params.get('mios') === '1' : (role === 'vendedor' || role === 'tienda');
   const vendedor = params.get('vendedor') ?? '';
   const date = (params.get('fecha') as DateFilter | null) ?? 'todos';
   const showAnulados = params.get('anulados') === '1';
@@ -102,7 +103,7 @@ export default function Tablero() {
       if (o.status === 'anulado') return showAnulados && (!mine || o.createdBy === uid);
       if (o.status === 'entregado' && o.updatedAt < closedSince) return false;
       if (mine) {
-        const isMine = role === 'vendedor' ? o.createdBy === uid : role === 'despacho' ? o.assignedPackerId === uid : (o.createdBy === uid || o.assignedPackerId === uid);
+        const isMine = (role === 'vendedor' || role === 'tienda') ? o.createdBy === uid : role === 'despacho' ? o.assignedPackerId === uid : (o.createdBy === uid || o.assignedPackerId === uid);
         if (!isMine) return false;
       }
       if (vendedor && o.createdBy !== vendedor) return false;
@@ -180,7 +181,7 @@ export default function Tablero() {
 
   // Mobile column tabs
   const scroller = useRef<HTMLDivElement | null>(null);
-  const [activeCol, setActiveCol] = useState<ColumnId>(role === 'admin' || role === 'superAdmin' ? 'por_facturar' : 'pendiente');
+  const [activeCol, setActiveCol] = useState<ColumnId>(can(role, 'order.link') ? 'por_facturar' : role === 'reparto' ? 'por_despachar' : 'pendiente');
   function scrollToCol(id: ColumnId) {
     setActiveCol(id);
     const el = scroller.current?.querySelector<HTMLElement>(`[data-col="${id}"]`);
@@ -194,7 +195,7 @@ export default function Tablero() {
     <div className="-mx-4 sm:-mx-6">
       <header className="px-4 sm:px-6 mb-3 flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <p className="eyebrow">{role === 'vendedor' ? 'Vendedor' : role === 'despacho' ? 'Despacho' : role === 'produccion' ? 'Producción' : 'Administración'}</p>
+          <p className="eyebrow">{ROLE_LABEL[role]}</p>
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Tablero de pedidos</h1>
           <p className="text-xs text-charcoal-300 mt-1">
             {totalOpen} abierto{totalOpen === 1 ? '' : 's'}{redCount > 0 && <span className="text-red-700 font-semibold"> · {redCount} en rojo</span>}
@@ -204,7 +205,7 @@ export default function Tablero() {
         </div>
         <div className="flex items-center gap-2">
           {canSync && <Button size="sm" variant="secondary" onClick={doSync} disabled={syncing}>{syncing ? 'Sincronizando…' : 'Sincronizar Bsale'}</Button>}
-          {(role === 'vendedor' || isAdmin) && <Link to="/vendedor/nuevo"><Button size="sm">Nuevo pedido</Button></Link>}
+          {canAny(role, ['order.create', 'order.createTransfer']) && <Link to="/vendedor/nuevo"><Button size="sm">Nuevo pedido</Button></Link>}
         </div>
       </header>
 
@@ -342,9 +343,9 @@ export default function Tablero() {
   );
 }
 
-function detailPath(o: Order, role: string, uid: string): string {
+function detailPath(o: Order, role: Role, uid: string): string {
   if (role === 'despacho') return `/despacho/cola/${o.id}`;
-  if (role === 'vendedor') return `/vendedor/mis/${o.id}`;
+  if (!can(role, 'order.pack')) return `/vendedor/mis/${o.id}`;
   // admin: armado detail is the richest view while the order is being packed.
   if (['confirmado', 'confirmado_parcial', 'en_armado', 'armado'].includes(o.status) && o.assignedPackerId === uid) return `/despacho/cola/${o.id}`;
   return `/vendedor/mis/${o.id}`;
@@ -370,9 +371,10 @@ function KanbanCard({ order, tone, action, onAction, detailTo, draggable, onDrag
   compact?: boolean;
   isShop?: boolean;
 }) {
+  const { nameOf } = useUsers();
   const anyPending = order.lines.some((l) => l.pendingProductionQty > 0);
-  const packer = order.assignedPackerId ? NAME_BY_UID[order.assignedPackerId] ?? '?' : null;
-  const vendedor = NAME_BY_UID[order.createdBy] ?? order.createdBy;
+  const packer = order.assignedPackerId ? nameOf(order.assignedPackerId) : null;
+  const vendedor = nameOf(order.createdBy);
   const late = tone.tone === 'red' && tone.reasons.includes('Atrasado');
   return (
     <article

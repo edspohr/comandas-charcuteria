@@ -1,4 +1,6 @@
-export type Role = 'vendedor' | 'despacho' | 'produccion' | 'admin' | 'superAdmin';
+// Un perfil por usuario. Ver domain/permissions.ts para lo que puede cada uno.
+export type Role =
+  | 'vendedor' | 'tienda' | 'despacho' | 'reparto' | 'produccion' | 'admin' | 'superAdmin' | 'consultor';
 
 export type Unit = 'g' | 'kg' | 'unidad';
 
@@ -186,6 +188,20 @@ export interface AppUser {
   displayName: string;
   role: Role;
   email: string;
+  // Desactivado = no puede entrar (la cuenta de Auth queda deshabilitada).
+  active?: boolean;
+  createdAt?: number;
+  createdBy?: string;
+}
+
+// Invitación pendiente: el superAdmin da de alta a alguien por correo y la
+// cuenta se vincula la primera vez que entra (Google o contraseña).
+export interface Invite {
+  email: string;          // en minúsculas; también es el id del doc
+  displayName: string;
+  role: Role;
+  createdAt: number;
+  createdBy: string;
 }
 
 // Thresholds that drive the kanban card colours. Editable in settings/app

@@ -9,16 +9,14 @@ import { formatDateLong, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { formatCLP } from '@/lib/pricing';
-import { demoUsers } from '@/data/demo-users';
+import { useUsers } from '@/data/users';
 import { ORDER_STATUS_LABEL } from '@/domain/types';
 
-const NAME_BY_UID: Record<string, string> = Object.fromEntries(
-  demoUsers.map((u) => [u.uid, u.displayName]),
-);
 
 interface PackedState { packedQty: number; packedWeightKg: string; short: boolean; shortReason: string; }
 
 export default function DetalleArmado() {
+  const { nameOf } = useUsers();
   const { orderId } = useParams<{ orderId: string }>();
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
@@ -144,7 +142,7 @@ export default function DetalleArmado() {
       {!canTake && !canPack && order.assignedPackerId && !mine && (
         <div className="card p-4 mb-4">
           <p className="text-sm text-charcoal-500">
-            Asignado a <span className="font-semibold text-charcoal-700">{NAME_BY_UID[order.assignedPackerId] ?? 'otro armador'}</span>.
+            Asignado a <span className="font-semibold text-charcoal-700">{nameOf(order.assignedPackerId) || 'otro armador'}</span>.
           </p>
         </div>
       )}
@@ -301,7 +299,7 @@ export default function DetalleArmado() {
               <li key={i} className="flex justify-between gap-2">
                 <span className="text-charcoal-700 font-medium">{ORDER_STATUS_LABEL[h.status]}</span>
                 <span className="text-charcoal-300">
-                  {NAME_BY_UID[h.by] ?? h.by} · {new Date(h.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}
+                  {nameOf(h.by)} · {new Date(h.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}
                 </span>
               </li>
             ))}

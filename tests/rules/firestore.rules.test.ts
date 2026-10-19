@@ -1,52 +1,44 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import {
   assertFails,
   assertSucceeds,
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
-// Firestore emulator must be running on 127.0.0.1:8080 for this suite.
-// Firestore + Auth emulators both require a Java runtime. This suite
-// has never actually run on the dev machine — no JDK installed — so
-// consider it aspirational until it runs on a CI host with Java.
-//
-// Coverage — three critical cases from the spec (each with its positive
-// counterpart bundled into the same test):
-//   1. Vendedor cannot edit orders belonging to another vendedor.
-//   2. Vendedor cannot skip states (en_armado forbidden), but CAN anular.
-//   3. Despacho cannot set invoiceRef, but CAN marcar armado.
+// Needs the Firestore emulator (Java). From the repo root:
+//   npm run test:rules:emu
+// The role travels as the custom claim `role`, exactly like production
+// (functions/src/users.ts sets it), so each context passes it as a token claim.
 
 const PROJECT = 'comandas-charcuteria-demo';
 
 let env: RulesTestEnvironment;
 
-async function seedUser(uid: string, role: string) {
-  await env.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(doc(ctx.firestore(), 'users', uid), {
-      uid, email: `${uid}@test.local`, displayName: uid, role,
-    });
-  });
+function as(uid: string, role?: string) {
+  return env.authenticatedContext(uid, role ? { role, email: `${uid}@test.local` } : { email: `${uid}@test.local` }).firestore();
+}
+
+async function seed(path: string, data: Record<string, unknown>) {
+  await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), path), data); });
 }
 
 async function seedOrder(id: string, createdBy: string, overrides: Record<string, unknown> = {}) {
-  await env.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(doc(ctx.firestore(), 'orders', id), {
-      id, createdBy,
-      clientId: 'c-1', clientSnapshot: { name: 'Cliente demo' },
-      lines: [], requestedDate: '2026-09-30',
-      deliveryMode: 'despacho',
-      status: 'confirmado',
-      statusHistory: [{ status: 'confirmado', by: createdBy, at: Date.now() }],
-      source: 'app',
-      invoicingComplete: true,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      ...overrides,
-    });
+  await seed(`orders/${id}`, {
+    id, createdBy,
+    clientId: 'c-1', clientSnapshot: { name: 'Cliente demo' },
+    lines: [], requestedDate: '2026-10-30',
+    deliveryMode: 'despacho',
+    status: 'confirmado',
+    statusHistory: [{ status: 'confirmado', by: createdBy, at: Date.now() }],
+    source: 'app',
+    invoicingComplete: true,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    ...overrides,
   });
 }
 
@@ -61,42 +53,78 @@ beforeAll(async () => {
   });
 });
 
+beforeEach(async () => { await env.clearFirestore(); });
+
 afterAll(async () => {
   await env?.cleanup();
 });
 
-describe('firestore rules', () => {
+describe('pedidos', () => {
   it('vendedor cannot edit another vendedor\'s order', async () => {
-    await env.clearFirestore();
-    await seedUser('u-alice', 'vendedor');
-    await seedUser('u-bob',   'vendedor');
-    await seedOrder('PED-A-1', 'u-alice');
-
-    const bob = env.authenticatedContext('u-bob').firestore();
-    await assertFails(updateDoc(doc(bob, 'orders', 'PED-A-1'), { status: 'anulado' }));
+    await seedOrder('PED-1', 'u-alice');
+    await assertFails(updateDoc(doc(as('u-bob', 'vendedor'), 'orders', 'PED-1'), { status: 'anulado' }));
   });
 
-  it('vendedor cannot change status past their allowed transition (en_armado is forbidden)', async () => {
-    await env.clearFirestore();
-    await seedUser('u-alice', 'vendedor');
-    await seedOrder('PED-A-2', 'u-alice');
-
-    const alice = env.authenticatedContext('u-alice').firestore();
-    // Trying to jump directly to en_armado from their own order must fail.
-    await assertFails(updateDoc(doc(alice, 'orders', 'PED-A-2'), { status: 'en_armado' }));
-    // Sanity: anular on the same order IS allowed.
-    await assertSucceeds(updateDoc(doc(alice, 'orders', 'PED-A-2'), { status: 'anulado' }));
+  it('vendedor cannot skip states, but can anular their own', async () => {
+    await seedOrder('PED-2', 'u-alice');
+    const alice = as('u-alice', 'vendedor');
+    await assertFails(updateDoc(doc(alice, 'orders', 'PED-2'), { status: 'en_armado' }));
+    await assertSucceeds(updateDoc(doc(alice, 'orders', 'PED-2'), { status: 'anulado' }));
   });
 
-  it('despacho cannot set invoiceRef', async () => {
-    await env.clearFirestore();
-    await seedUser('u-edu', 'despacho');
-    await seedOrder('PED-A-3', 'u-someone', { status: 'en_armado' });
+  it('despacho cannot set invoiceRef, but can marcar armado', async () => {
+    await seedOrder('PED-3', 'u-someone', { status: 'en_armado' });
+    const edu = as('u-edu', 'despacho');
+    await assertSucceeds(updateDoc(doc(edu, 'orders', 'PED-3'), { status: 'armado' }));
+    await assertFails(updateDoc(doc(edu, 'orders', 'PED-3'), { invoiceRef: 'FA-999999' }));
+  });
 
-    const edu = env.authenticatedContext('u-edu').firestore();
-    // Marcar armado (legal): status stays despacho-allowed and invoiceRef doesn't change.
-    await assertSucceeds(updateDoc(doc(edu, 'orders', 'PED-A-3'), { status: 'armado' }));
-    // Setting invoiceRef alongside is forbidden.
-    await assertFails(updateDoc(doc(edu, 'orders', 'PED-A-3'), { invoiceRef: 'FA-999999' }));
+  it('reparto delivers a dispatched order but cannot link a document', async () => {
+    await seedOrder('PED-4', 'u-someone', { status: 'despachado' });
+    await seedOrder('PED-5', 'u-someone', { status: 'armado' });
+    const daniel = as('u-daniel', 'reparto');
+    await assertSucceeds(updateDoc(doc(daniel, 'orders', 'PED-4'), { status: 'entregado' }));
+    await assertFails(updateDoc(doc(daniel, 'orders', 'PED-5'), { status: 'facturado', invoiceRef: 'FA-1' }));
+  });
+
+  it('tienda creates its own replenishment order', async () => {
+    const lucy = as('u-lucy', 'tienda');
+    await assertSucceeds(setDoc(doc(lucy, 'orders', 'PED-6'), {
+      id: 'PED-6', createdBy: 'u-lucy', status: 'confirmado', lines: [], statusHistory: [],
+    }));
+    await assertFails(setDoc(doc(lucy, 'orders', 'PED-7'), {
+      id: 'PED-7', createdBy: 'u-otro', status: 'confirmado', lines: [], statusHistory: [],
+    }));
+  });
+});
+
+describe('consultor (auditor)', () => {
+  it('reads everything but writes nothing', async () => {
+    await seedOrder('PED-8', 'u-alice');
+    await seed('stock/p__f', { productId: 'p', formatId: 'f', onHand: 5, reserved: 0 });
+    await seed('invites/x@y.cl', { email: 'x@y.cl', role: 'vendedor' });
+    const ed = as('u-ed', 'consultor');
+    await assertSucceeds(getDoc(doc(ed, 'orders', 'PED-8')));
+    await assertSucceeds(getDoc(doc(ed, 'invites', 'x@y.cl')));
+    await assertFails(updateDoc(doc(ed, 'orders', 'PED-8'), { status: 'anulado' }));
+    await assertFails(updateDoc(doc(ed, 'stock', 'p__f'), { reserved: 1 }));
+    await assertFails(setDoc(doc(ed, 'stockMovements', 'm1'), { by: 'u-ed', qty: 1 }));
+  });
+});
+
+describe('usuarios', () => {
+  it('nobody writes users or invites from the client, not even superAdmin', async () => {
+    const ciro = as('u-ciro', 'superAdmin');
+    await assertFails(setDoc(doc(ciro, 'users', 'u-x'), { role: 'superAdmin' }));
+    await assertFails(setDoc(doc(ciro, 'invites', 'a@b.cl'), { role: 'vendedor' }));
+  });
+
+  it('a signed-in account without a role reads only its own user doc', async () => {
+    await seed('users/u-new', { uid: 'u-new', role: 'vendedor' });
+    await seedOrder('PED-9', 'u-alice');
+    const fresh = as('u-new');
+    await assertSucceeds(getDoc(doc(fresh, 'users', 'u-new')));
+    await assertFails(getDoc(doc(fresh, 'orders', 'PED-9')));
+    await assertFails(getDoc(doc(as('u-new', 'vendedor'), 'invites', 'x@y.cl')));
   });
 });

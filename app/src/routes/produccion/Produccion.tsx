@@ -13,7 +13,7 @@ import { geminiEnabled, parseWithGemini } from '@/domain/parse/gemini';
 import { formatDateShort, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 
-type Tab = 'demanda' | 'ia';
+type Tab = 'demanda' | 'registrar' | 'ia';
 
 // Producción: what the open orders still need vs. what Bsale reports, plus
 // «Producción IA»: paste the factory's report, the AI turns it into stock
@@ -48,7 +48,7 @@ export default function Produccion() {
       <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
         <div>
           <p className="eyebrow">Producción</p>
-          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">{tab === 'demanda' ? 'Demanda vs. stock Bsale' : 'Producción IA'}</h1>
+          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">{tab === 'demanda' ? 'Demanda vs. stock Bsale' : tab === 'registrar' ? 'Registrar producción' : 'Producción IA'}</h1>
           <p className="text-xs text-charcoal-300 mt-1">
             La producción terminada se carga en Bsale. {sync?.at ? `Última sincronización ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}.` : 'Aún sin sincronizar.'}
           </p>
@@ -57,7 +57,7 @@ export default function Produccion() {
       </header>
 
       <nav className="mb-4 flex gap-1 border-b border-charcoal-100">
-        {([['demanda', `Demanda y stock${urgentCount ? ` · ${urgentCount} a producir` : ''}`], ...(canReceive ? [['ia', 'Producción IA']] : [])] as Array<[Tab, string]>).map(([t, label]) => (
+        {([['demanda', `Demanda y stock${urgentCount ? ` · ${urgentCount} a producir` : ''}`], ...(canReceive ? [['registrar', 'Registrar producción'], ['ia', 'Producción IA']] : [])] as Array<[Tab, string]>).map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} className={'px-4 py-2.5 text-xs uppercase tracking-display font-medium border-b-2 transition -mb-px ' + (t === tab ? 'border-brass-500 text-charcoal-900' : 'border-transparent text-charcoal-300 hover:text-charcoal-500')}>{label}</button>
         ))}
       </nav>
@@ -108,6 +108,7 @@ export default function Produccion() {
         </>
       )}
 
+      {tab === 'registrar' && <RegistrarProduccion uid={uid} onDone={(msg) => { setFlash(msg); setTab('demanda'); }} />}
       {tab === 'ia' && <ProduccionIA uid={uid} onDone={(msg) => { setFlash(msg); setTab('demanda'); }} />}
     </div>
   );
@@ -238,3 +239,52 @@ function ProduccionIA({ uid, onDone }: { uid: string; onDone: (msg: string) => v
   );
 }
 
+
+// Manual entry of finished production → reception at the factory office in
+// Bsale (same call as Producción IA). Yuri types what came out of the plant
+// once; nobody re-enters it in Bsale.
+function RegistrarProduccion({ uid, onDone }: { uid: string; onDone: (msg: string) => void }) {
+  const { products } = useProducts();
+  const active = useMemo(() => products.filter((p) => p.active && !p.discontinued), [products]);
+  const [rows, setRows] = useState<Array<{ productId: string; formatId: string; qty: string }>>([{ productId: '', formatId: '', qty: '' }]);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = (i: number, patch: Partial<{ productId: string; formatId: string; qty: string }>) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const valid = rows.filter((r) => r.productId && r.formatId && Number(r.qty.replace(',', '.')) > 0);
+
+  async function submit() {
+    setBusy(true); setError(null);
+    try {
+      const r = await registerProduction(valid.map((x) => ({ productId: x.productId, formatId: x.formatId, qty: Number(x.qty.replace(',', '.')) })), uid, note || undefined);
+      onDone(writeOutcomeText(r, `Registradas ${valid.length} línea${valid.length === 1 ? '' : 's'} de producción`));
+    } catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
+  }
+
+  return (
+    <div className="max-w-2xl card p-4 space-y-3">
+      <p className="text-sm text-charcoal-700">Lo que salió de la planta hoy. Se carga como recepción en la fábrica en Bsale y el stock nuevo se asigna a los pedidos que esperaban.</p>
+      {rows.map((r, i) => {
+        const p = active.find((x) => x.id === r.productId);
+        const f = p?.formats.find((x) => x.formatId === r.formatId);
+        return (
+          <div key={i} className="flex flex-wrap gap-2 items-center">
+            <select className="field h-10 text-sm flex-1 min-w-[12rem]" value={r.productId} onChange={(e) => { const np = active.find((x) => x.id === e.target.value); set(i, { productId: e.target.value, formatId: np?.formats[0]?.formatId ?? '' }); }}>
+              <option value="">Producto…</option>
+              {active.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+            <select className="field h-10 text-sm w-44" value={r.formatId} onChange={(e) => set(i, { formatId: e.target.value })} disabled={!p}>
+              {(p?.formats ?? []).map((x) => <option key={x.formatId} value={x.formatId}>{x.label}</option>)}
+            </select>
+            <input className="field h-10 text-sm w-24 text-right" inputMode="decimal" placeholder={f?.unit === 'kg' ? 'kg' : 'unid.'} value={r.qty} onChange={(e) => set(i, { qty: e.target.value })} />
+            {rows.length > 1 && <button className="text-charcoal-300 hover:text-red-700 text-lg" onClick={() => setRows((x) => x.filter((_, j) => j !== i))} aria-label="Quitar línea">×</button>}
+          </div>
+        );
+      })}
+      <button className="text-xs underline text-charcoal-500" onClick={() => setRows((x) => [...x, { productId: '', formatId: '', qty: '' }])}>+ Agregar línea</button>
+      <input className="field h-10 text-sm" placeholder="Nota (lote, turno…)" value={note} onChange={(e) => setNote(e.target.value)} />
+      {error && <ErrorBanner message={error} />}
+      <Button className="w-full" onClick={submit} disabled={busy || valid.length === 0}>{busy ? 'Cargando en Bsale…' : `Cargar ${valid.length || ''} línea${valid.length === 1 ? '' : 's'} en Bsale`}</Button>
+    </div>
+  );
+}

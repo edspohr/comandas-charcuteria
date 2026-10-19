@@ -9,6 +9,7 @@ import { loadSettings, requireEnabled, requireRole } from './config';
 import { runDiagnostic } from './diagnose';
 import { customerFromRaw, fullSync, stripUndefined, syncDocuments, syncStock } from './sync';
 import { createClient, receiveProduction, transferToStore, updateClient, type CustomerInput, type QtyLine } from './writes';
+import { buildInvoice, emitInvoice } from './invoice';
 
 const secrets = [BSALE_TOKEN];
 const SYNC_ROLES = ['despacho', 'produccion', 'admin', 'superAdmin'] as const;
@@ -152,4 +153,26 @@ export const bsaleUpdateClient = onCall({ region: REGION, secrets }, async (req)
   const id = String(req.data?.bsaleClientId ?? '');
   if (!id) throw new HttpsError('invalid-argument', 'Falta el id de Bsale.');
   return updateClient(apiFromSecret(), s, uid, id, parseCustomer(req.data?.patch, true));
+});
+
+// ---------- Facturación desde Comandas ----------
+
+const INVOICE_ROLES = ['admin', 'superAdmin'] as const;
+const kindArg = (x: unknown) => (x === 'factura' || x === 'boleta' ? x : undefined);
+
+export const bsaleInvoicePreview = onCall({ region: REGION }, async (req) => {
+  requireRole(req, [...INVOICE_ROLES], 'facturar');
+  const s = await loadSettings();
+  const orderId = String(req.data?.orderId ?? '');
+  if (!orderId) throw new HttpsError('invalid-argument', 'Falta el pedido.');
+  return { preview: await buildInvoice(s, orderId, kindArg(req.data?.kind)), writesEnabled: s.writesEnabled, dryRun: s.dryRun };
+});
+
+export const bsaleEmitInvoice = onCall({ region: REGION, secrets, timeoutSeconds: 120 }, async (req) => {
+  const { uid } = requireRole(req, [...INVOICE_ROLES], 'facturar');
+  const s = await loadSettings();
+  requireEnabled(s);
+  const orderId = String(req.data?.orderId ?? '');
+  if (!orderId) throw new HttpsError('invalid-argument', 'Falta el pedido.');
+  return emitInvoice(apiFromSecret(), s, uid, orderId, kindArg(req.data?.kind));
 });

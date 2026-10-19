@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
 import { anularOrder, despacharOrder, entregarOrder, registrarTraslado, vincularDocumento } from '@/data/orders';
 import { useBsaleDocuments } from '@/data/bsale';
 import { emitDocumentForOrder } from '@/integrations/bsale/mockAdmin';
 import { syncStockFromBsale } from '@/data/stock';
 import { bsale, isRealBsale } from '@/integrations/bsale/client';
+import { emitInvoice, previewInvoice, type InvoicePreview } from '@/data/bsaleOps';
+import { callableMessage } from '@/data/userAdmin';
 import { describeFirestoreError } from '@/lib/errors';
 import { formatCLP } from '@/lib/pricing';
 import type { Order } from '@/domain/types';
@@ -224,8 +226,10 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
   }
 
   return (
-    <ModalShell title="Vincular documento Bsale" eyebrow={order.id} onClose={onClose} wide>
+    <ModalShell title={isRealBsale ? 'Facturar en Bsale' : 'Vincular documento Bsale'} eyebrow={order.id} onClose={onClose} wide>
       <div className="space-y-4">
+        {isRealBsale && <EmitirEnBsale order={order} onDone={(d) => { onLinked?.(d as BsaleDocument); }} onClose={onClose} />}
+        {isRealBsale && <p className="eyebrow pt-2 border-t border-charcoal-100">¿Ya se emitió en el POS? Vincúlelo</p>}
         <p className="text-sm text-charcoal-700">
           La venta se emite en el POS de Bsale. Elegí el documento que corresponde a{' '}
           <span className="font-semibold">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</span>
@@ -291,5 +295,74 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
         {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-2 text-sm">{error}</div>}
       </div>
     </ModalShell>
+  );
+}
+
+// Emit the invoice/boleta in Bsale from the packed order (real weights, Bsale
+// prices) and link it in the same step: no retyping at the POS. Preview first;
+// with Bsale in dry-run the payload goes to the write log only.
+function EmitirEnBsale({ order, onDone, onClose }: { order: Order; onDone: (d: unknown) => void; onClose: () => void }) {
+  const [kind, setKind] = useState<'factura' | 'boleta' | undefined>(undefined);
+  const [state, setState] = useState<{ preview: InvoicePreview; writesEnabled: boolean; dryRun: boolean } | null>(null);
+  const [busy, setBusy] = useState<'preview' | 'emit' | null>('preview');
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setBusy('preview'); setError(null);
+    previewInvoice(order.id, kind).then((r) => { if (alive) { setState(r); setBusy(null); } }).catch((e) => { if (alive) { setError(callableMessage(e)); setBusy(null); } });
+    return () => { alive = false; };
+  }, [order.id, kind]);
+
+  async function emit() {
+    setBusy('emit'); setError(null);
+    try {
+      const r = await emitInvoice(order.id, state?.preview.kind === 'factura' || state?.preview.kind === 'boleta' ? state.preview.kind : undefined);
+      if (r.dryRun) setDone('Simulacro: el documento quedó en la bitácora de Bsale sin emitirse. El pedido no cambió.');
+      else { setDone(`Emitido ${r.number}. El pedido pasó a "Por despachar".`); onDone(r); }
+    } catch (e) { setError(callableMessage(e)); }
+    setBusy(null);
+  }
+
+  const p = state?.preview;
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-charcoal-700">Se emite con lo empacado: kilos reales y precios de la lista de Bsale.</p>
+        <div className="flex gap-1">
+          {(['factura', 'boleta'] as const).map((k) => (
+            <button key={k} onClick={() => setKind(k)} className={'rounded-md px-2.5 py-1 text-[11px] uppercase tracking-display border ' + ((p?.kind ?? kind) === k ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-500')}>{k}</button>
+          ))}
+        </div>
+      </div>
+      {busy === 'preview' && <p className="text-xs text-charcoal-300">Preparando el documento…</p>}
+      {p && (
+        <>
+          <div className="text-xs text-charcoal-500 flex flex-wrap gap-x-4">
+            <span><strong className="text-charcoal-900">{p.documentTypeName ?? p.kind}</strong></span>
+            <span>{p.client.name}{p.client.rut ? ` · ${p.client.rut}` : ''}{p.client.bsaleClientId ? '' : ' · (nuevo en Bsale)'}</span>
+            {p.seller && <span>Vendedor: {p.seller.name}</span>}
+          </div>
+          <div className="card divide-y divide-charcoal-100 text-sm">
+            {p.lines.map((l, i) => (
+              <div key={i} className="px-3 py-2 flex justify-between gap-3">
+                <span className="min-w-0"><span className="text-charcoal-900">{l.productName}</span> <span className="text-charcoal-300 text-xs">{l.variantLabel}</span></span>
+                <span className="shrink-0 tabular-nums text-charcoal-700">{l.quantity} {l.unitLabel} × {formatCLP(Math.round(l.netUnitValue * 1.19))} = <strong>{formatCLP(l.totalCLP)}</strong>{l.priceSource === 'pedido' && <span className="text-brass-700"> *</span>}</span>
+              </div>
+            ))}
+            <div className="px-3 py-2 flex justify-between font-semibold"><span>Total</span><span className="tabular-nums">{formatCLP(p.totalCLP)}{p.orderTotalCLP ? <span className="text-xs font-normal text-charcoal-300"> · pedido {formatCLP(p.orderTotalCLP)}</span> : null}</span></div>
+          </div>
+          {p.warnings.map((w) => <p key={w} className="text-xs text-brass-700">⚠︎ {w}</p>)}
+          {p.blocking.map((w) => <p key={w} className="text-xs text-red-700">✕ {w}</p>)}
+          {done
+            ? <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-2.5 text-sm flex justify-between gap-2"><span>{done}</span><button className="underline text-xs" onClick={onClose}>Cerrar</button></div>
+            : <Button className="w-full" onClick={emit} disabled={busy != null || p.blocking.length > 0 || !state?.writesEnabled}>
+                {busy === 'emit' ? 'Emitiendo…' : !state?.writesEnabled ? 'Escrituras hacia Bsale apagadas' : state.dryRun ? `Probar en simulacro (${p.kind})` : `Emitir ${p.kind} en Bsale`}
+              </Button>}
+        </>
+      )}
+      {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-2 text-sm">{error}</div>}
+    </section>
   );
 }

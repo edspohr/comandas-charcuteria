@@ -37,3 +37,17 @@ export function writeOutcomeText(o: BsaleWriteOutcome, what: string): string {
   if (!r) return `${what} en Bsale.`;
   return `${what} en Bsale.` + (r.absorbed > 0 ? ` Reasignadas ${r.absorbed} u/kg a pedidos pendientes.` : '') + (r.promoted.length > 0 ? ` Promovidos: ${r.promoted.join(', ')}.` : '');
 }
+
+// ---------- Facturación desde Comandas ----------
+
+export interface InvoiceLine { productName: string; formatLabel: string; variantId: string; variantLabel: string; quantity: number; unitLabel: string; netUnitValue: number; netCLP: number; totalCLP: number; priceSource: 'bsale' | 'pedido' }
+export interface InvoicePreview {
+  orderId: string; kind: 'factura' | 'boleta' | 'guia' | 'nota_credito' | 'otro'; documentTypeId?: number; documentTypeName?: string;
+  client: { name: string; rut?: string; bsaleClientId?: string }; seller?: { id: number; name: string };
+  lines: InvoiceLine[]; netCLP: number; totalCLP: number; orderTotalCLP?: number; warnings: string[]; blocking: string[]; payload: Record<string, unknown>;
+}
+const previewFn = httpsCallable<{ orderId: string; kind?: 'factura' | 'boleta' }, { preview: InvoicePreview; writesEnabled: boolean; dryRun: boolean }>(functions, 'bsaleInvoicePreview');
+const emitFn = httpsCallable<{ orderId: string; kind?: 'factura' | 'boleta' }, { dryRun: boolean; number?: string; urlPdf?: string; preview: InvoicePreview }>(functions, 'bsaleEmitInvoice', { timeout: 120_000 });
+
+export async function previewInvoice(orderId: string, kind?: 'factura' | 'boleta') { return (await previewFn({ orderId, kind })).data; }
+export async function emitInvoice(orderId: string, kind?: 'factura' | 'boleta') { return (await emitFn({ orderId, kind })).data; }

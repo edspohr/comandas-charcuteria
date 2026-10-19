@@ -183,6 +183,15 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     Object.assign(c, body, { id: c.id });
     return send(200, c);
   }
+  // Document emitted from Comandas (POST /v1/documents.json).
+  if (req.method === 'POST' && path === '/documents.json') {
+    const client = body.clientId ? bsClients.find((c) => c.id === Number(body.clientId)) ?? null : body.client ? { id: ++clientSeq, ...body.client, state: 0 } : null;
+    if (client && !bsClients.some((c) => c.id === client.id)) bsClients.push(client as typeof bsClients[number]);
+    const lines = (body.details ?? []).map((d: { variantId: number; quantity: number }) => ({ v: variants.find((v) => v.id === d.variantId)!, q: d.quantity })).filter((l: { v: unknown }) => l.v);
+    if (!lines.length) return send(400, { error: 'sin detalles válidos' });
+    const d = emit(Number(body.documentTypeId) || 1, client as typeof bsClients[number] | null, lines, body.officeId ?? FACTORY, body.emissionDate ?? nowS(), body.sellerId ?? 2);
+    return send(201, { ...d, urlPdf: `https://fake.bsale/${d.id}.pdf` });
+  }
   // Fake POS: emits a document so webhooks/linking can be exercised.
   if (req.method === 'POST' && path === '/_fake/emit') {
     const lines = (body.lines ?? []).map((l: { variantId: number; quantity: number }) => ({ v: variants.find((v) => v.id === l.variantId)!, q: l.quantity })).filter((l: { v: unknown }) => l.v);

@@ -106,7 +106,7 @@ export function nextAction(order: Order, role: Role, uid: string, opts: { isShop
     case 'armado':
       // La reposición de tienda no se factura: se registra como traslado.
       if (shop) return can(role, 'order.pack') || can(role, 'order.link') ? { kind: 'transfer', label: 'Registrar traslado' } : { kind: 'none', label: '' };
-      return can(role, 'order.link') ? { kind: 'link', label: 'Vincular doc.' } : { kind: 'none', label: '' };
+      return can(role, 'order.link') ? { kind: 'link', label: 'Facturar' } : { kind: 'none', label: '' };
     case 'facturado':
       return can(role, 'order.dispatch') ? { kind: 'dispatch', label: 'Despachar' } : { kind: 'none', label: '' };
     case 'despachado':

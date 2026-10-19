@@ -21,7 +21,7 @@ async function logWrite(entry: Record<string, unknown>): Promise<string> {
   return ref.id;
 }
 
-async function send<T>(api: BsaleApi, s: BsaleSettings, kind: string, by: string, method: 'POST' | 'PUT', path: string, body: unknown, ref?: string): Promise<WriteResult<T>> {
+export async function send<T>(api: BsaleApi, s: BsaleSettings, kind: string, by: string, method: 'POST' | 'PUT', path: string, body: unknown, ref?: string): Promise<WriteResult<T>> {
   if (!s.writesEnabled) throw new HttpsError('failed-precondition', 'Las escrituras hacia Bsale están desactivadas (Bsale → Configuración).');
   if (s.dryRun) {
     const logId = await logWrite({ kind, by, method, path, body, ref, dryRun: true, status: 'simulado' });

@@ -92,12 +92,17 @@ Lo que nace en Comandas se escribe en Bsale desde la app, siempre pasando por la
 | Producción → **Registrar producción** | recepción de stock en fábrica, a costo promedio vigente |
 | Tablero → **Traslado a tienda** | consumo en fábrica + recepción en tienda (o guía de traslado) |
 | Alta rápida de cliente | cliente nuevo |
+| Muestras sin cargo (en un pedido o solas) | consumo interno en fábrica, nota «Muestra · cliente · pedido», al facturar o al registrar la salida |
+
+### Muestras
+
+El vendedor agrega **+ Muestra** en el pedido (80 g por defecto, sale del granel del producto; sin granel, una unidad del formato más chico) y Pedido IA reconoce «incluir muestra de…». Van a $0, no generan demanda de producción y no entran en la factura. Despacho las arma con su peso y rotula; un pedido solo de muestras se cierra con **Registrar salida** (`MU-…`). Siete días después de la entrega el vendedor ve en su Tablero «¿Qué le pareció…?» y responde (`sampleFeedback`); si el cliente compra ese producto dentro de 60 días cuenta como conversión. Panel → Muestras: kilos y costo regalados, seguimiento por vendedor, conversión y venta generada.
 
 ### Panel de gestión
 
 Corre sobre las ventas de Bsale (facturas + boletas − notas de crédito, neto), no sobre los pedidos. Los hechos se guardan comprimidos, un documento por mes (`bsale/facts/months/{AAAA-MM}`): dos años de historia cuestan ~25 lecturas. Pestañas: Resumen, Ventas, Productos (ABC, margen), Clientes (ritmo de compra, en riesgo, perdidos), Vendedores (la tienda cuenta como vendedora), Stock (cobertura, reposición a tienda), Explorador (tabla dinámica + CSV) y Pedidos (el panel operativo de Comandas). El margen usa el costo promedio de Bsale; si las recepciones se cargan sin costo, aparece como "costo no informado".
 
-Funciones: `bsaleDiagnose`, `bsaleSyncNow`, `bsaleScheduledSync`, `bsaleWebhook`, `bsaleWebhookInfo`, `bsaleReceiveProduction`, `bsaleTransferToStore`, `bsaleCreateClient`, `bsaleUpdateClient`, `bsaleInvoicePreview`, `bsaleEmitInvoice`, `bsaleFactsBackfill`, `bsaleRefreshCosts`, `bsaleDailyCosts`, `bsaleProxy` (solo GET). Código en [`functions/src/bsale/`](functions/src/bsale). Los supuestos sobre la API (rutas, paginación, nombres de campos) están anotados en `api.ts`; el diagnóstico guarda las respuestas para verificarlos.
+Funciones: `bsaleDiagnose`, `bsaleSyncNow`, `bsaleScheduledSync`, `bsaleWebhook`, `bsaleWebhookInfo`, `bsaleReceiveProduction`, `bsaleTransferToStore`, `bsaleCreateClient`, `bsaleUpdateClient`, `bsaleInvoicePreview`, `bsaleEmitInvoice`, `bsaleFactsBackfill`, `bsaleRefreshCosts`, `bsaleDailyCosts`, `bsaleConsumeSamples`, `bsaleProxy` (solo GET). Código en [`functions/src/bsale/`](functions/src/bsale). Los supuestos sobre la API (rutas, paginación, nombres de campos) están anotados en `api.ts`; el diagnóstico guarda las respuestas para verificarlos.
 
 ### Colecciones
 
@@ -131,7 +136,7 @@ cd app && VITE_USE_EMULATORS=true VITE_DEMO_LOGIN=true VITE_FIREBASE_PROJECT_ID=
 
 **Probar Bsale real sin token:** `npx tsx scripts/fake-bsale.ts` levanta un Bsale falso en `:4010` con la misma forma de la API. Con `functions/.env.local` = `BSALE_BASE_URL=http://127.0.0.1:4010` y `functions/.secret.local` = `BSALE_ACCESS_TOKEN=fake`, las funciones del emulador le hablan a él. Agregar `VITE_BSALE_MODE=real` al comando de la app. Las configuraciones de `.claude/launch.json` (`emulators`, `fake-bsale`, `app-emulators`, `app-emulators-real`) hacen todo esto.
 
-**Tests de reglas** (11 casos: pedidos, reposición, consultor, usuarios, espejos de Bsale):
+**Tests de reglas** (13 casos: pedidos, reposición, muestras, consultor, usuarios, espejos de Bsale):
 
 ```bash
 npm run test:rules:emu

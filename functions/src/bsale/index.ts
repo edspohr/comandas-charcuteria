@@ -11,6 +11,7 @@ import { customerFromRaw, fullSync, stripUndefined, syncDocuments, syncStock } f
 import { createClient, receiveProduction, transferToStore, updateClient, type CustomerInput, type QtyLine } from './writes';
 import { buildInvoice, emitInvoice } from './invoice';
 import { backfillMonth, refreshCosts } from './facts';
+import { consumeSamples } from './samples';
 
 const secrets = [BSALE_TOKEN];
 const SYNC_ROLES = ['despacho', 'produccion', 'admin', 'superAdmin'] as const;
@@ -208,4 +209,15 @@ export const bsaleDailyCosts = onSchedule({ region: REGION, secrets, schedule: '
   if (!(await loadSettings()).enabled) return;
   const r = await refreshCosts(apiFromSecret(), await activeVariantIds());
   logger.info('[bsale] costos', r);
+});
+
+// ---------- Muestras ----------
+
+// Consumo interno de las muestras de un pedido (una vez por pedido).
+export const bsaleConsumeSamples = onCall({ region: REGION, secrets, timeoutSeconds: 60 }, async (req) => {
+  const { uid } = requireRole(req, ['despacho', 'admin', 'superAdmin'], 'registrar muestras');
+  const orderId = String(req.data?.orderId ?? '');
+  if (!orderId) throw new HttpsError('invalid-argument', 'Falta el pedido.');
+  const s = await loadSettings();
+  return consumeSamples(s.enabled && s.writesEnabled ? apiFromSecret() : null, s, uid, orderId);
 });

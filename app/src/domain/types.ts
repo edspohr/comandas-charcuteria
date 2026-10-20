@@ -133,6 +133,10 @@ export interface OrderLine {
   // overwrite with the actual `packedWeightKg`-based figure.
   unitPriceSnapshotCLP?: number;
   subtotalCLP?: number;
+  // Muestra a $0 (domain/samples.ts): sale del granel, no va en la factura y
+  // se descuenta en Bsale como consumo interno.
+  sample?: boolean;
+  sampleGrams?: number;
 }
 
 export interface StatusEvent {
@@ -148,7 +152,7 @@ export interface DeliveryProof {
 
 // venta = a cliente (se factura). reposicion = a la tienda propia: no se
 // factura, se registra como traslado fábrica → tienda en Bsale.
-export type OrderKind = 'venta' | 'reposicion';
+export type OrderKind = 'venta' | 'reposicion' | 'muestras';
 
 export interface Order {
   id: string;
@@ -175,6 +179,8 @@ export interface Order {
   // Importado: valores estimados con la lista de precios, estados inferidos.
   historical?: boolean;
   rawText?: string;
+  // Consumo interno de las muestras en Bsale (una vez por pedido).
+  samplesConsumption?: { at: number; by: string; ref: string; dryRun?: boolean; skipped?: boolean; logId?: string };
   invoicingComplete: boolean;
   createdAt: number;
   updatedAt: number;

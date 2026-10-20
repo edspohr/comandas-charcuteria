@@ -4,6 +4,7 @@ import type { BsaleApi, RawDocument } from './api';
 import { DOC_PREFIX, requireFactory, type BsaleSettings, type DocKind } from './config';
 import { confirmedMap, documentFromRaw, stripUndefined, syncStock, variantLabels } from './sync';
 import { send } from './writes';
+import { consumeSamples } from './samples';
 
 // Facturar desde Comandas: el pedido armado (con los pesos reales que
 // registró despacho) se emite como factura o boleta en Bsale, y queda
@@ -15,7 +16,7 @@ import { send } from './writes';
 //   clientId | client{code, company, activity, address, municipality, city},
 //   details[{ variantId, quantity, netUnitValue, comment }], sellerId.
 
-interface OrderLine { productId: string; productName: string; formatId: string; formatLabel: string; unit: string; qty: number; reservedQty: number; packedQty?: number; packedWeightKg?: number; unitPriceSnapshotCLP?: number; subtotalCLP?: number; notes?: string; shortReason?: string }
+interface OrderLine { productId: string; productName: string; formatId: string; formatLabel: string; unit: string; qty: number; reservedQty: number; packedQty?: number; packedWeightKg?: number; unitPriceSnapshotCLP?: number; subtotalCLP?: number; notes?: string; shortReason?: string; sample?: boolean }
 interface Order { id: string; kind?: string; status: string; createdBy: string; clientId: string; clientSnapshot: { name: string; rut?: string; address?: string }; lines: OrderLine[]; statusHistory: unknown[]; invoiceRef?: string; totalCLP?: number }
 interface Client { name: string; fantasyName?: string; rut?: string; giro?: string; address?: string; bsaleClientId?: string; invoicingComplete?: boolean }
 interface VariantMirror { variantId: string; label: string; description: string; allowDecimal?: boolean; netPriceCLP?: number; priceCLP?: number }
@@ -49,6 +50,9 @@ export async function buildInvoice(s: BsaleSettings, orderId: string, wanted?: '
   const warnings: string[] = [];
   const blocking: string[] = [];
   if (order.kind === 'reposicion') blocking.push('Es una reposición de tienda: se registra como traslado, no se factura.');
+  const samples = order.lines.filter((l) => l.sample);
+  if (order.kind === 'muestras' || (samples.length && samples.length === order.lines.length)) blocking.push('Es un pedido solo de muestras: no se factura, se registra la salida de muestras.');
+  else if (samples.length) warnings.push(`Incluye ${samples.length} muestra${samples.length === 1 ? '' : 's'} sin cargo: no van en el documento, se descuentan de Bsale como consumo interno.`);
   if (order.status !== 'armado') blocking.push(`El pedido está en "${order.status}": se factura cuando está armado.`);
   if (order.invoiceRef) blocking.push(`Ya tiene el documento ${order.invoiceRef}.`);
 
@@ -71,6 +75,7 @@ export async function buildInvoice(s: BsaleSettings, orderId: string, wanted?: '
 
   const lines: InvoiceLine[] = [];
   for (const l of order.lines) {
+    if (l.sample) continue; // muestra: consumo interno, no factura
     const variantId = reverse.get(`${l.productId}__${l.formatId}`);
     const shipped = l.packedQty ?? l.reservedQty;
     if (!shipped && !l.packedWeightKg) continue; // faltó: no se factura
@@ -154,21 +159,25 @@ export async function emitInvoice(api: BsaleApi, s: BsaleSettings, by: string, o
   await db.runTransaction(async (tx) => {
     const ref = db.doc(`orders/${orderId}`);
     const order = (await tx.get(ref)).data() as Order;
-    const stockRefs = order.lines.filter((l) => l.reservedQty > 0).map((l) => db.doc(`stock/${l.productId}__${l.formatId}`));
-    const stockSnaps = stockRefs.length ? await tx.getAll(...stockRefs) : [];
+    // One update per stock doc: a sale and a sample can share the bulk format.
+    const release = new Map<string, number>();
+    for (const l of order.lines) if (l.reservedQty > 0) release.set(`${l.productId}__${l.formatId}`, (release.get(`${l.productId}__${l.formatId}`) ?? 0) + l.reservedQty);
+    const stockSnaps = release.size ? await tx.getAll(...[...release.keys()].map((k) => db.doc(`stock/${k}`))) : [];
     const now = Date.now();
-    order.lines.filter((l) => l.reservedQty > 0).forEach((l, i) => {
-      const snap = stockSnaps[i];
-      if (snap?.exists) tx.update(snap.ref, { reserved: Math.max(0, (snap.data()!.reserved ?? 0) - l.reservedQty) });
+    for (const snap of stockSnaps) if (snap.exists) tx.update(snap.ref, { reserved: Math.max(0, (snap.data()!.reserved ?? 0) - (release.get(snap.id) ?? 0)) });
+    for (const l of order.lines.filter((x) => x.reservedQty > 0)) {
       const mv = db.collection('stockMovements').doc();
-      tx.set(mv, { id: mv.id, productId: l.productId, formatId: l.formatId, qty: l.packedQty ?? l.reservedQty, type: 'venta_bsale', orderId, by, at: now, reason: number });
-    });
+      tx.set(mv, { id: mv.id, productId: l.productId, formatId: l.formatId, qty: l.packedQty ?? l.reservedQty, type: 'venta_bsale', orderId, by, at: now, reason: l.sample ? `${number} · muestra` : number });
+    }
     tx.set(db.doc(`bsale/sales/documents/${mirror.id}`), { ...stripUndefined(mirror), linkedOrderId: orderId }, { merge: true });
     tx.update(ref, {
       status: 'facturado', invoiceRef: number, bsaleDocumentId: String(raw.id), invoiceUrl: raw.urlPdf ?? FieldValue.delete(), updatedAt: now,
       statusHistory: [...order.statusHistory, { status: 'facturado', by, at: now, note: `${number} · emitido desde Comandas` }],
     });
   });
+  // Samples leave the factory with the invoice: internal consumption in Bsale.
+  let samples: unknown = null;
+  try { samples = await consumeSamples(api, s, by, orderId); } catch (e) { samples = { error: (e as Error).message }; }
   try { await syncStock(api, s, { variantIds: preview.lines.map((l) => l.variantId), by }); } catch { /* el cron lo cubre */ }
-  return { dryRun: false, logId: result.logId, number, documentId: String(raw.id), urlPdf: raw.urlPdf, preview };
+  return { dryRun: false, logId: result.logId, number, documentId: String(raw.id), urlPdf: raw.urlPdf, preview, samples };
 }

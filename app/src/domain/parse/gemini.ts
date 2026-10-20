@@ -98,6 +98,7 @@ function getModel() {
       '- Nunca inventás productId ni formatId. Si dudás entre dos productos parecidos, elegí el más específico y marcá confidence "review".',
       '- Ignorá saludos, agradecimientos, cierres y frases sin cantidad ("hola", "buenos días", "para mañana necesito", "gracias", "un abrazo").',
       '- Si una línea menciona el mismo producto en más de un formato, devolvé UNA entrada por cada formato. Ejemplo: "Jamón cocido: 60 sachet de 200 g y 8 kg laminado" ⇒ dos entradas (sachet-200g qty 60 + granel-kg qty 8).',
+      '- Las muestras ("incluir muestra de roast beef 80 gr", "muestra lomo kassler") NO son líneas del pedido: no las devuelvas, se procesan aparte.',
       '- Si la línea NO trae cantidad ("necesito jamón cocido"), incluíla igual con qty 0 y confidence "review" para que el vendedor la complete a mano.',
       'Convenciones de formato:',
       '- "granel", "laminado", "laminado fino", "por kilo", "kg" sin "sachet" ⇒ formato granel-kg (unidad kg).',

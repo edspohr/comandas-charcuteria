@@ -200,14 +200,14 @@ function Flow() {
 // ---------- Funcionalidades ----------
 
 const FEATURES: Array<{ icon: ReactNode; title: string; text: string }> = [
-  { icon: <IconPhone />, title: 'Pedido en 4 pasos', text: 'Cliente, productos, entrega y confirmar. Con una mano, desde el teléfono, y "Repetir último pedido" para los habituales.' },
-  { icon: <IconSpark />, title: 'Pedido IA', text: 'Pegue el mensaje de WhatsApp del cliente y la app lo convierte en un pedido con productos, cantidades y datos del cliente.' },
+  { icon: <IconPhone />, title: 'Pedido en 4 pasos', text: 'Cliente, productos, entrega y confirmar. Con una mano, desde el teléfono, "Repetir último pedido" para los habituales y muestras sin cargo en el mismo pedido.' },
+  { icon: <IconSpark />, title: 'Pedido IA', text: 'Pegue el mensaje de WhatsApp del cliente y la app lo convierte en un pedido con productos, cantidades, muestras ("incluir muestra de…") y datos del cliente.' },
   { icon: <IconBox />, title: 'Stock real de Bsale', text: 'Semáforo por producto con lo que reporta Bsale menos lo ya reservado. Nadie vende lo que no hay.' },
   { icon: <IconBoard />, title: 'Tablero con visión y detalle', text: 'Resumen por etapa con montos y kilos, vista en tarjetas, compacta o lista, y el detalle del pedido a un clic. Rojo si se atrasa.' },
   { icon: <IconScale />, title: 'Facturar sin retipeo', text: 'La factura o boleta sale de Comandas a Bsale con el peso real empacado y el precio de la lista. Todo queda en la bitácora.' },
   { icon: <IconStore />, title: 'Reposición de tienda', text: 'La tienda pide por el mismo canal, el panel sugiere qué llevar según lo que vende y el traslado se registra en Bsale.' },
-  { icon: <IconUsers />, title: 'Clientes y cartera', text: 'Ritmo de compra de cada cliente, quién está en riesgo y quién se perdió, con su historial y lo que compra.' },
-  { icon: <IconChart />, title: 'Panel de gestión', text: 'Dos años de ventas de Bsale: margen, productos ABC, clientes, vendedores, estacionalidad, stock y un explorador con exportación a Excel.' },
+  { icon: <IconUsers />, title: 'Clientes y cartera', text: 'Ritmo de compra de cada cliente, quién está en riesgo y quién se perdió, y el seguimiento de cada muestra a los 7 días.' },
+  { icon: <IconChart />, title: 'Panel de gestión', text: 'Dos años de ventas de Bsale: margen, productos ABC, clientes, vendedores, estacionalidad, stock, muestras que terminan en venta y un explorador con exportación a Excel.' },
 ];
 
 function Features() {
@@ -252,7 +252,7 @@ function BsaleSection() {
         ))}
       </div>
       <p className="mt-5 text-xs text-charcoal-500 text-center max-w-2xl mx-auto">
-        Se sincroniza cada 10 minutos y con avisos de Bsale. Comandas solo escribe en Bsale lo que nace en la operación (facturas, producción, traslados y clientes nuevos), primero en simulacro y siempre con registro.
+        Se sincroniza cada 10 minutos y con avisos de Bsale. Comandas solo escribe en Bsale lo que nace en la operación (facturas, producción, traslados, muestras y clientes nuevos), primero en simulacro y siempre con registro.
       </p>
     </section>
   );

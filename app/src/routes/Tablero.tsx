@@ -9,10 +9,13 @@ import { syncStockFromBsale, useAllStock, useSyncState } from '@/data/stock';
 import { useSettings } from '@/data/settings';
 import { useUsers } from '@/data/users';
 import { CompactRow, OrderDrawer, OrderList, SummaryStrip, type BoardView } from '@/components/orders/BoardViews';
-import { ROLE_LABEL, can, canAny, isReadOnly } from '@/domain/permissions';
+import { ROLE_LABEL, can, canAny, isReadOnly, isSeller } from '@/domain/permissions';
 import Button from '@/components/ui/Button';
 import ErrorBanner from '@/components/ui/ErrorBanner';
-import { AnularDialog, DeliverDialog, DispatchDialog, TrasladoDialog, VincularDocumentoDialog } from '@/components/orders/OrderDialogs';
+import SampleTag from '@/components/orders/SampleTag';
+import SampleFollowups from '@/components/orders/SampleFollowups';
+import { lineKey, sampleLabel } from '@/domain/samples';
+import { AnularDialog, DeliverDialog, DispatchDialog, TrasladoDialog, SalidaMuestrasDialog, VincularDocumentoDialog } from '@/components/orders/OrderDialogs';
 import { COLUMNS, actionForDrop, cardTone, columnFor, nextAction, type ActionKind, type ColumnId, type Tone } from '@/domain/kanban';
 import { DEFAULT_KANBAN_THRESHOLDS, ORDER_STATUS_LABEL, type Order, type OrderStatus, type Role } from '@/domain/types';
 import { addDaysIso, formatDateShort, todayInSantiago } from '@/lib/format';
@@ -151,6 +154,7 @@ export default function Tablero() {
         case 'arm': navigate(`/despacho/cola/${order.id}`); break;
         case 'link':
         case 'transfer':
+        case 'samples':
         case 'dispatch':
         case 'deliver':
         case 'anular':
@@ -222,6 +226,8 @@ export default function Tablero() {
           {canAny(role, ['order.create', 'order.createTransfer']) && <Link to="/vendedor/nuevo"><Button size="sm">Nuevo pedido</Button></Link>}
         </div>
       </header>
+
+      {isSeller(role) && <div className="px-4 sm:px-6"><SampleFollowups uid={uid} /></div>}
 
       {flash?.justCreated && (
         <div className="mx-4 sm:mx-6 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-3 relative pr-9">
@@ -383,6 +389,7 @@ export default function Tablero() {
       )}
 
       {dialog?.kind === 'transfer' && <TrasladoDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'samples' && <SalidaMuestrasDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'link' && <VincularDocumentoDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'dispatch' && <DispatchDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'deliver' && <DeliverDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
@@ -448,7 +455,7 @@ function KanbanCard({ order, tone, action, onAction, onOpen, detailTo, draggable
       {!compact && (
         <ul className="mt-1.5 text-[11px] text-charcoal-500 space-y-0.5">
           {order.lines.slice(0, 2).map((l) => (
-            <li key={`${l.productId}-${l.formatId}`} className="truncate">{l.qty} × {l.productName} <span className="text-charcoal-300">{l.formatLabel}</span></li>
+            <li key={lineKey(l)} className="truncate">{l.sample ? <><SampleTag />{l.productName} <span className="text-charcoal-300">{sampleLabel(l)}</span></> : <>{l.qty} × {l.productName} <span className="text-charcoal-300">{l.formatLabel}</span></>}</li>
           ))}
           {order.lines.length > 2 && <li className="text-charcoal-300">+ {order.lines.length - 2} más</li>}
         </ul>

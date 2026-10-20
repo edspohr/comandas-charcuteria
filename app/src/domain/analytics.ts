@@ -103,6 +103,7 @@ export function byProduct(orders: Order[], products: Product[], grams: Map<strin
     if (o.status === 'anulado') continue;
     const seen = new Set<string>();
     for (const l of o.lines) {
+      if (l.sample) continue; // muestras: Panel → Muestras
       const row = m.get(l.productId) ?? { key: l.productId, name: l.productName, category: cat.get(l.productId) ?? '—', kg: 0, revenue: 0, orders: 0, units: 0 };
       row.kg += lineKg(l, grams, l.packedQty ?? l.qty);
       row.revenue += isInvoiced(o) ? (l.subtotalCLP ?? 0) : 0;

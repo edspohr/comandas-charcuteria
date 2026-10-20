@@ -42,7 +42,7 @@ export async function send<T>(api: BsaleApi, s: BsaleSettings, kind: string, by:
 
 export interface QtyLine { productId: string; formatId: string; qty: number }
 
-async function variantsFor(lines: QtyLine[]): Promise<Array<QtyLine & { variantId: number }>> {
+export async function variantsFor(lines: QtyLine[]): Promise<Array<QtyLine & { variantId: number }>> {
   const map = await confirmedMap(getFirestore());
   const reverse = new Map<string, string>();
   for (const [v, k] of map) if (!reverse.has(k)) reverse.set(k, v);

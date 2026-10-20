@@ -19,6 +19,9 @@ export interface ParsedLine {
   notes?: string;
   status: MatchStatus;
   suggestions?: Array<{ productId: string; productName: string }>;
+  // Muestra sin cargo (parse/samples.ts).
+  sample?: boolean;
+  sampleGrams?: number;
 }
 
 const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');

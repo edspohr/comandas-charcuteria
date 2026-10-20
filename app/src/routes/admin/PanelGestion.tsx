@@ -20,16 +20,20 @@ import {
 import Button from '@/components/ui/Button';
 import { Card, Export, Metric, Table, setExportPeriod } from '@/components/panel/PanelUI';
 import PanelPedidos from './Panel';
+import SamplesPanel from '@/components/panel/SamplesPanel';
+import { useClients } from '@/data/clients';
+import type { CatalogMapEntry } from '@/data/catalogMap';
+import type { Purchase, SampleRow } from '@/domain/samples';
 
 // Panel de gestión sobre las ventas reales de Bsale (facturas, boletas y
 // notas de crédito de fábrica y tienda). Filtros globales arriba; cada
 // pestaña va de la visión general al detalle, y cualquier fila de cliente o
 // producto abre su ficha a la derecha. Sin Bsale real, el panel de pedidos.
 
-type Tab = 'resumen' | 'ventas' | 'productos' | 'clientes' | 'vendedores' | 'stock' | 'explorador' | 'pedidos';
+type Tab = 'resumen' | 'ventas' | 'productos' | 'clientes' | 'vendedores' | 'stock' | 'muestras' | 'explorador' | 'pedidos';
 const TABS: Array<[Tab, string]> = [
   ['resumen', 'Resumen'], ['ventas', 'Ventas'], ['productos', 'Productos'], ['clientes', 'Clientes'], ['vendedores', 'Vendedores'],
-  ['stock', 'Stock'], ['explorador', 'Explorador'], ['pedidos', 'Pedidos'],
+  ['stock', 'Stock'], ['muestras', 'Muestras'], ['explorador', 'Explorador'], ['pedidos', 'Pedidos'],
 ];
 const GOLD = '#a8834a'; const WOOD = '#4d3b28'; const WOOD_LIGHT = '#b39776'; const GRID = '#e5e2dd'; const AXIS = '#8b8177';
 const TOOLTIP = { borderRadius: 8, border: '1px solid #e5e2dd', fontSize: 12 };
@@ -150,6 +154,7 @@ function Gestion() {
       {tab === 'clientes' && <Clientes {...ctx} />}
       {tab === 'vendedores' && <Vendedores {...ctx} />}
       {tab === 'stock' && <Stock {...ctx} />}
+      {tab === 'muestras' && <Muestras {...ctx} map={map} />}
       {tab === 'explorador' && <Explorador {...ctx} />}
       {tab === 'pedidos' && <PanelPedidos embedded />}
 
@@ -486,6 +491,36 @@ function Stock(c: Ctx) {
         rowTone={(r) => (r.flag === 'quiebre' ? 'bad' : r.flag === 'bajo' ? 'warn' : undefined)} />
     </div>
   );
+}
+
+// ---------- Muestras ----------
+
+// Bsale sales as purchases for the sample conversion: Bsale client → app
+// client (bsaleClientId) and variant → product (confirmed cross).
+function Muestras({ map, ...c }: Ctx & { map: CatalogMapEntry[] }) {
+  const { clients } = useClients();
+  const extra = useMemo<Purchase[]>(() => {
+    const clientOf = new Map(clients.filter((x) => x.bsaleClientId).map((x) => [String(x.bsaleClientId), x.id]));
+    const productOf = new Map(map.filter((m) => m.status === 'confirmado' && m.productId).map((m) => [m.variantId, m.productId!]));
+    const out: Purchase[] = [];
+    for (const l of c.facts.lines) {
+      if (l.kind === 'nota_credito' || l.net <= 0) continue;
+      const clientId = clientOf.get(l.clientId); const productId = productOf.get(l.variantId);
+      if (clientId && productId) out.push({ clientId, productId, at: Date.parse(`${l.date}T12:00:00Z`), ref: `Bsale ${l.date.slice(8)}/${l.date.slice(5, 7)}`, revenue: Math.round(l.net * 1.19) });
+    }
+    return out;
+  }, [clients, map, c.facts]);
+  const costOf = useMemo(() => {
+    const variantOf = new Map<string, string>();
+    for (const m of map) if (m.status === 'confirmado' && m.productId && !variantOf.has(`${m.productId}__${m.formatId}`)) variantOf.set(`${m.productId}__${m.formatId}`, m.variantId);
+    return (r: SampleRow) => {
+      const v = variantOf.get(`${r.productId}__${r.formatId}`);
+      const cost = v ? c.costs[v] : undefined;
+      if (!cost) return null;
+      return c.dims.get(v!)?.kgPerUnit === 1 ? cost * r.kg : cost;
+    };
+  }, [map, c.costs, c.dims]);
+  return <SamplesPanel extraPurchases={extra} costOf={costOf} />;
 }
 
 // ---------- Explorador ----------

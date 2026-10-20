@@ -144,6 +144,12 @@ service cloud.firestore {
     }
 
     // -------- Orders
+    // Seguimiento de muestras: lo responde el vendedor (o administración).
+    match /sampleFeedback/{id} {
+      allow read:  if canRead();
+      allow write: if (canCreateOrder() && request.resource.data.by == request.auth.uid) || isSupervisor();
+    }
+
     match /orders/{id} {
       allow read: if canRead();
 
@@ -174,6 +180,16 @@ service cloud.firestore {
           && resource.data.status == 'armado'
           && request.resource.data.status == 'facturado'
           && request.resource.data.invoiceRef.matches('^TR-.*')
+          && unchanged('createdBy') && unchanged('lines') && unchanged('kind')
+        )
+        || (
+          // Pedido solo de muestras: despacho registra la salida (consumo
+          // interno en Bsale, no se factura).
+          canPack()
+          && resource.data.get('kind', '') == 'muestras'
+          && resource.data.status == 'armado'
+          && request.resource.data.status == 'facturado'
+          && request.resource.data.invoiceRef.matches('^MU-.*')
           && unchanged('createdBy') && unchanged('lines') && unchanged('kind')
         )
         || (

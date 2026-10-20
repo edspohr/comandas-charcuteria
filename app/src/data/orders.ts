@@ -14,7 +14,35 @@ import type { Client, Order, OrderLine, OrderStatus, ProductFormat, StockDoc, St
 import { stockDocId } from '@/domain/types';
 import { describeFirestoreError } from '@/lib/errors';
 import { computeLineSubtotal } from '@/lib/pricing';
-import { DOCUMENTS_PATH } from '@/integrations/bsale/client';
+import { DOCUMENTS_PATH, isRealBsale } from '@/integrations/bsale/client';
+import { hasSamples, isSampleOnly, lineKey } from '@/domain/samples';
+import type { DocumentReference, Transaction } from 'firebase/firestore';
+
+// One read per stock doc, even when several lines share it (a Coppa line and
+// a Coppa sample both come out of the bulk format): reading it twice and
+// writing `prev.reserved ± qty` per line would let the last write win.
+type StockRead = { ref: DocumentReference; prev: StockDoc | null };
+async function readStocks(tx: Transaction, lines: Array<Pick<OrderLine, 'productId' | 'formatId'>>): Promise<Map<string, StockRead>> {
+  const out = new Map<string, StockRead>();
+  for (const l of lines) {
+    const id = stockDocId(l.productId, l.formatId);
+    if (out.has(id)) continue;
+    const ref = doc(db, 'stock', id);
+    const snap = await tx.get(ref);
+    out.set(id, { ref, prev: snap.exists() ? (snap.data() as StockDoc) : null });
+  }
+  return out;
+}
+
+// Releases the reservation of every line in one write per stock doc.
+function releaseReserved(tx: Transaction, reads: Map<string, StockRead>, lines: OrderLine[]) {
+  const total = new Map<string, number>();
+  for (const l of lines) if (l.reservedQty > 0) { const id = stockDocId(l.productId, l.formatId); total.set(id, (total.get(id) ?? 0) + l.reservedQty); }
+  for (const [id, qty] of total) {
+    const r = reads.get(id);
+    if (r?.prev) tx.update(r.ref, { reserved: Math.max(0, r.prev.reserved - qty) });
+  }
+}
 
 export interface DraftLine {
   productId: string;
@@ -24,6 +52,8 @@ export interface DraftLine {
   unit: OrderLine['unit'];
   qty: number;
   notes?: string;
+  sample?: boolean;
+  sampleGrams?: number;
   // Optional pricing snapshot passed from the wizard (comes from the catalog
   // format at the moment the line was added). If absent, createOrder computes
   // it from `format` inside the transaction.
@@ -63,11 +93,20 @@ export async function createOrder(
     const nextN = (counterSnap.data()?.last ?? 0) + 1;
     const orderId = `PED-${year}-${String(nextN).padStart(4, '0')}`;
 
-    const stockReads: Array<{ ref: ReturnType<typeof doc>; snap: StockDoc | null }> = [];
-    for (const line of input.lines) {
-      const ref = doc(db, 'stock', stockDocId(line.productId, line.formatId));
-      const snap = await tx.get(ref);
-      stockReads.push({ ref, snap: (snap.exists() ? (snap.data() as StockDoc) : null) });
+    const stockReads = await readStocks(tx, input.lines);
+    // Available per stock doc, consumed line by line: regular lines first so
+    // a sample never takes stock a sale needs.
+    const left = new Map([...stockReads].map(([id, r]) => [id, r.prev ? Math.max(0, r.prev.onHand - r.prev.reserved) : 0]));
+    const order_ = input.lines.map((l, i) => ({ l, i })).sort((a, b) => Number(!!a.l.sample) - Number(!!b.l.sample));
+    const split = new Map<number, { reservedQty: number; pendingProductionQty: number }>();
+    for (const { l, i } of order_) {
+      const id = stockDocId(l.productId, l.formatId);
+      const available = left.get(id) ?? 0;
+      const reservedQty = Math.min(available, l.qty);
+      left.set(id, available - reservedQty);
+      // Samples never create production demand: without stock, despacho
+      // decides at packing time (replace or mark as missing).
+      split.set(i, { reservedQty, pendingProductionQty: l.sample ? 0 : Math.round((l.qty - reservedQty) * 1000) / 1000 });
     }
 
     // ---- Decide split per line
@@ -76,15 +115,8 @@ export async function createOrder(
     let anyPending = false;
 
     input.lines.forEach((line, i) => {
-      const stock = stockReads[i].snap;
-      const available = stock ? Math.max(0, stock.onHand - stock.reserved) : 0;
-      let reservedQty = 0;
-      let pendingProductionQty = 0;
-      if (available >= line.qty) {
-        reservedQty = line.qty;
-      } else {
-        reservedQty = available;
-        pendingProductionQty = line.qty - available;
+      const { reservedQty, pendingProductionQty } = split.get(i)!;
+      if (pendingProductionQty > 0) {
         anyPending = true;
         parcialLines.push({
           productName: line.productName,
@@ -92,8 +124,8 @@ export async function createOrder(
           missing: pendingProductionQty,
         });
       }
-      const subtotalCLP = line.format ? computeLineSubtotal(line.format, line.qty) : undefined;
-      const unitPriceSnapshotCLP = line.format?.priceCLP ?? line.format?.pricePerKgCLP;
+      const subtotalCLP = line.sample ? 0 : line.format ? computeLineSubtotal(line.format, line.qty) : undefined;
+      const unitPriceSnapshotCLP = line.sample ? undefined : line.format?.priceCLP ?? line.format?.pricePerKgCLP;
       enriched.push({
         productId: line.productId,
         productName: line.productName,
@@ -106,8 +138,11 @@ export async function createOrder(
         pendingProductionQty,
         subtotalCLP,
         unitPriceSnapshotCLP,
+        ...(line.sample ? { sample: true, sampleGrams: line.sampleGrams } : {}),
       });
     });
+    // Firestore rejects undefined fields.
+    for (const l of enriched) for (const k of Object.keys(l) as Array<keyof OrderLine>) if (l[k] === undefined) delete l[k];
 
     const totalCLP = enriched.reduce((s, l) => s + (l.subtotalCLP ?? 0), 0);
 
@@ -116,7 +151,7 @@ export async function createOrder(
 
     const order: Order = {
       id: orderId,
-      kind: input.client.isInternalShop ? 'reposicion' : 'venta',
+      kind: input.client.isInternalShop ? 'reposicion' : enriched.every((l) => l.sample) ? 'muestras' : 'venta',
       createdBy: createdByUid,
       clientId: input.client.id,
       clientSnapshot: {
@@ -145,22 +180,14 @@ export async function createOrder(
 
     // ---- Writes
     // Only reserve where we could — pending is not written to stock.reserved.
-    enriched.forEach((line, i) => {
+    const addReserved = new Map<string, number>();
+    for (const line of enriched) if (line.reservedQty > 0) { const id = stockDocId(line.productId, line.formatId); addReserved.set(id, (addReserved.get(id) ?? 0) + line.reservedQty); }
+    for (const [id, qty] of addReserved) {
+      const { ref, prev } = stockReads.get(id)!;
+      if (prev) tx.update(ref, { reserved: prev.reserved + qty });
+    }
+    enriched.forEach((line) => {
       if (line.reservedQty > 0) {
-        const ref = stockReads[i].ref;
-        const prev = stockReads[i].snap;
-        if (prev) {
-          tx.update(ref, { reserved: prev.reserved + line.reservedQty });
-        } else {
-          // Missing stock doc — create with onHand=0, reserved=reservedQty
-          // (shouldn't happen in the seeded set, but safe fallback).
-          tx.set(ref, {
-            productId: line.productId,
-            formatId: line.formatId,
-            onHand: 0,
-            reserved: line.reservedQty,
-          });
-        }
         const mvRef = doc(collection(db, 'stockMovements'));
         tx.set(mvRef, {
           id: mvRef.id,
@@ -169,6 +196,7 @@ export async function createOrder(
           qty: line.reservedQty,
           type: 'reserva',
           orderId,
+          ...(line.sample ? { reason: 'muestra' } : {}),
           by: createdByUid,
           at: now,
         });
@@ -268,6 +296,7 @@ export async function assignPacker(orderId: string, packerUid: string): Promise<
 export interface PackedLineInput {
   productId: string;
   formatId: string;
+  sample?: boolean;
   packedQty: number;
   packedWeightKg?: number;
   // Si se marcó "Faltó", packedQty=0 y shortReason lleva el motivo (obligatorio
@@ -304,20 +333,21 @@ export async function markArmado(
     // let the packer ship goods that no longer exist: the kanban paints the
     // card red and admin has to re-sync / resolve first.
     const compromised: string[] = [];
+    const reads = await readStocks(tx, order.lines.filter((l) => l.reservedQty > 0));
     for (const line of order.lines) {
       if (line.reservedQty <= 0) continue;
-      const snap = await tx.get(doc(db, 'stock', stockDocId(line.productId, line.formatId)));
-      const st = snap.exists() ? (snap.data() as StockDoc) : null;
-      if (st && st.onHand < st.reserved) compromised.push(`${line.productName} · ${line.formatLabel}`);
+      const st = reads.get(stockDocId(line.productId, line.formatId))?.prev;
+      const label = `${line.productName} · ${line.formatLabel}`;
+      if (st && st.onHand < st.reserved && !compromised.includes(label)) compromised.push(label);
     }
     if (compromised.length > 0) {
       throw new Error(`Bsale reporta menos stock del reservado en ${compromised.join(', ')}. Sincronizá con Bsale o resolvé el pedido desde administración antes de armar.`);
     }
 
     const now = Date.now();
-    const packedMap = new Map(packed.map((p) => [`${p.productId}::${p.formatId}`, p]));
+    const packedMap = new Map(packed.map((p) => [lineKey(p), p]));
     const enrichedLines: OrderLine[] = order.lines.map((line) => {
-      const key = `${line.productId}::${line.formatId}`;
+      const key = lineKey(line);
       const p = packedMap.get(key);
       const packedQty = p?.packedQty ?? line.reservedQty;
       // Recompute the subtotal against actual packed values so pieza-by-weight
@@ -336,7 +366,10 @@ export async function markArmado(
       // Si la línea faltó, forzamos packedQty=0 y subtotal=0: la ficha y el
       // Panel lo tratan como no-vendido, no como merma.
       if (shortReason) return { ...line, packedQty: 0, packedWeightKg: undefined, subtotalCLP: 0, shortReason };
-      return { ...line, packedQty, packedWeightKg: p?.packedWeightKg, subtotalCLP };
+      const out: OrderLine = { ...line, packedQty, packedWeightKg: p?.packedWeightKg, subtotalCLP };
+      if (out.packedWeightKg === undefined) delete out.packedWeightKg;
+      if (out.subtotalCLP === undefined) delete out.subtotalCLP;
+      return out;
     });
     const totalCLP = enrichedLines.reduce((s, l) => s + (l.subtotalCLP ?? 0), 0);
 
@@ -385,30 +418,23 @@ export async function vincularDocumento(
       throw new Error('Ese documento ya está vinculado a otro pedido');
     }
 
-    const reads: Array<{ ref: ReturnType<typeof doc>; prev: StockDoc | null; line: OrderLine }> = [];
-    for (const line of order.lines) {
-      if (line.reservedQty <= 0) continue;
-      const ref = doc(db, 'stock', stockDocId(line.productId, line.formatId));
-      const snap = await tx.get(ref);
-      reads.push({ ref, prev: snap.exists() ? (snap.data() as StockDoc) : null, line });
-    }
+    const reserved = order.lines.filter((l) => l.reservedQty > 0);
+    const reads = await readStocks(tx, reserved);
 
     const now = Date.now();
-    for (const { ref, prev, line } of reads) {
-      if (!prev) continue;
-      const packedQty = line.packedQty ?? line.reservedQty;
-      tx.update(ref, { reserved: Math.max(0, prev.reserved - line.reservedQty) });
+    releaseReserved(tx, reads, order.lines);
+    for (const line of reserved) {
       const mvRef = doc(collection(db, 'stockMovements'));
       const mv: StockMovement = {
         id: mvRef.id,
         productId: line.productId,
         formatId: line.formatId,
-        qty: packedQty,
+        qty: line.packedQty ?? line.reservedQty,
         type: 'venta_bsale',
         orderId,
         by,
         at: now,
-        reason: number,
+        reason: line.sample ? `${number} · muestra` : number,
       };
       tx.set(mvRef, mv);
     }
@@ -435,6 +461,7 @@ export async function registrarTraslado(order: Order, by: string): Promise<{ dry
   if (order.status !== 'armado') throw new Error(`No se puede trasladar un pedido en estado ${order.status}`);
   const { registerTransfer } = await import('./bsaleOps');
   const lines = order.lines
+    .filter((l) => !l.sample)
     .map((l) => ({ productId: l.productId, formatId: l.formatId, qty: l.packedQty ?? l.reservedQty }))
     .filter((l) => l.qty > 0);
   const result = await registerTransfer(order.id, lines);
@@ -445,17 +472,11 @@ export async function registrarTraslado(order: Order, by: string): Promise<{ dry
     if (!snap.exists()) throw new Error('Pedido no encontrado');
     const fresh = snap.data() as Order;
     if (fresh.status !== 'armado') throw new Error('El pedido cambió de estado mientras se registraba el traslado');
-    const reads: Array<{ ref: ReturnType<typeof doc>; prev: StockDoc | null; line: OrderLine }> = [];
-    for (const line of fresh.lines) {
-      if (line.reservedQty <= 0) continue;
-      const r = doc(db, 'stock', stockDocId(line.productId, line.formatId));
-      const s = await tx.get(r);
-      reads.push({ ref: r, prev: s.exists() ? (s.data() as StockDoc) : null, line });
-    }
+    const reserved = fresh.lines.filter((l) => l.reservedQty > 0);
+    const reads = await readStocks(tx, reserved);
     const now = Date.now();
-    for (const { ref: r, prev, line } of reads) {
-      if (!prev) continue;
-      tx.update(r, { reserved: Math.max(0, prev.reserved - line.reservedQty) });
+    releaseReserved(tx, reads, fresh.lines);
+    for (const line of reserved) {
       const mvRef = doc(collection(db, 'stockMovements'));
       const mv: StockMovement = {
         id: mvRef.id, productId: line.productId, formatId: line.formatId, qty: line.packedQty ?? line.reservedQty,
@@ -473,6 +494,49 @@ export async function registrarTraslado(order: Order, by: string): Promise<{ dry
     });
   });
   return result;
+}
+
+// Pedido solo de muestras armado → salida. No se factura: las muestras se
+// descuentan de Bsale como consumo interno (servidor, con bitácora), se libera
+// la reserva y el pedido queda listo para despachar con referencia MU-.
+export async function registrarSalidaMuestras(order: Order, by: string): Promise<{ dryRun?: boolean; skipped?: boolean; reason?: string }> {
+  if (order.status !== 'armado') throw new Error(`No se puede registrar la salida de un pedido en estado ${order.status}`);
+  if (!isSampleOnly(order)) throw new Error('El pedido trae productos para facturar: las muestras se descuentan al facturarlo.');
+  const { consumeSamples } = await import('./bsaleOps');
+  const result = await consumeSamples(order.id);
+  const ref = `MU-${order.id}`;
+  const orderRef = doc(db, 'orders', order.id);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(orderRef);
+    if (!snap.exists()) throw new Error('Pedido no encontrado');
+    const fresh = snap.data() as Order;
+    if (fresh.status !== 'armado') throw new Error('El pedido cambió de estado mientras se registraba la salida');
+    const reserved = fresh.lines.filter((l) => l.reservedQty > 0);
+    const reads = await readStocks(tx, reserved);
+    const now = Date.now();
+    releaseReserved(tx, reads, fresh.lines);
+    for (const line of reserved) {
+      const mvRef = doc(collection(db, 'stockMovements'));
+      tx.set(mvRef, { id: mvRef.id, productId: line.productId, formatId: line.formatId, qty: line.packedQty ?? line.reservedQty, type: 'venta_bsale', orderId: order.id, by, at: now, reason: `${ref} · muestra` });
+    }
+    const note = result.skipped ? `${ref} · solo en la app (${result.reason ?? 'Bsale apagado'})` : result.dryRun ? `${ref} · simulacro` : `${ref} · consumo interno en Bsale`;
+    tx.update(orderRef, {
+      kind: 'muestras',
+      status: 'facturado',
+      invoiceRef: ref,
+      updatedAt: now,
+      ...(isRealBsale ? {} : { samplesConsumption: { at: now, by, ref, skipped: true } }),
+      statusHistory: [...fresh.statusHistory, { status: 'facturado', by, at: now, note }],
+    });
+  });
+  return result;
+}
+
+// Mixed order just invoiced or linked: its samples leave with it. Best effort
+// (the order is already facturado); a failure is visible in the write log.
+export async function consumeSamplesAfterInvoice(order: Pick<Order, 'id' | 'lines'>): Promise<void> {
+  if (!hasSamples(order)) return;
+  try { const { consumeSamples } = await import('./bsaleOps'); await consumeSamples(order.id); } catch (e) { console.warn('[muestras] consumo', e); }
 }
 
 export async function despacharOrder(
@@ -563,31 +627,20 @@ export async function anularOrder(orderId: string, by: string, reason: string): 
       throw new Error(`No se puede anular un pedido en estado ${order.status}`);
     }
 
-    // Reads: one stock doc per line with reservedQty > 0.
-    const reads: Array<{ ref: ReturnType<typeof doc>; prev: StockDoc | null; releaseQty: number; line: OrderLine }> = [];
-    for (const line of order.lines) {
-      if (line.reservedQty <= 0) continue;
-      const ref = doc(db, 'stock', stockDocId(line.productId, line.formatId));
-      const stockSnap = await tx.get(ref);
-      reads.push({
-        ref,
-        prev: stockSnap.exists() ? (stockSnap.data() as StockDoc) : null,
-        releaseQty: line.reservedQty,
-        line,
-      });
-    }
+    // Reads: one per stock doc touched by a reservation.
+    const reserved = order.lines.filter((l) => l.reservedQty > 0);
+    const reads = await readStocks(tx, reserved);
 
     // Writes
     const now = Date.now();
-    for (const r of reads) {
-      if (!r.prev) continue;
-      tx.update(r.ref, { reserved: Math.max(0, r.prev.reserved - r.releaseQty) });
+    releaseReserved(tx, reads, order.lines);
+    for (const line of reserved) {
       const mvRef = doc(collection(db, 'stockMovements'));
       tx.set(mvRef, {
         id: mvRef.id,
-        productId: r.line.productId,
-        formatId: r.line.formatId,
-        qty: r.releaseQty,
+        productId: line.productId,
+        formatId: line.formatId,
+        qty: line.reservedQty,
         type: 'liberacion',
         orderId,
         by,

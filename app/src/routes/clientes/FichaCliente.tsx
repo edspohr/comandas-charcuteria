@@ -48,6 +48,7 @@ export default function FichaCliente() {
     const top = new Map<string, { name: string; format: string; unit: 'g' | 'kg' | 'unidad'; qty: number; kg: number; times: number; score: number; lastAt: number }>();
     const nowMs = Date.now();
     for (const o of valid) for (const l of o.lines) {
+      if (l.sample) continue; // una muestra no es un habitual
       const k = `${l.productId}::${l.formatId}`;
       const t = top.get(k) ?? { name: l.productName, format: l.formatLabel, unit: l.unit, qty: 0, kg: 0, times: 0, score: 0, lastAt: 0 };
       const weeks = Math.max(0, (nowMs - o.createdAt) / (7 * DAY));

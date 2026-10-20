@@ -90,7 +90,7 @@ export function emitDocumentForOrder(order: Order, type: BsaleDocumentType = 'fa
     clientRut: order.clientSnapshot.rut,
     reference: order.id,
     lines: order.lines
-      .filter((l) => (l.packedQty ?? l.reservedQty) > 0)
+      .filter((l) => !l.sample && (l.packedQty ?? l.reservedQty) > 0)
       .map((l) => ({
         sku: `${l.productId}__${l.formatId}`,
         description: `${l.productName} · ${l.formatLabel}`,

@@ -3,6 +3,7 @@ import { DEFAULT_KANBAN_THRESHOLDS } from './types';
 import { orderHasCompromisedStock } from '@/data/stock';
 import { todayInSantiago } from '@/lib/format';
 import { can } from './permissions';
+import { isSampleOnly } from './samples';
 
 // ---------- Columns ----------
 
@@ -79,7 +80,7 @@ export function cardTone(
 
 // ---------- Next action per role ----------
 
-export type ActionKind = 'take' | 'arm' | 'link' | 'transfer' | 'dispatch' | 'deliver' | 'anular' | 'none';
+export type ActionKind = 'take' | 'arm' | 'link' | 'transfer' | 'samples' | 'dispatch' | 'deliver' | 'anular' | 'none';
 
 export interface NextAction { kind: ActionKind; label: string; }
 
@@ -106,6 +107,7 @@ export function nextAction(order: Order, role: Role, uid: string, opts: { isShop
     case 'armado':
       // La reposición de tienda no se factura: se registra como traslado.
       if (shop) return can(role, 'order.pack') || can(role, 'order.link') ? { kind: 'transfer', label: 'Registrar traslado' } : { kind: 'none', label: '' };
+      if (isSampleOnly(order)) return can(role, 'order.pack') || can(role, 'order.link') ? { kind: 'samples', label: 'Registrar salida' } : { kind: 'none', label: '' };
       return can(role, 'order.link') ? { kind: 'link', label: 'Facturar' } : { kind: 'none', label: '' };
     case 'facturado':
       return can(role, 'order.dispatch') ? { kind: 'dispatch', label: 'Despachar' } : { kind: 'none', label: '' };
@@ -125,7 +127,7 @@ export function actionForDrop(order: Order, target: ColumnId, role: Role, uid: s
   if (COLUMNS[idx + 1]?.id !== target) return null;
   const a = nextAction(order, role, uid, opts);
   const expected: Record<ColumnId, ActionKind[]> = {
-    pendiente: [], en_armado: ['take'], por_facturar: ['arm'], por_despachar: ['link', 'transfer'], cerrado: ['dispatch'],
+    pendiente: [], en_armado: ['take'], por_facturar: ['arm'], por_despachar: ['link', 'transfer', 'samples'], cerrado: ['dispatch'],
   };
   return expected[target].includes(a.kind) ? a.kind : null;
 }

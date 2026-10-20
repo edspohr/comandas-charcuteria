@@ -1,3 +1,5 @@
+import SampleTag from './SampleTag';
+import { sampleLabel } from '@/domain/samples';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Button from '@/components/ui/Button';
@@ -154,8 +156,8 @@ export function OrderDrawer({ order, tone, action, onAction, onClose, detailTo, 
             {order.lines.map((l, i) => (
               <li key={i} className="px-3 py-2">
                 <div className="flex justify-between gap-3">
-                  <span className="text-charcoal-900">{l.productName} <span className="text-charcoal-300 text-xs">{l.formatLabel}</span></span>
-                  <span className="tabular-nums shrink-0">{formatQty(l.qty, l.unit)}</span>
+                  <span className="text-charcoal-900">{l.sample && <SampleTag />}{l.productName} <span className="text-charcoal-300 text-xs">{l.formatLabel}</span></span>
+                  <span className="tabular-nums shrink-0">{l.sample ? sampleLabel(l) : formatQty(l.qty, l.unit)}</span>
                 </div>
                 <p className="text-[11px] text-charcoal-500">
                   {l.packedQty != null ? `Empacado ${formatQty(l.packedQty, l.unit)}${l.packedWeightKg ? ` · ${l.packedWeightKg} kg` : ''}` : l.pendingProductionQty > 0 ? `Reservado ${formatQty(l.reservedQty, l.unit)} · a producción ${formatQty(l.pendingProductionQty, l.unit)}` : `Reservado ${formatQty(l.reservedQty, l.unit)}`}

@@ -31,6 +31,14 @@ export async function registerTransfer(orderId: string, lines: QtyLine[]): Promi
   return { dryRun: !!(r.consumo?.dryRun ?? r.guia?.dryRun) };
 }
 
+// Muestras → consumo interno en Bsale (una vez por pedido; el servidor lo
+// recuerda en order.samplesConsumption). En mock no hay nada que descontar.
+const samplesFn = httpsCallable<{ orderId: string }, { dryRun?: boolean; skipped?: boolean; already?: boolean; reason?: string }>(functions, 'bsaleConsumeSamples');
+export async function consumeSamples(orderId: string): Promise<{ dryRun?: boolean; skipped?: boolean; already?: boolean; reason?: string }> {
+  if (!isRealBsale) return { skipped: true, reason: 'Bsale simulado' };
+  return (await samplesFn({ orderId })).data;
+}
+
 export function writeOutcomeText(o: BsaleWriteOutcome, what: string): string {
   if (o.dryRun) return `${what}: Bsale está en simulacro, quedó registrado en la bitácora sin enviarse.`;
   const r = o.summary;

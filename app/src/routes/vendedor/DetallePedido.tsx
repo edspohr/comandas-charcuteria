@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import SampleTag from '@/components/orders/SampleTag';
+import { lineKey, sampleLabel } from '@/domain/samples';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/ui/Button';
 import StatusPill from '@/components/ui/StatusPill';
@@ -64,16 +66,16 @@ export default function DetallePedido() {
         </div>
         <ul className="divide-y divide-charcoal-100">
           {order.lines.map((l) => (
-            <li key={`${l.productId}-${l.formatId}`} className="p-4">
+            <li key={lineKey(l)} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-semibold text-charcoal-900">{l.productName}</p>
+                  <p className="font-semibold text-charcoal-900">{l.sample && <SampleTag />}{l.productName}</p>
                   <p className="text-xs text-charcoal-300 mt-0.5">{l.formatLabel}</p>
                   {l.notes && <p className="text-xs text-charcoal-500 mt-1 italic">{l.notes}</p>}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="eyebrow">Vendido</p>
-                  <p className="font-semibold text-charcoal-700 mt-0.5">{formatQty(l.qty, l.unit)}</p>
+                  <p className="eyebrow">{l.sample ? 'Muestra' : 'Vendido'}</p>
+                  <p className="font-semibold text-charcoal-700 mt-0.5">{l.sample ? sampleLabel(l) : formatQty(l.qty, l.unit)}</p>
                   {l.reservedQty !== l.qty && l.reservedQty > 0 && (
                     <p className="text-[10px] uppercase tracking-display text-emerald-700 mt-1">
                       Reservado {formatQty(l.reservedQty, l.unit)}

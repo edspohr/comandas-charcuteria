@@ -4,6 +4,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContaine
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/data/firebase';
 import { Card, Export, Metric, Mini, Table, Today, setExportPeriod } from '@/components/panel/PanelUI';
+import SamplesPanel from '@/components/panel/SamplesPanel';
 import { useProducts } from '@/data/products';
 import { useClients } from '@/data/clients';
 import { useAllStock, useSyncState } from '@/data/stock';
@@ -20,8 +21,8 @@ import { formatCLP } from '@/lib/pricing';
 import type { Order } from '@/domain/types';
 
 
-type Tab = 'ventas' | 'fuerza' | 'operacion' | 'stock' | 'clientes';
-const TABS: Array<[Tab, string]> = [['ventas', 'Ventas'], ['fuerza', 'Fuerza de ventas'], ['operacion', 'Operación'], ['stock', 'Stock'], ['clientes', 'Clientes']];
+type Tab = 'ventas' | 'fuerza' | 'operacion' | 'stock' | 'clientes' | 'muestras';
+const TABS: Array<[Tab, string]> = [['ventas', 'Ventas'], ['fuerza', 'Fuerza de ventas'], ['operacion', 'Operación'], ['stock', 'Stock'], ['clientes', 'Clientes'], ['muestras', 'Muestras']];
 
 const GOLD = '#a8834a'; const WOOD = '#4d3b28'; const WOOD_LIGHT = '#b39776';
 const TOOLTIP = { borderRadius: 8, border: '1px solid #e5e2dd', fontSize: 12 };
@@ -136,7 +137,7 @@ export default function Panel({ embedded = false }: { embedded?: boolean } = {})
       </div>
 
       <nav className="mb-5 flex gap-1 border-b border-charcoal-100 overflow-x-auto">
-        {TABS.map(([t, label]) => (
+        {TABS.filter(([t]) => !(embedded && t === 'muestras')).map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} className={'px-4 py-2.5 text-xs uppercase tracking-display font-medium border-b-2 transition -mb-px whitespace-nowrap ' + (t === tab ? 'border-brass-500 text-charcoal-900' : 'border-transparent text-charcoal-300 hover:text-charcoal-500')}>{label}</button>
         ))}
       </nav>
@@ -198,6 +199,8 @@ export default function Panel({ embedded = false }: { embedded?: boolean } = {})
           </div>
         </div>
       )}
+
+      {tab === 'muestras' && <SamplesPanel />}
 
       {tab === 'fuerza' && (
         <div className="space-y-5">

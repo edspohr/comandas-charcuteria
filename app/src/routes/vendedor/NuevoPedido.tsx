@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button';
 import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
 import SemaphoreBadge from '@/components/ui/SemaphoreBadge';
 import Stepper from '@/components/ui/Stepper';
+import SampleTag from '@/components/orders/SampleTag';
 import { useCurrentUser } from '@/data/auth';
 import { useClients, searchClients } from '@/data/clients';
 import { useProducts } from '@/data/products';
@@ -16,6 +17,7 @@ import { formatDateLong, formatDateShort, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 import { categoryLabel, categoryOrder } from '@/domain/categories';
 import { computeLineSubtotal, formatCLP, unitPriceLabel } from '@/lib/pricing';
+import { SAMPLE_DEFAULT_GRAMS, SAMPLE_GRAM_OPTIONS, lineKey, sampleLabel, sampleLine, sampleSourceFor } from '@/domain/samples';
 import type { Client, Product, ProductFormat, StockDoc } from '@/domain/types';
 
 interface Draft {
@@ -132,7 +134,7 @@ export default function NuevoPedido() {
           onSelect={(c) => { update('clientId', c.id); update('deliveryMode', c.deliveryMode); goto(2); }}
           onRepeat={() => {
             if (!lastOrder) return;
-            update('lines', lastOrder.lines.map((l) => ({
+            update('lines', lastOrder.lines.filter((l) => !l.sample).map((l) => ({
               productId: l.productId, productName: l.productName,
               formatId: l.formatId, formatLabel: l.formatLabel,
               unit: l.unit, qty: l.qty, notes: l.notes,
@@ -153,7 +155,7 @@ export default function NuevoPedido() {
           onBack={() => goto(1)}
           lastOrder={lastOrder}
           onRepeat={lastOrder ? () => {
-            update('lines', lastOrder.lines.map((l) => ({
+            update('lines', lastOrder.lines.filter((l) => !l.sample).map((l) => ({
               productId: l.productId, productName: l.productName,
               formatId: l.formatId, formatLabel: l.formatLabel,
               unit: l.unit, qty: l.qty, notes: l.notes,
@@ -336,11 +338,12 @@ function StepProductos({
   onRepeat?: () => void;
 }) {
   const [openProductId, setOpenProductId] = useState<string | null>(null);
+  const [sampleOpen, setSampleOpen] = useState(false);
   const active = products.filter((p) => p.active && !p.discontinued);
   const showRepeat = !!(lastOrder && onRepeat && lines.length === 0);
 
   function addOrUpdate(product: Product, format: ProductFormat, qty: number, notes?: string) {
-    const idx = lines.findIndex((l) => l.productId === product.id && l.formatId === format.formatId);
+    const idx = lines.findIndex((l) => !l.sample && l.productId === product.id && l.formatId === format.formatId);
     if (qty <= 0) {
       if (idx >= 0) onLines(lines.filter((_, i) => i !== idx));
       return;
@@ -375,7 +378,11 @@ function StepProductos({
 
       <ProductGrid products={active} lines={lines} openId={openProductId} onOpen={setOpenProductId} />
 
-      <SelectedLines lines={lines} onRemove={(l) => onLines(lines.filter((x) => !(x.productId === l.productId && x.formatId === l.formatId)))} />
+      <button type="button" onClick={() => setSampleOpen(true)} className="w-full rounded-md border border-dashed border-brass-300 bg-white px-3 py-2.5 text-sm text-brass-700 hover:bg-brass-50 text-left">
+        <span className="font-semibold">+ Muestra</span> <span className="text-charcoal-500">· sin cargo, {SAMPLE_DEFAULT_GRAMS} g por defecto, sale del granel</span>
+      </button>
+
+      <SelectedLines lines={lines} onRemove={(l) => onLines(lines.filter((x) => lineKey(x) !== lineKey(l)))} />
 
 
       <div className="flex gap-2 pt-2 sticky bottom-0 bg-cream-50 py-3 border-t border-charcoal-100">
@@ -385,11 +392,20 @@ function StepProductos({
         </Button>
       </div>
 
+      {sampleOpen && (
+        <SamplePicker
+          products={active}
+          stock={stock}
+          onAdd={(line) => { onLines([...lines.filter((x) => lineKey(x) !== lineKey(line)), line]); setSampleOpen(false); }}
+          onClose={() => setSampleOpen(false)}
+        />
+      )}
+
       {openProductId && (
         <FormatPicker
           product={active.find((p) => p.id === openProductId)!}
           stock={stock}
-          existing={lines.filter((l) => l.productId === openProductId)}
+          existing={lines.filter((l) => !l.sample && l.productId === openProductId)}
           onCommit={(fmt, qty, notes) => {
             const prod = active.find((p) => p.id === openProductId)!;
             addOrUpdate(prod, fmt, qty, notes);
@@ -421,7 +437,7 @@ function ProductGrid({ products, lines, openId, onOpen }: { products: Product[];
           <p className="eyebrow mb-2 px-0.5">{categoryLabel(cat)}</p>
           <div className="flex flex-wrap gap-1.5">
             {list.map((p) => {
-              const has = lines.some((l) => l.productId === p.id);
+              const has = lines.some((l) => !l.sample && l.productId === p.id);
               return (
                 <button
                   key={p.id}
@@ -529,6 +545,71 @@ function FormatPicker({
   );
 }
 
+// "+ Muestra": product + size. Comes out of the product's bulk format (or one
+// unit of its smallest format when it has no bulk).
+function SamplePicker({ products, stock, onAdd, onClose }: { products: Product[]; stock: Map<string, StockDoc>; onAdd: (l: DraftLine) => void; onClose: () => void }) {
+  const [q, setQ] = useState('');
+  const [productId, setProductId] = useState<string | null>(null);
+  const [grams, setGrams] = useState(SAMPLE_DEFAULT_GRAMS);
+  const [notes, setNotes] = useState('');
+  const norm = (x: string) => x.toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const candidates = products.filter((p) => sampleSourceFor(p) && (!q || norm(`${p.name} ${(p.aliases ?? []).join(' ')}`).includes(norm(q)))).slice(0, 30);
+  const product = products.find((p) => p.id === productId);
+  const src = product ? sampleSourceFor(product) : null;
+  const line = product ? sampleLine(product, grams, notes.trim() || undefined) : null;
+  const av = product && src ? availableFor(stock, product.id, src.format.formatId) : 0;
+  return (
+    <div className="fixed inset-0 z-20 bg-charcoal-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-cream-50 rounded-t-xl sm:rounded-xl shadow-lift p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="eyebrow">Sin cargo</p>
+            <h3 className="font-semibold text-charcoal-900 tracking-display uppercase mt-0.5">Agregar muestra</h3>
+          </div>
+          <button onClick={onClose} className="text-charcoal-300 hover:text-charcoal-700 text-xl w-8 h-8 flex items-center justify-center" aria-label="Cerrar">×</button>
+        </div>
+        {!product ? (
+          <>
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar producto…" className="field h-10 text-sm mb-3" />
+            <div className="flex flex-wrap gap-1.5">
+              {candidates.map((p) => (
+                <button key={p.id} onClick={() => setProductId(p.id)} className="rounded-md border border-charcoal-200 bg-white px-3 py-1.5 text-sm text-charcoal-700 hover:border-charcoal-300">{p.name}</button>
+              ))}
+              {candidates.length === 0 && <p className="text-xs text-charcoal-300">Sin productos que coincidan.</p>}
+            </div>
+          </>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-charcoal-900">{product.name}</p>
+              <button onClick={() => setProductId(null)} className="text-[11px] uppercase tracking-display text-charcoal-500 underline">Cambiar</button>
+            </div>
+            {src?.byWeight ? (
+              <div>
+                <p className="eyebrow mb-1.5">Tamaño</p>
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  {SAMPLE_GRAM_OPTIONS.map((g) => (
+                    <button key={g} onClick={() => setGrams(g)} className={'rounded-md border px-3 py-1.5 text-sm ' + (grams === g ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-700')}>{g} g</button>
+                  ))}
+                  <input type="number" min={10} max={1000} step={10} value={grams} onChange={(e) => setGrams(Math.max(10, Math.min(1000, Number(e.target.value) || SAMPLE_DEFAULT_GRAMS)))} className="field h-9 w-24 text-sm" aria-label="Gramos" />
+                </div>
+                <p className="text-xs text-charcoal-500 mt-2">Sale de {src.format.label.toLowerCase()} · disponible {formatQty(av, 'kg')}{av < grams / 1000 ? ' — sin stock: despacho decide al armar' : ''}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-charcoal-700">Este producto no tiene granel: la muestra es <strong>1 × {src?.format.label}</strong>. Disponible {formatQty(av, src?.format.unit ?? 'unidad')}.</p>
+            )}
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Nota para despacho — laminado fino, para el chef…" className="field h-10 text-sm" />
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
+              <Button onClick={() => line && onAdd(line)} disabled={!line} className="flex-1">Agregar muestra</Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SelectedLines({ lines, onRemove }: { lines: DraftLine[]; onRemove: (l: DraftLine) => void }) {
   if (lines.length === 0) return null;
   const total = lines.reduce((s, l) => s + (l.format ? (computeLineSubtotal(l.format, l.qty) ?? 0) : 0), 0);
@@ -539,17 +620,17 @@ function SelectedLines({ lines, onRemove }: { lines: DraftLine[]; onRemove: (l: 
         {lines.map((l) => {
           const sub = l.format ? computeLineSubtotal(l.format, l.qty) : undefined;
           return (
-          <li key={`${l.productId}-${l.formatId}`} className="flex items-center justify-between gap-2 text-sm py-2 first:pt-0 last:pb-0">
+          <li key={lineKey(l)} className="flex items-center justify-between gap-2 text-sm py-2 first:pt-0 last:pb-0">
             <div className="min-w-0">
-              <div className="text-charcoal-700 truncate font-medium">{l.productName}</div>
+              <div className="text-charcoal-700 truncate font-medium">{l.sample && <SampleTag />}{l.productName}</div>
               <div className="text-xs text-charcoal-300 truncate">
                 {l.formatLabel}{l.notes ? ` · ${l.notes}` : ''}
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <div className="text-right">
-                <div className="font-semibold text-charcoal-700">{formatQty(l.qty, l.unit)}</div>
-                {sub != null && <div className="text-[11px] text-charcoal-500">{formatCLP(sub)}</div>}
+                <div className="font-semibold text-charcoal-700">{l.sample ? sampleLabel(l) : formatQty(l.qty, l.unit)}</div>
+                {l.sample ? <div className="text-[11px] text-charcoal-500">sin cargo</div> : sub != null && <div className="text-[11px] text-charcoal-500">{formatCLP(sub)}</div>}
               </div>
               <button onClick={() => onRemove(l)} className="text-[11px] uppercase tracking-display text-charcoal-300 hover:text-red-700">Quitar</button>
             </div>
@@ -657,8 +738,9 @@ function StepConfirmar({
 }) {
   const preview = useMemo(() => draft.lines.map((l) => {
     const av = availableFor(stock, l.productId, l.formatId);
-    const subtotalCLP = l.format ? computeLineSubtotal(l.format, l.qty) : undefined;
-    return { line: l, available: av, reserved: Math.min(av, l.qty), pending: Math.max(0, l.qty - av), subtotalCLP };
+    const subtotalCLP = l.sample ? undefined : l.format ? computeLineSubtotal(l.format, l.qty) : undefined;
+    // Samples never go to production: without stock despacho decides.
+    return { line: l, available: av, reserved: Math.min(av, l.qty), pending: l.sample ? 0 : Math.max(0, l.qty - av), subtotalCLP };
   }), [draft.lines, stock]);
 
   const anyPending = preview.some((p) => p.pending > 0);
@@ -704,16 +786,17 @@ function StepConfirmar({
         <p className="eyebrow mb-2">Líneas ({preview.length})</p>
         <ul className="divide-y divide-charcoal-100">
           {preview.map((p) => (
-            <li key={`${p.line.productId}-${p.line.formatId}`} className="py-2.5 first:pt-0 last:pb-0 text-sm">
+            <li key={lineKey(p.line)} className="py-2.5 first:pt-0 last:pb-0 text-sm">
               <div className="flex justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="text-charcoal-700 truncate font-medium">{p.line.productName}</div>
+                  <div className="text-charcoal-700 truncate font-medium">{p.line.sample && <SampleTag />}{p.line.productName}</div>
                   <div className="text-xs text-charcoal-300 truncate">
                     {p.line.formatLabel}{p.line.notes ? ` · ${p.line.notes}` : ''}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="font-semibold text-charcoal-700">{formatQty(p.line.qty, p.line.unit)}</div>
+                  <div className="font-semibold text-charcoal-700">{p.line.sample ? sampleLabel(p.line) : formatQty(p.line.qty, p.line.unit)}</div>
+                  {p.line.sample && <div className="text-[11px] text-charcoal-500">sin cargo{p.available < p.line.qty ? ' · sin stock en granel' : ''}</div>}
                   {p.subtotalCLP != null && (
                     <div className="text-[11px] text-charcoal-500">{formatCLP(p.subtotalCLP)}</div>
                   )}

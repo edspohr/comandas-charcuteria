@@ -5,6 +5,8 @@ import { useCurrentUser } from '@/data/auth';
 import { useProducts } from '@/data/products';
 import { parseLocal, type ParsedLine, type MatchStatus } from '@/domain/parse/local';
 import { geminiEnabled, parseWithGeminiFull } from '@/domain/parse/gemini';
+import { applySamples } from '@/domain/parse/samples';
+import { SAMPLE_DEFAULT_GRAMS, sampleLine } from '@/domain/samples';
 import { extractClientHints, hintsHaveSomething, isClientInfoLine, matchExistingClient, type ClientHints } from '@/domain/parse/client';
 import { useClients } from '@/data/clients';
 import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
@@ -26,6 +28,8 @@ interface WizardDraft {
     unit: 'g' | 'kg' | 'unidad';
     qty: number;
     notes?: string;
+    sample?: boolean;
+    sampleGrams?: number;
   }>;
   requestedDate: string;
   deliveryMode: 'retiro' | 'despacho';
@@ -81,7 +85,7 @@ export default function PegarPedido() {
           const remote = await parseWithGeminiFull(text, products);
           if (remote.client) h = { ...h, ...Object.fromEntries(Object.entries(remote.client).filter(([, v]) => v != null && v !== '')) };
           if (remote.lines.length > 0) {
-            setParsed(remote.lines);
+            setParsed(applySamples(remote.lines, text, products));
             setEngine('ai');
             return;
           }
@@ -92,7 +96,7 @@ export default function PegarPedido() {
           usedFallback = true;
         }
       }
-      setParsed(parseLocal(text, products).filter((l) => !isClientInfoLine(l.raw)));
+      setParsed(applySamples(parseLocal(text, products).filter((l) => !isClientInfoLine(l.raw)), text, products));
       setEngine('local');
       if (usedFallback) setAiFallback(true);
     } finally {
@@ -113,6 +117,12 @@ export default function PegarPedido() {
       const line = copy[idx];
       const prod = catalog.find((p) => p.id === productId);
       if (!prod) return prev;
+      if (line.sample) {
+        const s = sampleLine(prod, line.sampleGrams ?? SAMPLE_DEFAULT_GRAMS);
+        if (!s) return prev;
+        copy[idx] = { ...line, productId: prod.id, productName: prod.name, formatId: s.formatId, formatLabel: s.formatLabel, unit: s.unit, qty: s.qty, sampleGrams: s.sampleGrams, status: 'review' };
+        return copy;
+      }
       const fmt = prod.formats.find((f) => f.formatId === line.formatId) ?? prod.formats[0];
       copy[idx] = {
         ...line,
@@ -172,6 +182,7 @@ export default function PegarPedido() {
         unit: l.unit!,
         qty: l.qty!,
         notes: l.notes,
+        ...(l.sample ? { sample: true, sampleGrams: l.sampleGrams } : {}),
       })),
       requestedDate: defaultRequestedDate(settings.cutoffHour),
       deliveryMode: withClient?.deliveryMode ?? hints?.deliveryMode ?? 'despacho',
@@ -324,14 +335,14 @@ function ParsedLineCard({
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="text-xs text-charcoal-300 italic truncate">"{line.raw}"</p>
+        <p className="text-xs text-charcoal-300 italic truncate">{line.sample && <span className="not-italic mr-1.5 inline-block rounded bg-brass-100 border border-brass-300 text-brass-700 px-1.5 py-px text-[9px] uppercase tracking-display font-semibold">Muestra</span>}"{line.raw}"</p>
         <span className={`shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-display font-semibold ${STATUS_STYLE[line.status]}`}>
           {STATUS_LABEL[line.status]}
         </span>
       </div>
 
       {line.status === 'not_found' ? (
-        <p className="text-sm text-red-800">No encontramos un producto para esta línea. Borre y agregue manualmente en el wizard.</p>
+        <p className="text-sm text-red-800">{line.sample ? 'No encontramos ese producto en el catálogo. Agregue la muestra en el paso Productos con «+ Muestra».' : 'No encontramos un producto para esta línea. Borre y agregue manualmente en el wizard.'}</p>
       ) : (
         <div className="space-y-3">
           <div>
@@ -347,7 +358,10 @@ function ParsedLineCard({
             </select>
           </div>
 
-          {prod && (
+          {prod && line.sample && (
+            <p className="text-sm text-charcoal-700">Muestra sin cargo · <strong>{line.unit === 'kg' ? `${Math.round((line.qty ?? 0) * 1000)} g` : line.formatLabel}</strong> <span className="text-charcoal-500">(sale del granel; el tamaño se ajusta en el paso Productos)</span></p>
+          )}
+          {prod && !line.sample && (
             <div>
               <label className="eyebrow block mb-1">Formato</label>
               <select
@@ -362,7 +376,7 @@ function ParsedLineCard({
             </div>
           )}
 
-          <div>
+          {!line.sample && <div>
             <label className="eyebrow block mb-1">Cantidad {line.unit && `(${line.unit === 'kg' ? 'kg' : line.unit === 'g' ? 'g' : 'u'})`}</label>
             <input
               type="number"
@@ -373,7 +387,7 @@ function ParsedLineCard({
               className="field h-10 text-sm"
             />
             {line.qty && line.unit && <p className="text-[11px] text-charcoal-300 mt-1">{formatQty(line.qty, line.unit)}</p>}
-          </div>
+          </div>}
 
           {line.notes && (
             <p className="text-xs text-charcoal-500">Notas: <em>{line.notes}</em></p>

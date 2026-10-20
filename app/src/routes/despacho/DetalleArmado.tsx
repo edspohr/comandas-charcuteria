@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/ui/Button';
+import SampleTag from '@/components/orders/SampleTag';
+import { lineKey, sampleLabel } from '@/domain/samples';
 import Stepper from '@/components/ui/Stepper';
 import StatusPill from '@/components/ui/StatusPill';
 import { useCurrentUser } from '@/data/auth';
@@ -31,7 +33,7 @@ export default function DetalleArmado() {
     if (!order) return;
     // Initialize inputs from reservedQty (assumed default packed amount).
     setState(Object.fromEntries(order.lines.map((l) => [
-      `${l.productId}::${l.formatId}`,
+      lineKey(l),
       {
         packedQty: l.packedQty ?? l.reservedQty,
         packedWeightKg: l.packedWeightKg != null ? String(l.packedWeightKg) : '',
@@ -49,7 +51,7 @@ export default function DetalleArmado() {
 
   const anyPacked = useMemo(
     () => order?.lines.some((l) => {
-      const s = state[`${l.productId}::${l.formatId}`];
+      const s = state[lineKey(l)];
       if (!s) return false;
       return s.short || (s.packedQty ?? 0) > 0;
     }) ?? false,
@@ -57,7 +59,7 @@ export default function DetalleArmado() {
   );
   const missingReasons = useMemo(
     () => order?.lines.some((l) => {
-      const s = state[`${l.productId}::${l.formatId}`];
+      const s = state[lineKey(l)];
       return s?.short && !s.shortReason.trim();
     }) ?? false,
     [order, state],
@@ -76,15 +78,16 @@ export default function DetalleArmado() {
       await markArmado(
         order.id,
         order.lines.map((l) => {
-          const k = `${l.productId}::${l.formatId}`;
+          const k = lineKey(l);
           const s = state[k];
           const parsedWeight = s?.packedWeightKg ? Number(s.packedWeightKg) : undefined;
           if (s?.short) {
-            return { productId: l.productId, formatId: l.formatId, packedQty: 0, shortReason: s.shortReason.trim() || 'Faltó' };
+            return { productId: l.productId, formatId: l.formatId, sample: l.sample, packedQty: 0, shortReason: s.shortReason.trim() || 'Faltó' };
           }
           return {
             productId: l.productId,
             formatId: l.formatId,
+            sample: l.sample,
             packedQty: s?.packedQty ?? l.reservedQty,
             packedWeightKg: Number.isFinite(parsedWeight) ? parsedWeight : undefined,
           };
@@ -152,7 +155,7 @@ export default function DetalleArmado() {
           <p className="eyebrow">Líneas a armar</p>
         </div>
         {order.lines.map((line) => {
-          const k = `${line.productId}::${line.formatId}`;
+          const k = lineKey(line);
           const s = state[k] ?? { packedQty: line.reservedQty, packedWeightKg: '', short: false, shortReason: '' };
           const packed = s.packedQty;
           const readOnly = !canPack;
@@ -164,13 +167,14 @@ export default function DetalleArmado() {
             <div key={k} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-charcoal-900">{line.productName}</p>
-                  <p className="text-xs text-charcoal-300 mt-0.5">{line.formatLabel}</p>
+                  <p className="font-semibold text-charcoal-900">{line.sample && <SampleTag />}{line.productName}</p>
+                  <p className="text-xs text-charcoal-300 mt-0.5">{line.formatLabel}{line.sample ? ' · sin cargo · rotular con el nombre del cliente' : ''}</p>
+                  {line.sample && line.reservedQty < line.qty && <p className="text-[11px] text-brass-700 mt-1">Sin stock reservado en granel: empaque si hay en cámara o márquela como faltante.</p>}
                   {line.notes && <p className="text-xs text-charcoal-500 mt-1 italic">{line.notes}</p>}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="eyebrow">Vendido</p>
-                  <p className="font-semibold text-charcoal-700 mt-0.5">{formatQty(line.qty, line.unit)}</p>
+                  <p className="eyebrow">{line.sample ? 'Muestra' : 'Vendido'}</p>
+                  <p className="font-semibold text-charcoal-700 mt-0.5">{line.sample ? sampleLabel(line) : formatQty(line.qty, line.unit)}</p>
                   {line.reservedQty !== line.qty && (
                     <p className="text-[10px] uppercase tracking-display text-brass-700 mt-0.5">
                       Reserv. {formatQty(line.reservedQty, line.unit)}
@@ -233,9 +237,9 @@ export default function DetalleArmado() {
                         <Stepper
                           value={packed}
                           onChange={(v) => setState((prev) => ({ ...prev, [k]: { ...s, packedQty: v } }))}
-                          step={line.unit === 'kg' ? 0.5 : 1}
-                          decimals={line.unit === 'kg' ? 2 : 0}
-                          quick={line.unit === 'kg' ? [0.5, 1, 5] : [1, 5, 10]}
+                          step={line.sample && line.unit === 'kg' ? 0.01 : line.unit === 'kg' ? 0.5 : 1}
+                          decimals={line.sample && line.unit === 'kg' ? 3 : line.unit === 'kg' ? 2 : 0}
+                          quick={line.sample ? (line.unit === 'kg' ? [0.05, 0.08, 0.1] : [1]) : line.unit === 'kg' ? [0.5, 1, 5] : [1, 5, 10]}
                         />
                         {showWeight && (
                           <div>

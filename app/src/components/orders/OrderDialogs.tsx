@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
-import { anularOrder, despacharOrder, entregarOrder, registrarTraslado, vincularDocumento } from '@/data/orders';
+import { anularOrder, consumeSamplesAfterInvoice, despacharOrder, entregarOrder, registrarSalidaMuestras, registrarTraslado, vincularDocumento } from '@/data/orders';
+import { lineKey, sampleLabel } from '@/domain/samples';
 import { useBsaleDocuments } from '@/data/bsale';
 import { emitDocumentForOrder } from '@/integrations/bsale/mockAdmin';
 import { syncStockFromBsale } from '@/data/stock';
@@ -50,6 +51,9 @@ export function DispatchDialog({ order, uid, onClose }: { order: Order; uid: str
   return (
     <ModalShell title="Despachar pedido" eyebrow={order.id} onClose={onClose}>
       <div className="space-y-4">
+        {order.lines.some((l) => l.sample && !l.shortReason) && (
+          <p className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 px-3 py-2 text-xs">Lleva {order.lines.filter((l) => l.sample && !l.shortReason).length} muestra(s) sin cargo: {order.lines.filter((l) => l.sample && !l.shortReason).map((l) => `${l.productName} ${sampleLabel(l)}`).join(', ')}.</p>
+        )}
         <div>
           <label className="eyebrow block mb-1.5">Entregado por</label>
           <select value={deliveredBy} onChange={(e) => setDeliveredBy(e.target.value)} className="field">
@@ -82,6 +86,9 @@ export function DeliverDialog({ order, uid, onClose }: { order: Order; uid: stri
   return (
     <ModalShell title={order.kind === 'reposicion' ? 'Recibir en tienda' : 'Marcar entregado'} eyebrow={order.id} onClose={onClose}>
       <div className="space-y-4">
+        {order.lines.some((l) => l.sample && !l.shortReason) && (
+          <p className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 px-3 py-2 text-xs">Lleva {order.lines.filter((l) => l.sample && !l.shortReason).length} muestra(s) sin cargo: {order.lines.filter((l) => l.sample && !l.shortReason).map((l) => `${l.productName} ${sampleLabel(l)}`).join(', ')}.</p>
+        )}
         <div>
           <label className="eyebrow block mb-1.5">Confirmación de entrega</label>
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: recibido por chef Andrés" className="field h-10 text-sm" />
@@ -133,6 +140,50 @@ export function TrasladoDialog({ order, uid, onClose }: { order: Order; uid: str
             <div className="flex gap-2">
               <Button variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
               <Button onClick={submit} disabled={busy || lines.length === 0} className="flex-1">{busy ? 'Registrando…' : 'Registrar traslado'}</Button>
+            </div>
+          </>
+        )}
+      </div>
+    </ModalShell>
+  );
+}
+
+// Pedido solo de muestras armado → salida (consumo interno en Bsale).
+export function SalidaMuestrasDialog({ order, uid, onClose }: { order: Order; uid: string; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const lines = order.lines.filter((l) => !l.shortReason && (l.packedQty ?? l.reservedQty) > 0);
+  async function submit() {
+    setBusy(true); setError(null);
+    try {
+      const r = await registrarSalidaMuestras(order, uid);
+      setDone(r.skipped ? `Salida registrada en la app (${r.reason ?? 'Bsale apagado'}).` : r.dryRun ? 'Salida registrada. Bsale está en simulacro: el consumo quedó en la bitácora sin enviarse.' : 'Salida registrada y descontada en Bsale como consumo interno.');
+    } catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
+  }
+  return (
+    <ModalShell title="Registrar salida de muestras" eyebrow={order.id} onClose={onClose}>
+      <div className="space-y-4">
+        {done ? (
+          <>
+            <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm">{done}</div>
+            <Button onClick={onClose} className="w-full">Listo</Button>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-charcoal-700">Muestras sin cargo para <strong>{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</strong>. No se factura: se descuentan de Bsale como consumo interno con la nota «Muestra · cliente · {order.id}».</p>
+            <ul className="card divide-y divide-charcoal-100 text-sm">
+              {lines.map((l) => (
+                <li key={lineKey(l)} className="px-3 py-2 flex justify-between gap-3">
+                  <span className="text-charcoal-700">{l.productName}</span>
+                  <span className="font-semibold text-charcoal-900 tabular-nums">{l.unit === 'kg' ? `${Math.round((l.packedQty ?? l.reservedQty) * 1000)} g` : `${l.packedQty ?? l.reservedQty} u`}</span>
+                </li>
+              ))}
+            </ul>
+            {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-2 text-sm">{error}</div>}
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
+              <Button onClick={submit} disabled={busy || lines.length === 0} className="flex-1">{busy ? 'Registrando…' : 'Registrar salida'}</Button>
             </div>
           </>
         )}
@@ -194,7 +245,10 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
 
   // After linking, Bsale is the only writer of onHand: refresh the mirror
   // right away so availability reflects the counter sale.
-  async function afterLink() { try { await syncStockFromBsale(uid); } catch (e) { console.warn('[vincular] sync', e); } }
+  async function afterLink() {
+    await consumeSamplesAfterInvoice(order);
+    try { await syncStockFromBsale(uid); } catch (e) { console.warn('[vincular] sync', e); }
+  }
 
   async function link(d: BsaleDocument) {
     setBusy(d.id); setError(null);

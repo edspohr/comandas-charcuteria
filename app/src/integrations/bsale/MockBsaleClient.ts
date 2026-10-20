@@ -86,7 +86,7 @@ export class MockBsaleClient implements BsaleClient {
         address: order.clientSnapshot.address ?? null,
       },
       details: order.lines
-        .filter((l) => (l.packedQty ?? l.reservedQty) > 0)
+        .filter((l) => !l.sample && (l.packedQty ?? l.reservedQty) > 0)
         .map((l) => {
           const invoicedQty = l.packedQty ?? l.reservedQty;
           const subtotal = l.subtotalCLP ?? 0;

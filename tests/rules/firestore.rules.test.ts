@@ -100,6 +100,23 @@ describe('pedidos', () => {
 });
 
 describe('reposición de tienda', () => {
+  it('despacho registers the exit of a samples-only order (MU-) but not of a sale', async () => {
+    await seedOrder('PED-M', 'u-alice', { status: 'armado', kind: 'muestras' });
+    await seedOrder('PED-V', 'u-alice', { status: 'armado', kind: 'venta' });
+    const edu = as('u-edu', 'despacho');
+    await assertFails(updateDoc(doc(edu, 'orders', 'PED-V'), { status: 'facturado', invoiceRef: 'MU-PED-V' }));
+    await assertFails(updateDoc(doc(edu, 'orders', 'PED-M'), { status: 'facturado', invoiceRef: 'FA-000001' }));
+    await assertSucceeds(updateDoc(doc(edu, 'orders', 'PED-M'), { status: 'facturado', invoiceRef: 'MU-PED-M' }));
+  });
+
+  it('a seller answers a sample follow-up only as themself', async () => {
+    const alice = as('u-alice', 'vendedor');
+    const fb = { id: 'PED-1__coppa__granel', orderId: 'PED-1', productId: 'coppa', formatId: 'granel', result: 'gusto', at: Date.now() };
+    await assertFails(setDoc(doc(alice, 'sampleFeedback', fb.id), { ...fb, by: 'u-bob' }));
+    await assertSucceeds(setDoc(doc(alice, 'sampleFeedback', fb.id), { ...fb, by: 'u-alice' }));
+    await assertFails(setDoc(doc(as('u-edu', 'despacho'), 'sampleFeedback', fb.id), { ...fb, by: 'u-edu' }));
+  });
+
   it('despacho registers the transfer only for a reposición, and tienda receives it', async () => {
     await seedOrder('PED-R1', 'u-lucy', { kind: 'reposicion', status: 'armado' });
     await seedOrder('PED-V1', 'u-alice', { kind: 'venta', status: 'armado' });

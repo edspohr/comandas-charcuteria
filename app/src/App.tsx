@@ -13,6 +13,7 @@ const Clientes = lazy(() => import('./routes/clientes/Clientes'));
 const FichaCliente = lazy(() => import('./routes/clientes/FichaCliente'));
 const BsaleConsola = lazy(() => import('./routes/admin/Bsale'));
 const Panel = lazy(() => import('./routes/admin/PanelGestion'));
+const Ayuda = lazy(() => import('./routes/Ayuda'));
 const Catalogo = lazy(() => import('./routes/admin/Catalogo'));
 const Usuarios = lazy(() => import('./routes/admin/Usuarios'));
 const Explorador = lazy(() => import('./routes/bsale/Explorador'));
@@ -154,6 +155,16 @@ export default function App() {
             <RouteGuard current={current} route="catalogo">
               <AppShell current={current!}>
                 <Catalogo />
+              </AppShell>
+            </RouteGuard>
+          }
+        />
+        <Route
+          path="/ayuda"
+          element={
+            <RouteGuard current={current} route="ayuda">
+              <AppShell current={current!}>
+                <Ayuda />
               </AppShell>
             </RouteGuard>
           }

@@ -212,6 +212,7 @@ function AccountMenu({ className, light = false, name, roleLabel }: { className:
           <p className="text-[10px] uppercase tracking-display text-charcoal-400">{roleLabel}</p>
         </div>
       )}
+      <Link to="/ayuda" className={item + ' text-charcoal-800'}><Icon name="help" size={18} className="text-brass-600" /> Guía de uso</Link>
       <InstallButton variant="menu" className={item + ' text-charcoal-800'} />
       <button className={item + ' text-charcoal-800'} onClick={() => lockNow()}><Icon name="lock" size={18} className="text-brass-600" /> Bloquear ahora</button>
       <button className={item + ' text-red-700'} onClick={() => void signOut()}><Icon name="logout" size={18} /> Cerrar sesión</button>

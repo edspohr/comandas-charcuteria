@@ -231,7 +231,7 @@ function LoginCard({ onPin }: { onPin: () => void }) {
         {message && <div role="alert" className="rounded-md border border-red-200 bg-red-50 text-red-800 text-sm px-3 py-2">{message}</div>}
         {info && <div className="rounded-md border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm px-3 py-2">{info}</div>}
 
-        <p className="text-[11px] text-charcoal-300 text-center">El acceso es por invitación. Si no puede entrar, pídale a administración que lo agregue con su correo. La primera vez la app le pide crear su PIN.</p>
+        <p className="text-[11px] text-charcoal-300 text-center">El acceso es por invitación. Si no puede entrar, pídale a administración que lo agregue con su correo. La primera vez la app le pide crear su PIN. Después encuentra la guía de su perfil en su nombre → «Guía de uso».</p>
         <div className="text-center">
           <button type="button" onClick={onPin} className="text-xs text-charcoal-500 underline hover:text-charcoal-900">Ya tengo PIN: entrar con correo y PIN</button>
         </div>

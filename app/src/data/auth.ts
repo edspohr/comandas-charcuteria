@@ -178,7 +178,10 @@ export function touchActivity() { try { if (sessionStorage.getItem(UNLOCK_KEY)) 
 export function isLocked(): boolean {
   try { const t = Number(sessionStorage.getItem(UNLOCK_KEY) ?? 0); return !t || Date.now() - t > LOCK_AFTER_MS; } catch { return false; }
 }
-export function lockNow() { try { sessionStorage.removeItem(UNLOCK_KEY); } catch { /* ignore */ } }
+export function lockNow() {
+  try { sessionStorage.removeItem(UNLOCK_KEY); } catch { /* ignore */ }
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('comandas:lock'));
+}
 
 export async function requestPasswordReset(email: string) {
   await sendPasswordResetEmail(auth, email.trim());

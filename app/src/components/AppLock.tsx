@@ -25,7 +25,8 @@ export default function AppLock() {
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('pointerdown', activity, { passive: true });
     window.addEventListener('keydown', activity);
-    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pointerdown', activity); window.removeEventListener('keydown', activity); };
+    window.addEventListener('comandas:lock', check);
+    return () => { window.removeEventListener('comandas:lock', check); window.clearInterval(id); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pointerdown', activity); window.removeEventListener('keydown', activity); };
   }, []);
 
   if (!current) return null;

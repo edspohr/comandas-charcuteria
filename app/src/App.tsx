@@ -16,7 +16,6 @@ const Panel = lazy(() => import('./routes/admin/PanelGestion'));
 const Catalogo = lazy(() => import('./routes/admin/Catalogo'));
 const Usuarios = lazy(() => import('./routes/admin/Usuarios'));
 const Explorador = lazy(() => import('./routes/bsale/Explorador'));
-import PWAInstallHint from './components/PWAInstallHint';
 import UpdateToast from './components/UpdateToast';
 import AppShell from './components/AppShell';
 import RouteGuard from './components/RouteGuard';
@@ -36,7 +35,6 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <PWAInstallHint />
       <UpdateToast />
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-charcoal-300 text-sm">Cargando…</div>}>
       <Routes>

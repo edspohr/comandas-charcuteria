@@ -1,3 +1,4 @@
+import { Icon } from '@/components/ui/Icon';
 import { windowKey } from '@/domain/delivery';
 import { isStrictStock } from '@/domain/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,7 +12,7 @@ import { syncStockFromBsale, useAllStock, useSyncState } from '@/data/stock';
 import { useSettings } from '@/data/settings';
 import { useUsers } from '@/data/users';
 import { CompactRow, OrderDrawer, OrderList, SummaryStrip, type BoardView } from '@/components/orders/BoardViews';
-import { ROLE_LABEL, can, canAny, isReadOnly, isSeller } from '@/domain/permissions';
+import { can, isReadOnly, isSeller } from '@/domain/permissions';
 import Button from '@/components/ui/Button';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import SampleTag from '@/components/orders/SampleTag';
@@ -103,6 +104,8 @@ export default function Tablero() {
   const now = Date.now();
   const closedSince = now - thresholds.cerradoDias * 24 * 60 * 60 * 1000;
 
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const extraFilters = (showAnulados ? 1 : 0) + (vendedor ? 1 : 0) + (mine && !(role === 'vendedor' || role === 'tienda') ? 1 : 0);
   const pendingApproval = useMemo(() => orders.filter((o) => !o.archived && o.approval?.status === 'pendiente' && o.status !== 'anulado'), [orders]);
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -221,20 +224,20 @@ export default function Tablero() {
 
   return (
     <div className="-mx-4 sm:-mx-6">
-      <header className="px-4 sm:px-6 mb-3 flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <p className="eyebrow">{ROLE_LABEL[role]}</p>
-          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Tablero de pedidos</h1>
+      <header className="px-4 sm:px-6 mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">{mine && isSeller(role) ? 'Mis pedidos' : 'Pedidos'}</h1>
           <p className="text-xs text-charcoal-300 mt-1">
             {totalOpen} abierto{totalOpen === 1 ? '' : 's'}{redCount > 0 && <span className="text-red-700 font-semibold"> · {redCount} en rojo</span>}
             {sync?.at && <> · stock Bsale {new Date(sync.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</>}
             {sync?.compromised?.length ? <span className="text-red-700"> · {sync.compromised.length} formato{sync.compromised.length === 1 ? '' : 's'} con stock comprometido</span> : null}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {canSync && <Button size="sm" variant="secondary" onClick={doSync} disabled={syncing}>{syncing ? 'Sincronizando…' : 'Sincronizar Bsale'}</Button>}
-          {canAny(role, ['order.create', 'order.createTransfer']) && <Link to="/vendedor/nuevo"><Button size="sm">Nuevo pedido</Button></Link>}
-        </div>
+        {canSync && (
+          <button onClick={doSync} disabled={syncing} title="Sincronizar stock y documentos con Bsale" className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-charcoal-200 bg-white px-2.5 py-1.5 text-[11px] uppercase tracking-display text-charcoal-600 hover:border-charcoal-300 disabled:opacity-60">
+            <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Sincronizando' : 'Bsale'}
+          </button>
+        )}
       </header>
 
       {isSeller(role) && <div className="px-4 sm:px-6"><SampleFollowups uid={uid} /></div>}
@@ -275,44 +278,61 @@ export default function Tablero() {
 
       {/* Visión general */}
       <div className="px-4 sm:px-6 mb-3">
-        <SummaryStrip byColumn={byColumn.columns} toneOf={toneOf} showMoney={isAdmin} active={etapa}
-          onPick={(c) => { setParam('etapa', c); if (c && view === 'tarjetas') scrollToCol(c); }} />
+        <SummaryStrip byColumn={byColumn.columns} toneOf={toneOf} showMoney={isAdmin || isSeller(role)} active={etapa}
+          onPick={(c) => {
+            // Phone + board: the strip doubles as column tabs (scroll, no filter).
+            if (window.innerWidth < 1024 && view !== 'lista') { if (c) scrollToCol(c); return; }
+            setParam('etapa', c); if (c && view === 'tarjetas') scrollToCol(c);
+          }} />
       </div>
 
-      {/* Filters */}
-      <div className="px-4 sm:px-6 mb-3 flex flex-wrap items-center gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar pedido, cliente, documento…" className="field h-9 text-sm w-full sm:w-64" />
-        <div className="flex flex-wrap gap-1.5">
+      {/* Filtros: búsqueda + fecha a la vista; el resto en «Filtros». */}
+      <div className="px-4 sm:px-6 mb-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <label className="relative flex-1 min-w-0 sm:max-w-sm">
+            <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-300" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar pedido, cliente, documento…" className="field h-10 text-sm pl-9 w-full" />
+          </label>
+          <div className="hidden sm:flex rounded-md border border-charcoal-200 overflow-hidden" role="group" aria-label="Vista">
+            {(['tarjetas', 'compacta', 'lista'] as BoardView[]).map((v) => (
+              <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className={'px-2.5 h-10 text-[11px] uppercase tracking-display ' + (view === v ? 'bg-charcoal-900 text-cream-50' : 'bg-white text-charcoal-500 hover:text-charcoal-900')}>{v}</button>
+            ))}
+          </div>
+          <div className="relative">
+            <button onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen} className={'h-10 inline-flex items-center gap-1.5 rounded-md border px-3 text-[11px] uppercase tracking-display ' + (extraFilters ? 'border-charcoal-900 bg-charcoal-900 text-cream-50' : 'border-charcoal-200 bg-white text-charcoal-600')}>
+              <Icon name="filter" size={14} /> Filtros{extraFilters ? ` · ${extraFilters}` : ''}
+            </button>
+            {filtersOpen && (
+              <div className="absolute right-0 top-full mt-2 z-20 w-72 card p-4 space-y-3 shadow-lift">
+                <label className="flex items-center justify-between text-sm text-charcoal-800">Solo mis pedidos <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} className="w-4 h-4" /></label>
+                <label className="flex items-center justify-between text-sm text-charcoal-800">Mostrar anulados <input type="checkbox" checked={showAnulados} onChange={(e) => setShowAnulados(e.target.checked)} className="w-4 h-4" /></label>
+                {isAdmin && (
+                  <label className="block text-xs text-charcoal-500">Vendedor
+                    <select value={vendedor} onChange={(e) => setVendedor(e.target.value)} className="field mt-1 h-10 text-sm">
+                      <option value="">Todos los vendedores</option>
+                      {VENDEDORES.map((v) => <option key={v.uid} value={v.uid}>{v.displayName}</option>)}
+                    </select>
+                  </label>
+                )}
+                <div className="sm:hidden">
+                  <p className="text-xs text-charcoal-500 mb-1">Vista</p>
+                  <div className="flex rounded-md border border-charcoal-200 overflow-hidden" role="group" aria-label="Vista">
+                    {(['tarjetas', 'compacta', 'lista'] as BoardView[]).map((v) => (
+                      <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className={'flex-1 py-2 text-[11px] uppercase tracking-display ' + (view === v ? 'bg-charcoal-900 text-cream-50' : 'bg-white text-charcoal-500')}>{v}</button>
+                    ))}
+                  </div>
+                </div>
+                <Button size="sm" variant="secondary" className="w-full" onClick={() => setFiltersOpen(false)}>Listo</Button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto">
           <Chip active={date === 'todos'} onClick={() => setDate('todos')}>Todos</Chip>
           <Chip active={date === 'hoy'} onClick={() => setDate('hoy')}>Hoy</Chip>
           <Chip active={date === 'manana'} onClick={() => setDate('manana')}>Mañana</Chip>
           <Chip active={date === 'atrasados'} onClick={() => setDate('atrasados')} tone="red">Atrasados</Chip>
-          <Chip active={mine} onClick={() => setMine(!mine)}>Míos</Chip>
-          <Chip active={showAnulados} onClick={() => setShowAnulados(!showAnulados)}>Anulados</Chip>
         </div>
-        <div className="flex rounded-md border border-charcoal-200 overflow-hidden ml-auto" role="group" aria-label="Vista">
-          {(['tarjetas', 'compacta', 'lista'] as BoardView[]).map((v) => (
-            <button key={v} onClick={() => setView(v)} aria-pressed={view === v} className={'px-2.5 py-1.5 text-[11px] uppercase tracking-display ' + (view === v ? 'bg-charcoal-900 text-cream-50' : 'bg-white text-charcoal-500 hover:text-charcoal-900')}>{v}</button>
-          ))}
-        </div>
-        {isAdmin && (
-          <select value={vendedor} onChange={(e) => setVendedor(e.target.value)} className="field h-9 text-xs w-auto">
-            <option value="">Todos los vendedores</option>
-            {VENDEDORES.map((v) => <option key={v.uid} value={v.uid}>{v.displayName}</option>)}
-          </select>
-        )}
-      </div>
-
-      {/* Mobile column tabs */}
-      <div className="lg:hidden px-4 sm:px-6 mb-2 flex gap-1.5 overflow-x-auto">
-        {COLUMNS.map((c) => {
-          const n = byColumn.columns.get(c.id)?.length ?? 0;
-          return (
-            <button key={c.id} onClick={() => scrollToCol(c.id)} className={'shrink-0 rounded-full px-3 py-1 text-[11px] uppercase tracking-display border ' + (activeCol === c.id ? 'bg-charcoal-900 text-cream-50 border-charcoal-900' : 'bg-white text-charcoal-500 border-charcoal-200')}>
-              {c.short} <span className="opacity-70">{n}</span>
-            </button>
-          );
-        })}
       </div>
 
       {loading && <p className="px-4 sm:px-6 text-sm text-charcoal-300">Cargando…</p>}

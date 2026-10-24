@@ -183,7 +183,7 @@ function ProduccionIA({ uid, onDone }: { uid: string; onDone: (msg: string) => v
   return (
     <div className="max-w-2xl">
       <div className="card p-4 mb-4">
-        <p className="text-sm text-charcoal-700 mb-2">Pegá el reporte de la fábrica (WhatsApp, planilla, lo que sea). La IA lo convierte en líneas producto · formato · cantidad; vos revisás y confirmás. La carga se registra <strong>en Bsale</strong> y la app se sincroniza.</p>
+        <p className="text-sm text-charcoal-700 mb-2">Pegue el reporte de la fábrica (WhatsApp, planilla, lo que sea). La IA lo convierte en líneas producto · formato · cantidad; usted revisa y confirma. La carga se registra <strong>en Bsale</strong> y la app se sincroniza.</p>
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={7} placeholder="Ej: salieron 20 kg de longaniza chillán granel, 60 sachet de jamón cocido…" className="field h-auto py-3 text-sm resize-y" />
         <div className="flex items-center gap-2 mt-3 flex-wrap">
           <Button onClick={interpret} disabled={busy || text.trim().length < 3} className="flex-1">{busy && !lines ? 'Interpretando…' : 'Interpretar con IA'}</Button>

@@ -1,3 +1,4 @@
+import NewOrderTabs from '@/components/orders/NewOrderTabs';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '@/components/ui/Button';
@@ -129,11 +130,8 @@ export default function NuevoPedido() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <header className="mb-6 flex items-end justify-between">
-        <div>
-          <p className="eyebrow">{isTienda ? 'Tienda' : 'Vendedor'}</p>
-          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">{isTienda ? 'Pedir reposición' : 'Nuevo pedido'}</h1>
-        </div>
+      <header className="mb-4 flex items-end justify-between">
+        <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">{isTienda ? 'Pedir reposición' : 'Nuevo pedido'}</h1>
         <button
           onClick={() => { if (confirm('¿Descartar borrador?')) { clearDraft(uid); setDraft(emptyDraft(settings.cutoffHour)); } }}
           className="text-[11px] uppercase tracking-display text-charcoal-300 hover:text-charcoal-700"
@@ -141,6 +139,8 @@ export default function NuevoPedido() {
           Descartar
         </button>
       </header>
+
+      {!isTienda && <NewOrderTabs active="manual" />}
 
       <Steps current={draft.step} onGo={goto} />
 
@@ -408,7 +408,7 @@ function StepProductos({
       <SelectedLines lines={lines} onRemove={(l) => onLines(lines.filter((x) => lineKey(x) !== lineKey(l)))} />
 
 
-      <div className="flex gap-2 pt-2 sticky bottom-0 bg-cream-50 py-3 border-t border-charcoal-100">
+      <div className="flex gap-2 pt-2 sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] lg:bottom-0 bg-cream-50 py-3 border-t border-charcoal-100 z-10">
         <Button variant="secondary" onClick={onBack} className="flex-1">Volver</Button>
         <Button onClick={onNext} disabled={lines.length === 0} className="flex-1">
           Siguiente ({lines.length} {lines.length === 1 ? 'línea' : 'líneas'})

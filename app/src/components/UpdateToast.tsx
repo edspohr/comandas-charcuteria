@@ -14,7 +14,7 @@ export default function UpdateToast() {
   if (!needRefresh) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-40 card p-4 border-brass-500 bg-cream-50 shadow-lift">
+    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] lg:bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-40 card p-4 border-brass-500 bg-cream-50 shadow-lift">
       <p className="eyebrow">Actualización disponible</p>
       <p className="text-sm text-charcoal-700 mt-1 mb-3">
         Hay una versión nueva de Comandas. Recargue para verla.

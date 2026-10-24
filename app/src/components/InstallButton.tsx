@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import Button from '@/components/ui/Button';
 import { promptInstall, useInstallMode } from '@/lib/install';
+import { Icon } from '@/components/ui/Icon';
 
 // Botón fijo "Instalar app" (encabezado, barra lateral y login). En Android y
 // computador abre la instalación del navegador; en iPhone/iPad explica los
 // dos pasos de Safari. Desaparece cuando la app ya está instalada.
-export default function InstallButton({ className = '' }: { className?: string }) {
+export default function InstallButton({ className = '', variant = 'pill' }: { className?: string; variant?: 'pill' | 'menu' }) {
   const mode = useInstallMode();
   const [help, setHelp] = useState(false);
   if (mode === 'hidden') return null;
@@ -15,10 +16,13 @@ export default function InstallButton({ className = '' }: { className?: string }
   }
   return (
     <>
-      <button onClick={click} className={'inline-flex items-center gap-1.5 text-[11px] uppercase tracking-display rounded-md px-2.5 py-1.5 transition border border-brass-500/60 text-brass-300 hover:text-cream-50 hover:border-brass-300 ' + className} aria-label="Instalar Comandas como app">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14" /></svg>
-        Instalar app
-      </button>
+      {variant === 'menu' ? (
+        <button onClick={click} className={className}><Icon name="download" size={18} className="text-brass-600" /> Instalar app en este teléfono</button>
+      ) : (
+        <button onClick={click} className={'inline-flex items-center gap-1.5 text-[11px] uppercase tracking-display rounded-md px-2.5 py-1.5 transition border border-brass-500/60 text-brass-300 hover:text-cream-50 hover:border-brass-300 ' + className} aria-label="Instalar Comandas como app">
+          <Icon name="download" size={14} /> Instalar app
+        </button>
+      )}
       {help && (
         <div className="fixed inset-0 z-[70] bg-charcoal-900/60 flex items-end sm:items-center justify-center p-4" onClick={() => setHelp(false)} role="dialog" aria-label="Instalar Comandas">
           <div className="w-full max-w-sm bg-cream-50 text-charcoal-800 rounded-xl shadow-lift p-5 space-y-3" onClick={(e) => e.stopPropagation()}>

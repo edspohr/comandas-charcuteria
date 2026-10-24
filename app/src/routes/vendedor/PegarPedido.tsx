@@ -1,3 +1,4 @@
+import NewOrderTabs from '@/components/orders/NewOrderTabs';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '@/components/ui/Button';
@@ -199,11 +200,11 @@ export default function PegarPedido() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <header className="mb-6">
-        <p className="eyebrow">Vendedor · pedido + cliente en un paso</p>
-        <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Pedido IA</h1>
-        <p className="text-xs text-charcoal-300 mt-1">Pegá el mensaje del cliente tal como llegó por WhatsApp. La IA identifica <strong className="text-charcoal-500">el pedido</strong> (productos, formatos, cantidades) y <strong className="text-charcoal-500">al cliente</strong>: si ya existe lo reconoce por nombre, RUT o teléfono; si es nuevo, propone crearlo con los datos del mensaje. Vos revisás antes de continuar.</p>
+      <header className="mb-4">
+        <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Nuevo pedido</h1>
       </header>
+      <NewOrderTabs active="ia" />
+      <p className="text-xs text-charcoal-500 mb-4">Pegue el mensaje del cliente tal como llegó por WhatsApp. La IA identifica <strong className="text-charcoal-700">el pedido</strong> (productos, formatos, cantidades, muestras) y <strong className="text-charcoal-700">al cliente</strong>: si ya existe lo reconoce por nombre, RUT o teléfono; si es nuevo, propone crearlo con los datos del mensaje. Usted revisa antes de continuar.</p>
 
       <div className="card p-4 mb-4">
         <textarea

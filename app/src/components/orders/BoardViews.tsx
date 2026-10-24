@@ -25,7 +25,7 @@ export function SummaryStrip({ byColumn, toneOf, showMoney, active, onPick }: {
   byColumn: Map<ColumnId, Order[]>; toneOf: (o: Order) => ToneInfo; showMoney: boolean; active: ColumnId | null; onPick: (c: ColumnId | null) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+    <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1 sm:grid sm:grid-cols-5 sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0">
       {COLUMNS.map((c) => {
         const list = byColumn.get(c.id) ?? [];
         const red = list.filter((o) => toneOf(o).tone === 'red').length;
@@ -35,7 +35,7 @@ export function SummaryStrip({ byColumn, toneOf, showMoney, active, onPick }: {
         const on = active === c.id;
         return (
           <button key={c.id} onClick={() => onPick(on ? null : c.id)} aria-pressed={on}
-            className={'text-left rounded-lg border px-3 py-2 transition ' + (on ? 'border-charcoal-900 bg-white shadow-soft' : 'border-charcoal-100 bg-white/60 hover:border-charcoal-300')}>
+            className={'shrink-0 min-w-[7.25rem] sm:min-w-0 text-left rounded-lg border px-3 py-2 transition ' + (on ? 'border-charcoal-900 bg-white shadow-soft' : 'border-charcoal-100 bg-white/60 hover:border-charcoal-300')}>
             <p className="text-[10px] uppercase tracking-display text-charcoal-300 font-semibold">{c.label}</p>
             <p className="text-xl font-semibold text-charcoal-900 tabular-nums leading-tight">{list.length}</p>
             <p className="text-[11px] text-charcoal-500 tabular-nums truncate">

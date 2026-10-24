@@ -310,7 +310,7 @@ export default function DetalleArmado() {
       )}
 
       {canPack && (
-        <div className="mt-5 sticky bottom-0 bg-cream-50 border-t border-charcoal-100 pt-4 pb-2">
+        <div className="mt-5 sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] lg:bottom-0 bg-cream-50 border-t border-charcoal-100 pt-4 pb-2 z-10">
           <Button
             onClick={done}
             disabled={submitting || !anyPacked || missingReasons}

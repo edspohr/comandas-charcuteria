@@ -1,3 +1,4 @@
+import { Icon } from '@/components/ui/Icon';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -11,7 +12,7 @@ import { useCurrentUser } from '@/data/auth';
 import { useClients } from '@/data/clients';
 import { useSettings } from '@/data/settings';
 import { useUsers } from '@/data/users';
-import { ROLE_LABEL, can, isSeller } from '@/domain/permissions';
+import { can, isSeller } from '@/domain/permissions';
 import { clientRows, rangeFor, HEALTH_LABEL, DEFAULT_CLIENT_HEALTH, type ClientHealth, type ClientRow } from '@/domain/analytics';
 import { formatDateShort } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
@@ -74,22 +75,24 @@ export default function Clientes() {
 
   return (
     <div>
-      <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <p className="eyebrow">{ROLE_LABEL[role]}</p>
+      <header className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Clientes</h1>
-          <p className="text-xs text-charcoal-300 mt-1">{filtered.length} de {rows.length} · datos desde Bsale · salud según pedidos de los últimos 90 días · toque una fila para ver el detalle</p>
+          <p className="text-xs text-charcoal-300 mt-1">{filtered.length} de {rows.length} · datos desde Bsale · salud según los últimos 90 días</p>
         </div>
-        {can(role, 'client.quickCreate') && <Button size="sm" onClick={() => setCreating(true)}>+ Nuevo cliente</Button>}
+        {can(role, 'client.quickCreate') && <Button size="sm" onClick={() => setCreating(true)} className="shrink-0"><Icon name="plus" size={14} /> Cliente</Button>}
       </header>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, razón social, RUT o dirección" className="field h-9 text-sm w-full sm:w-72" />
-        <div className="flex flex-wrap gap-1.5">
+      <div className="mb-3 space-y-2">
+        <label className="relative block sm:max-w-sm">
+          <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-300" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, razón social, RUT o dirección" className="field h-10 text-sm pl-9 w-full" />
+        </label>
+        <div className="flex gap-1.5 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
           <Chip active={filter === 'todos'} onClick={() => setFilter('todos')}>Todos</Chip>
           <Chip active={filter === 'cartera'} onClick={() => setFilter('cartera')}>Mi cartera</Chip>
-          <Chip active={filter === 'riesgo'} onClick={() => setFilter('riesgo')}>En riesgo / inactivos{riskCount > 0 && <span className="ml-1 rounded-full bg-brass-100 text-brass-700 px-1.5">{riskCount}</span>}</Chip>
-          <Chip active={filter === 'revision'} onClick={() => setFilter('revision')}>Pendientes de revisión{reviewCount > 0 && <span className="ml-1 rounded-full bg-brass-100 text-brass-700 px-1.5">{reviewCount}</span>}</Chip>
+          <Chip active={filter === 'riesgo'} onClick={() => setFilter('riesgo')}>En riesgo{riskCount > 0 && <span className="ml-1 rounded-full bg-brass-100 text-brass-700 px-1.5">{riskCount}</span>}</Chip>
+          <Chip active={filter === 'revision'} onClick={() => setFilter('revision')}>Por revisar{reviewCount > 0 && <span className="ml-1 rounded-full bg-brass-100 text-brass-700 px-1.5">{reviewCount}</span>}</Chip>
         </div>
       </div>
 
@@ -160,7 +163,7 @@ function ClientDetail({ client, row, habituales, onEdit }: { client: Client | un
 
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} className={'rounded-md px-2.5 py-1.5 text-[11px] uppercase tracking-display font-medium border transition ' + (active ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-500 hover:border-charcoal-300')}>
+    <button onClick={onClick} className={'shrink-0 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[11px] uppercase tracking-display font-medium border transition ' + (active ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-500 hover:border-charcoal-300')}>
       {children}
     </button>
   );

@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { Icon } from '@/components/ui/Icon';
+import { photoToJpegBase64 } from '@/lib/image';
 import Button from '@/components/ui/Button';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import DataTable, { Pill } from '@/components/ui/DataTable';
@@ -47,8 +49,7 @@ export default function Produccion() {
     <div>
       <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <p className="eyebrow">Producción</p>
-          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">{tab === 'demanda' ? 'Demanda vs. stock Bsale' : tab === 'registrar' ? 'Registrar producción' : 'Producción IA'}</h1>
+          <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">{tab === 'demanda' ? 'Demanda vs. stock Bsale' : tab === 'registrar' ? 'Registrar producción' : 'Registrar con foto o texto'}</h1>
           <p className="text-xs text-charcoal-300 mt-1">
             La producción terminada se carga en Bsale. {sync?.at ? `Última sincronización ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}.` : 'Aún sin sincronizar.'}
           </p>
@@ -57,7 +58,7 @@ export default function Produccion() {
       </header>
 
       <nav className="mb-4 flex gap-1 border-b border-charcoal-100">
-        {([['demanda', `Demanda y stock${urgentCount ? ` · ${urgentCount} a producir` : ''}`], ...(canReceive ? [['registrar', 'Registrar producción'], ['ia', 'Producción IA']] : [])] as Array<[Tab, string]>).map(([t, label]) => (
+        {([['demanda', `Demanda y stock${urgentCount ? ` · ${urgentCount} a producir` : ''}`], ...(canReceive ? [['ia', 'Foto o texto (IA)'], ['registrar', 'Registrar a mano']] : [])] as Array<[Tab, string]>).map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} className={'px-4 py-2.5 text-xs uppercase tracking-display font-medium border-b-2 transition -mb-px ' + (t === tab ? 'border-brass-500 text-charcoal-900' : 'border-transparent text-charcoal-300 hover:text-charcoal-500')}>{label}</button>
         ))}
       </nav>
@@ -128,6 +129,8 @@ interface StockLine { productId: string; productName: string; formatId: string; 
 function ProduccionIA({ uid, onDone }: { uid: string; onDone: (msg: string) => void }) {
   const { products } = useProducts();
   const [text, setText] = useState('');
+  const [photo, setPhoto] = useState<{ base64: string; mimeType: 'image/jpeg'; dataUrl: string } | null>(null);
+  const camera = useRef<HTMLInputElement>(null);
   const [lines, setLines] = useState<StockLine[] | null>(null);
   const [engine, setEngine] = useState<'ai' | 'local' | null>(null);
   const [aiFallback, setAiFallback] = useState(false);
@@ -139,16 +142,27 @@ function ProduccionIA({ uid, onDone }: { uid: string; onDone: (msg: string) => v
     .filter((l) => l.status !== 'not_found')
     .map((l) => ({ productId: l.productId ?? '', productName: l.productName ?? '', formatId: l.formatId ?? '', formatLabel: l.formatLabel ?? '', unit: l.unit ?? 'unidad', qty: l.qty ?? 0, raw: l.raw, ok: l.status === 'verified' }));
 
+  async function takePhoto(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    try { setPhoto(await photoToJpegBase64(file)); setLines(null); } catch (e) { setError((e as Error).message); }
+  }
+
   async function interpret() {
-    if (busy || text.trim().length < 3) return;
+    if (busy || (text.trim().length < 3 && !photo)) return;
     setBusy(true); setError(null); setEngine(null); setAiFallback(false);
     let usedFallback = false;
     try {
       if (geminiEnabled()) {
         try {
-          const remote = await parseWithGemini(text, products);
+          const remote = await parseWithGemini(text, products, photo ?? undefined);
           if (remote.length > 0) { setLines(toLines(remote)); setEngine('ai'); return; }
         } catch (e) { console.warn('[produccion-ia] Gemini failed, local fallback', e); usedFallback = true; }
+      }
+      if (photo && text.trim().length < 3) {
+        // The local parser can't read photos.
+        setError(usedFallback ? 'La IA no está disponible en este momento: no se pudo leer la foto. Escriba las cantidades o intente de nuevo en unos minutos.' : 'No se identificaron productos en la foto. Tome otra con mejor luz y la planilla completa, o escriba las cantidades.');
+        return;
       }
       setLines(toLines(parseLocal(text, products)));
       setEngine('local');
@@ -183,13 +197,28 @@ function ProduccionIA({ uid, onDone }: { uid: string; onDone: (msg: string) => v
   return (
     <div className="max-w-2xl">
       <div className="card p-4 mb-4">
-        <p className="text-sm text-charcoal-700 mb-2">Pegue el reporte de la fábrica (WhatsApp, planilla, lo que sea). La IA lo convierte en líneas producto · formato · cantidad; usted revisa y confirma. La carga se registra <strong>en Bsale</strong> y la app se sincroniza.</p>
+        <p className="text-sm text-charcoal-700 mb-3">Fotografíe la planilla de producción o pegue el reporte (WhatsApp, lo que sea). La IA lo convierte en líneas producto · formato · cantidad; usted revisa y confirma. La carga se registra <strong>en Bsale</strong> y la app se sincroniza.</p>
+        <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { void takePhoto(e.target.files?.[0]); e.target.value = ''; }} />
+        <Button onClick={() => camera.current?.click()} disabled={busy} className="w-full mb-3" variant={photo ? 'secondary' : 'primary'}>
+          <Icon name="camera" size={18} /> {photo ? 'Tomar otra foto' : 'Fotografiar planilla'}
+        </Button>
+        {photo && (
+          <div className="mb-3 flex items-start gap-3">
+            <img src={photo.dataUrl} alt="Foto de la planilla" className="w-28 h-28 object-cover rounded-md border border-charcoal-100" />
+            <div className="text-xs text-charcoal-500 space-y-1">
+              <p>Foto lista. Puede agregar texto abajo si quiere aclarar algo.</p>
+              <button onClick={() => setPhoto(null)} className="underline hover:text-red-700">Quitar foto</button>
+            </div>
+          </div>
+        )}
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={7} placeholder="Ej: salieron 20 kg de longaniza chillán granel, 60 sachet de jamón cocido…" className="field h-auto py-3 text-sm resize-y" />
         <div className="flex items-center gap-2 mt-3 flex-wrap">
-          <Button onClick={interpret} disabled={busy || text.trim().length < 3} className="flex-1">{busy && !lines ? 'Interpretando…' : 'Interpretar con IA'}</Button>
+          <Button onClick={interpret} disabled={busy || (text.trim().length < 3 && !photo)} className="flex-1">{busy && !lines ? (photo ? 'Leyendo la foto…' : 'Interpretando…') : photo ? 'Leer foto con IA' : 'Interpretar con IA'}</Button>
           <Button variant="ghost" size="sm" onClick={() => setText(SAMPLE)} disabled={busy}>Cargar texto de ejemplo</Button>
         </div>
       </div>
+
+      {error && !lines && <div className="mb-3 rounded-md bg-red-50 border border-red-200 text-red-800 p-3 text-sm">{error}</div>}
 
       {aiFallback && (
         <div className="mb-3 rounded-md bg-brass-50 border border-brass-300 text-brass-700 px-3 py-2 text-xs">

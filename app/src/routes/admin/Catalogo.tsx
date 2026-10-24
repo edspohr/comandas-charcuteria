@@ -3,7 +3,7 @@ import { db } from '@/data/firebase';
 import { useCurrentUser } from '@/data/auth';
 import { can } from '@/domain/permissions';
 import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import CruceBsale from '@/components/catalog/CruceBsale';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import DataTable, { Pill } from '@/components/ui/DataTable';
@@ -84,13 +84,11 @@ function CatalogoStock() {
     <div>
       <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <p className="eyebrow">Administración</p>
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Catálogo</h1>
           <p className="text-xs text-charcoal-300 mt-1">
-            {products.length} productos · {rows.length} formatos · stock según Bsale{sync?.at ? ` (sincronizado ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })})` : ''} · los ajustes se hacen en Bsale · toque una fila para ver la bitácora
+            {products.length} productos · {rows.length} formatos · stock según Bsale{sync?.at ? ` (sincronizado ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })})` : ''} · los ajustes se hacen en Bsale
           </p>
         </div>
-        <Link to="/clientes" className="text-[11px] uppercase tracking-display text-charcoal-500 hover:text-charcoal-900 border border-charcoal-200 rounded-md px-3 py-1.5">Clientes →</Link>
       </header>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -115,7 +113,7 @@ function CatalogoStock() {
               <p className="text-[10px] uppercase tracking-display text-charcoal-300">{categoryLabel(r.product.category)}{r.product.discontinued ? ' · discontinuado' : ''}{!r.product.active ? ' · inactivo' : ''}</p>
               {editable && (
                 <label className="mt-1 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-display text-charcoal-500" onClick={(e) => e.stopPropagation()}>
-                  <input type="checkbox" checked={r.product.sellable !== false} onChange={(e) => void setSellable(r.product.id, e.target.checked)} /> Se ofrece en pedidos
+                  <input type="checkbox" checked={r.product.sellable !== false} onChange={(e) => void setSellable(r.product.id, e.target.checked)} /> En pedidos
                 </label>
               )}
             </div>

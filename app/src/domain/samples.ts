@@ -130,3 +130,28 @@ export function sampleRows(orders: Order[], feedback: SampleFeedback[], purchase
   }
   return rows.sort((a, b) => (b.deliveredAt ?? 0) - (a.deliveredAt ?? 0));
 }
+
+// KPI de muestras (reunión 20-10): kilos de muestra por cliente nuevo
+// conseguido. Cliente nuevo = no había comprado antes de su primera muestra
+// y compra cualquier producto dentro de los 60 días siguientes.
+export interface NewClientWon { clientId: string; clientName: string; sellerUid: string; firstSampleAt: number; firstPurchaseAt: number; ref: string }
+
+export function newClientsWon(rows: SampleRow[], purchases: Purchase[]): NewClientWon[] {
+  const firstSample = new Map<string, SampleRow>();
+  for (const r of rows) {
+    const at = r.deliveredAt ?? r.createdAt;
+    const cur = firstSample.get(r.clientId);
+    if (!cur || at < (cur.deliveredAt ?? cur.createdAt)) firstSample.set(r.clientId, r);
+  }
+  const byClient = new Map<string, Purchase[]>();
+  for (const p of purchases) { const l = byClient.get(p.clientId) ?? []; l.push(p); byClient.set(p.clientId, l); }
+  const out: NewClientWon[] = [];
+  for (const [clientId, r] of firstSample) {
+    const at = r.deliveredAt ?? r.createdAt;
+    const list = (byClient.get(clientId) ?? []).filter((p) => p.ref !== r.orderId);
+    if (list.some((p) => p.at < at)) continue; // already a client
+    const first = list.filter((p) => p.at >= at && p.at <= at + SAMPLE_CONVERSION_DAYS * DAY).sort((a, b) => a.at - b.at)[0];
+    if (first) out.push({ clientId, clientName: r.clientName, sellerUid: r.sellerUid, firstSampleAt: at, firstPurchaseAt: first.at, ref: first.ref });
+  }
+  return out;
+}

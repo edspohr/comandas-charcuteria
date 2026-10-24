@@ -110,8 +110,7 @@ export default function Panel({ embedded = false }: { embedded?: boolean } = {})
     <div>
       <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
         <div>
-          {!embedded && <p className="eyebrow">Gerencia</p>}
-          {!embedded && <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Panel de dueños</h1>}
+          {!embedded && <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Panel de pedidos</h1>}
           <p className="text-xs text-charcoal-300 mt-1">Pedidos por fecha solicitada · {rangeLabel} {prevLabel}{sync?.at ? ` · stock Bsale ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}` : ''}</p>
         </div>
         <div className="flex items-center gap-1.5">

@@ -80,7 +80,7 @@ export default function Usuarios() {
     <div>
       <header className="mb-4 flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <p className="eyebrow">{manage ? 'Super Administración' : 'Consulta'}</p>
+          {!manage && <p className="eyebrow">Consulta · solo lectura</p>}
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Usuarios</h1>
           <p className="text-xs text-charcoal-300 mt-1">
             {users.filter((u) => u.active !== false && !u.placeholder).length} con cuenta{users.some((u) => u.placeholder && !u.mergedInto) ? ` · ${users.filter((u) => u.placeholder && !u.mergedInto).length} sin cuenta (historial WhatsApp)` : ''} · {byRole.filter(([, n]) => n > 0).map(([r, n]) => `${n} ${ROLE_LABEL[r].toLowerCase()}`).join(' · ')}

@@ -135,13 +135,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-export async function parseWithGemini(text: string, products: Product[]): Promise<ParsedLine[]> {
-  return (await parseWithGeminiFull(text, products)).lines;
+export interface InlineImage { base64: string; mimeType: string }
+
+export async function parseWithGemini(text: string, products: Product[], image?: InlineImage): Promise<ParsedLine[]> {
+  return (await parseWithGeminiFull(text, products, image)).lines;
 }
 
 export interface GeminiFullResult { lines: ParsedLine[]; client: ClientHints | null; }
 
-export async function parseWithGeminiFull(text: string, products: Product[]): Promise<GeminiFullResult> {
+// `image`: photo of a handwritten or printed sheet (Producción: Yuri's
+// planilla). Gemini reads its rows with the same catalog and schema.
+export async function parseWithGeminiFull(text: string, products: Product[], image?: InlineImage): Promise<GeminiFullResult> {
   const manifest = buildCatalogManifest(products);
   const prompt = [
     'Catálogo disponible (productId | nombre | formatId | etiqueta formato | unidad | aliases):',
@@ -151,12 +155,16 @@ export async function parseWithGeminiFull(text: string, products: Product[]): Pr
     'Regla: si el texto no mapea a ningún producto del catálogo, no incluyas esa línea.',
     'Además, si el mensaje revela quién pide (nombre del local, razón social, RUT, teléfono, dirección, horario, retiro/despacho), completá el bloque client; si no, dejalo en null.',
     '',
+    ...(image ? ['Se adjunta una FOTO (planilla de producción o pedido, impresa o escrita a mano). Leé cada fila con producto y cantidad; si una cifra no se lee con seguridad, marcá confidence "review". El texto, si hay, complementa la foto.', ''] : []),
     'Mensaje:',
-    text,
+    text || '(sin texto: interpretá la foto)',
   ].join('\n');
 
   const model = getModel();
-  const raw = await withTimeout(model.generateContent(prompt), TIMEOUT_MS);
+  const raw = await withTimeout(
+    image ? model.generateContent([prompt, { inlineData: { mimeType: image.mimeType, data: image.base64 } }]) : model.generateContent(prompt),
+    image ? TIMEOUT_MS * 3 : TIMEOUT_MS,
+  );
   const jsonText = raw.response.text();
   const parsed = JSON.parse(jsonText) as GeminiParsed;
   const productById = new Map(products.map((p) => [p.id, p]));

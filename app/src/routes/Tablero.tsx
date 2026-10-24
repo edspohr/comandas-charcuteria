@@ -455,7 +455,7 @@ function detailPath(o: Order, role: Role, uid: string): string {
 
 function Chip({ active, onClick, children, tone }: { active: boolean; onClick: () => void; children: React.ReactNode; tone?: 'red' }) {
   return (
-    <button onClick={onClick} className={'rounded-md px-2.5 py-1.5 text-[11px] uppercase tracking-display font-medium border transition ' + (active ? (tone === 'red' ? 'bg-red-700 border-red-700 text-white' : 'bg-charcoal-900 border-charcoal-900 text-cream-50') : 'bg-white border-charcoal-200 text-charcoal-500 hover:border-charcoal-300')}>
+    <button onClick={onClick} className={'shrink-0 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[11px] uppercase tracking-display font-medium border transition ' + (active ? (tone === 'red' ? 'bg-red-700 border-red-700 text-white' : 'bg-charcoal-900 border-charcoal-900 text-cream-50') : 'bg-white border-charcoal-200 text-charcoal-500 hover:border-charcoal-300')}>
       {children}
     </button>
   );

@@ -29,7 +29,7 @@ export default function Bsale() {
   return (
     <div>
       <header className="mb-4">
-        <p className="eyebrow">Super Administración · modo {BSALE_MODE === 'real' ? 'Bsale real' : 'Bsale simulado'}</p>
+        <p className="eyebrow">{BSALE_MODE === 'real' ? 'Bsale real' : 'Bsale simulado'}</p>
         <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Bsale</h1>
       </header>
       <nav className="mb-4 flex gap-1 border-b border-charcoal-100">

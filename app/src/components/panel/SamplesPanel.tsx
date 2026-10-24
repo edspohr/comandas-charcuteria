@@ -3,7 +3,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@/data/firebase';
 import { useSampleFeedback } from '@/data/samples';
 import { useUsers } from '@/data/users';
-import { purchasesFromOrders, sampleRows, SAMPLE_CONVERSION_DAYS, SAMPLE_FOLLOWUP_DAYS, SAMPLE_RESULT_LABEL, type Purchase, type SampleRow } from '@/domain/samples';
+import { newClientsWon, purchasesFromOrders, sampleRows, SAMPLE_CONVERSION_DAYS, SAMPLE_FOLLOWUP_DAYS, SAMPLE_RESULT_LABEL, type Purchase, type SampleRow } from '@/domain/samples';
 import { formatCLP } from '@/lib/pricing';
 import type { Order } from '@/domain/types';
 import { Metric, Table } from './PanelUI';
@@ -49,7 +49,17 @@ export default function SamplesPanel({ extraPurchases = [], costOf }: { extraPur
   const cost = costs.reduce<number>((s, c) => s + (c ?? 0), 0);
   const costKnown = costs.filter((c) => c != null).length;
 
-  const bySeller = useMemo(() => group(delivered, (r) => r.sellerUid, (r) => nameOf(r.sellerUid) || 'Sin vendedor', costOf), [delivered, nameOf, costOf]);
+  // Prior purchases count even before the range, so use the whole history.
+  const won = useMemo(() => newClientsWon(all, purchases).filter((w) => w.firstSampleAt >= from), [all, purchases, from]);
+  const kgPerNew = won.length ? kg / won.length : null;
+  const costPerNew = won.length && costOf && costKnown ? cost / won.length : null;
+  const wonBySeller = new Map<string, number>(); for (const w of won) wonBySeller.set(w.sellerUid, (wonBySeller.get(w.sellerUid) ?? 0) + 1);
+  const bySeller = useMemo(() => group(delivered, (r) => r.sellerUid, (r) => nameOf(r.sellerUid) || 'Sin vendedor', costOf).map((g) => {
+    const nuevos = wonBySeller.get(g.key) ?? 0;
+    const kgS = delivered.filter((r) => r.sellerUid === g.key).reduce((t, r) => t + r.kg, 0);
+    return { ...g, nuevos, kgPorNuevo: nuevos ? kgS / nuevos : null };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [delivered, nameOf, costOf, won]);
   const byProduct = useMemo(() => group(delivered, (r) => r.productId, (r) => r.productName, costOf), [delivered, costOf]);
   const detail = rows.map((r) => ({
     ...r, seller: nameOf(r.sellerUid) || '—', delivered: dShort(r.deliveredAt),
@@ -73,9 +83,14 @@ export default function SamplesPanel({ extraPurchases = [], costOf }: { extraPur
         <Metric label="Conversión" value={pct(converted.length, delivered.length)} sub={`${converted.length} de ${delivered.length}`} />
         <Metric label="Venta generada" value={formatCLP(revenue)} sub={cost ? `${(revenue / cost).toLocaleString('es-CL', { maximumFractionDigits: 1 })}× el costo` : undefined} />
       </div>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+        <Metric label="Clientes nuevos conseguidos" value={won.length} sub={`no compraban y compraron ≤ ${SAMPLE_CONVERSION_DAYS} días tras la muestra`} />
+        <Metric label="Kg de muestra por cliente nuevo" value={kgPerNew == null ? '—' : `${kgPerNew.toLocaleString('es-CL', { maximumFractionDigits: 2 })} kg`} sub="kilos regalados ÷ clientes nuevos" />
+        <Metric label="Costo por cliente nuevo" value={costPerNew == null ? '—' : formatCLP(Math.round(costPerNew))} sub={costOf ? 'a costo promedio Bsale' : 'con Bsale real'} />
+      </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <Table title="Por vendedor" rows={bySeller} export={{ name: 'muestras-por-vendedor', rows: bySeller }}
-          cols={[['name', 'Vendedor'], ['n', 'Entregadas'], ['followed', 'Seguidas', (v, r) => pct(v as number, r.due as number)], ['conv', 'Convertidas', (v, r) => pct(v as number, r.n as number)], ['revenue', 'Venta', (v) => formatCLP(v as number)], ['cost', 'Costo', (v) => (v == null ? '—' : formatCLP(v as number))]]} />
+          cols={[['name', 'Vendedor'], ['n', 'Entregadas'], ['nuevos', 'Clientes nuevos'], ['kgPorNuevo', 'Kg por nuevo', (v) => (v == null ? '—' : `${(v as number).toLocaleString('es-CL', { maximumFractionDigits: 2 })} kg`)], ['followed', 'Seguidas', (v, r) => pct(v as number, r.due as number)], ['conv', 'Convertidas', (v, r) => pct(v as number, r.n as number)], ['revenue', 'Venta', (v) => formatCLP(v as number)], ['cost', 'Costo', (v) => (v == null ? '—' : formatCLP(v as number))]]} />
         <Table title="Por producto" rows={byProduct} export={{ name: 'muestras-por-producto', rows: byProduct }}
           cols={[['name', 'Producto'], ['n', 'Entregadas'], ['liked', 'Les gustó'], ['conv', 'Convertidas', (v, r) => pct(v as number, r.n as number)], ['revenue', 'Venta', (v) => formatCLP(v as number)]]} />
       </div>

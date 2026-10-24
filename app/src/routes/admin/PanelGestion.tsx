@@ -105,7 +105,6 @@ function Gestion() {
     <div>
       <header className="mb-3 flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <p className="eyebrow">Gerencia</p>
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Panel de gestión</h1>
           <p className="text-xs text-charcoal-300 mt-1">
             Ventas de Bsale (facturas + boletas − notas de crédito, neto) · {fmtRange(range)}
@@ -115,7 +114,7 @@ function Gestion() {
       </header>
 
       {tab !== 'pedidos' && (
-        <div className="card p-3 mb-3 flex flex-wrap items-center gap-2 lg:sticky lg:top-0 lg:z-10">
+        <div className="card p-3 mb-3 flex flex-wrap items-center gap-2 lg:sticky lg:top-0 lg:z-10 [&>select]:flex-1 sm:[&>select]:flex-none">
           <Seg value={period} onChange={setPeriod} options={(Object.keys(PERIOD_LABEL) as PeriodKey[]).map((k) => [k, PERIOD_LABEL[k]])} />
           <select className="field h-9 text-xs w-auto" value={compare} onChange={(e) => setCompare(e.target.value as CompareMode)} aria-label="Comparar con">
             <option value="anio">vs. año anterior</option>
@@ -658,9 +657,9 @@ function DetailDrawer({ detail, onClose, ...c }: Ctx & { detail: NonNullable<Det
 
 function Seg<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: Array<[T, string]> }) {
   return (
-    <div className="inline-flex flex-wrap rounded-md border border-charcoal-200 overflow-hidden">
+    <div className="inline-flex max-w-full overflow-x-auto rounded-md border border-charcoal-200">
       {options.map(([k, label]) => (
-        <button key={k} onClick={() => onChange(k)} className={'px-2.5 py-1.5 text-[11px] uppercase tracking-display font-medium transition ' + (value === k ? 'bg-charcoal-900 text-cream-50' : 'bg-white text-charcoal-500 hover:bg-cream-100')}>{label}</button>
+        <button key={k} onClick={() => onChange(k)} className={'shrink-0 whitespace-nowrap px-2.5 py-1.5 text-[11px] uppercase tracking-display font-medium transition ' + (value === k ? 'bg-charcoal-900 text-cream-50' : 'bg-white text-charcoal-500 hover:bg-cream-100')}>{label}</button>
       ))}
     </div>
   );

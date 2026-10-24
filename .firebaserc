@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "comandas-charcuteria"
+    "default": "comandas-charcuteria",
+    "staging": "comandas-staging"
   }
 }

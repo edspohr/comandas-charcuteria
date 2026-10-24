@@ -52,7 +52,8 @@ export default function DetalleArmado() {
   const shortOfStock = order?.lines.some((l) => l.pendingProductionQty > 0) ?? false;
   // Informative stock: a shortfall in Bsale doesn't stop packing.
   const anyPendingProduction = strictStock && shortOfStock;
-  const canTake = order && (!order.assignedPackerId || mine) && (order.status === 'confirmado' || order.status === 'confirmado_parcial') && !anyPendingProduction;
+  const pendingApproval = order?.approval?.status === 'pendiente';
+  const canTake = order && !pendingApproval && (!order.assignedPackerId || mine) && (order.status === 'confirmado' || order.status === 'confirmado_parcial') && !anyPendingProduction;
   const canPack = order && mine && order.status === 'en_armado' && !anyPendingProduction;
   const isDone = order && (order.status === 'armado' || order.status === 'facturado' || order.status === 'despachado' || order.status === 'entregado');
 
@@ -144,6 +145,12 @@ export default function DetalleArmado() {
           <Button onClick={take} className="w-full">
             {order.assignedPackerId ? 'Comenzar armado' : 'Tomar este pedido'}
           </Button>
+        </div>
+      )}
+
+      {pendingApproval && (
+        <div className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 p-3 text-sm mb-4">
+          Pedido con condición especial esperando la aprobación de Ciro: todavía no se arma. {order.approval?.reasons.join(' · ')}
         </div>
       )}
 

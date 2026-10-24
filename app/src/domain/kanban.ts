@@ -1,3 +1,4 @@
+import { awaitingApproval } from './exceptions';
 import type { KanbanThresholds, Order, OrderStatus, Role, StockDoc } from './types';
 import { DEFAULT_KANBAN_THRESHOLDS } from './types';
 import { orderHasCompromisedStock } from '@/data/stock';
@@ -56,6 +57,7 @@ export function cardTone(
     if (t === 'red' || (t === 'amber' && tone !== 'red')) tone = t;
   };
 
+  if (awaitingApproval(order)) bump('amber', 'Por aprobar');
   const open = order.status !== 'despachado';
   if (open && order.requestedDate < today) bump('red', 'Atrasado');
   if (orderHasCompromisedStock(order, stock)) bump('red', 'Stock comprometido');
@@ -80,7 +82,7 @@ export function cardTone(
 
 // ---------- Next action per role ----------
 
-export type ActionKind = 'take' | 'arm' | 'link' | 'transfer' | 'samples' | 'dispatch' | 'deliver' | 'anular' | 'none';
+export type ActionKind = 'take' | 'arm' | 'link' | 'transfer' | 'samples' | 'dispatch' | 'deliver' | 'anular' | 'approve' | 'none';
 
 export interface NextAction { kind: ActionKind; label: string; }
 
@@ -96,6 +98,12 @@ export function nextAction(order: Order, role: Role, uid: string, opts: { isShop
   const canCancel = (supervisor || (can(role, 'order.cancelOwn') && order.createdBy === uid));
   // Only strict stock blocks packing while production is pending.
   const anyPending = !!opts.strictStock && order.lines.some((l) => l.pendingProductionQty > 0);
+  // Exception waiting for Ciro: nobody packs it until it's approved.
+  if (awaitingApproval(order) && ['recibido', 'confirmado', 'confirmado_parcial'].includes(order.status)) {
+    if (can(role, 'order.approve')) return { kind: 'approve', label: 'Aprobar' };
+    if (canCancel) return { kind: 'anular', label: 'Anular' };
+    return { kind: 'none', label: '' };
+  }
   switch (order.status) {
     case 'recibido':
     case 'confirmado':

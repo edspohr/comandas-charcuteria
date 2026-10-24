@@ -185,6 +185,8 @@ service cloud.firestore {
           canPack()
           && resource.data.status in ['confirmado', 'confirmado_parcial', 'en_armado']
           && request.resource.data.status in ['en_armado', 'armado']
+          // Pedido con excepción: no se arma hasta que super administración lo aprueba.
+          && resource.data.get('approval', {}).get('status', '') != 'pendiente'
           && unchanged('createdBy') && unchanged('invoiceRef')
         )
         || (

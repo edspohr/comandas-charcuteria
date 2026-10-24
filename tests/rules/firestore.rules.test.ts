@@ -119,6 +119,13 @@ describe('reposición de tienda', () => {
     await assertFails(updateDoc(doc(as('u-rep', 'reparto'), 'clients', 'c-1'), { fantasyName: 'X' }));
   });
 
+  it('despacho cannot take an order waiting for approval; superAdmin approves it', async () => {
+    await seedOrder('PED-X', 'u-alice', { approval: { status: 'pendiente', reasons: ['Precio especial'], requestedBy: 'u-alice', requestedAt: 1 } });
+    await assertFails(updateDoc(doc(as('u-edu', 'despacho'), 'orders', 'PED-X'), { status: 'en_armado', assignedPackerId: 'u-edu' }));
+    await assertSucceeds(updateDoc(doc(as('u-ciro', 'superAdmin'), 'orders', 'PED-X'), { 'approval.status': 'aprobado' }));
+    await assertSucceeds(updateDoc(doc(as('u-edu', 'despacho'), 'orders', 'PED-X'), { status: 'en_armado', assignedPackerId: 'u-edu' }));
+  });
+
   it('a seller answers a sample follow-up only as themself', async () => {
     const alice = as('u-alice', 'vendedor');
     const fb = { id: 'PED-1__coppa__granel', orderId: 'PED-1', productId: 'coppa', formatId: 'granel', result: 'gusto', at: Date.now() };

@@ -17,7 +17,7 @@ import ErrorBanner from '@/components/ui/ErrorBanner';
 import SampleTag from '@/components/orders/SampleTag';
 import SampleFollowups from '@/components/orders/SampleFollowups';
 import { lineKey, sampleLabel } from '@/domain/samples';
-import { AnularDialog, DeliverDialog, DispatchDialog, TrasladoDialog, SalidaMuestrasDialog, VincularDocumentoDialog } from '@/components/orders/OrderDialogs';
+import { ApprovalDialog, AnularDialog, DeliverDialog, DispatchDialog, TrasladoDialog, SalidaMuestrasDialog, VincularDocumentoDialog } from '@/components/orders/OrderDialogs';
 import { COLUMNS, actionForDrop, cardTone, columnFor, nextAction, type ActionKind, type ColumnId, type Tone } from '@/domain/kanban';
 import { DEFAULT_KANBAN_THRESHOLDS, ORDER_STATUS_LABEL, type Order, type OrderStatus, type Role } from '@/domain/types';
 import { addDaysIso, formatDateShort, todayInSantiago } from '@/lib/format';
@@ -39,7 +39,7 @@ export default function Tablero() {
   const { current } = useCurrentUser();
   const role = current!.appUser.role;
   const uid = current!.appUser.uid;
-  const { sellers: VENDEDORES } = useUsers();
+  const { sellers: VENDEDORES, nameOf: nameOfUser } = useUsers();
   const isAdmin = can(role, 'order.cancelAny') || isReadOnly(role);
   const canSync = can(role, 'stock.sync');
   // Auto-refresh only for roles that act on the board; producción syncs by hand.
@@ -68,7 +68,7 @@ export default function Tablero() {
   }, []);
 
   // Flash from the wizard (pedido creado) or from DetalleArmado (armado ok).
-  const flash = location.state as null | { justCreated?: string; status?: OrderStatus; parcialLines?: Array<{ productName: string; formatLabel: string; missing: number }>; armadoOk?: string };
+  const flash = location.state as null | { justCreated?: string; status?: OrderStatus; parcialLines?: Array<{ productName: string; formatLabel: string; missing: number }>; armadoOk?: string; awaitingApproval?: boolean };
   const dismissFlash = () => navigate(location.pathname + location.search, { replace: true, state: null });
   useEffect(() => {
     if (!flash) return;
@@ -103,6 +103,7 @@ export default function Tablero() {
   const now = Date.now();
   const closedSince = now - thresholds.cerradoDias * 24 * 60 * 60 * 1000;
 
+  const pendingApproval = useMemo(() => orders.filter((o) => !o.archived && o.approval?.status === 'pendiente' && o.status !== 'anulado'), [orders]);
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return orders.filter((o) => {
@@ -163,6 +164,7 @@ export default function Tablero() {
         case 'link':
         case 'transfer':
         case 'samples':
+        case 'approve':
         case 'dispatch':
         case 'deliver':
         case 'anular':
@@ -236,11 +238,27 @@ export default function Tablero() {
       </header>
 
       {isSeller(role) && <div className="px-4 sm:px-6"><SampleFollowups uid={uid} /></div>}
+      {can(role, 'order.approve') && pendingApproval.length > 0 && (
+        <section className="mx-4 sm:mx-6 card p-4 mb-3 border-brass-300 bg-brass-50/40">
+          <p className="eyebrow mb-2">Pedidos por aprobar · {pendingApproval.length}</p>
+          <ul className="divide-y divide-charcoal-100">
+            {pendingApproval.map((o) => (
+              <li key={o.id} className="py-2 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-charcoal-900 truncate"><span className="font-mono text-[11px] text-charcoal-400">{o.id}</span> {o.clientSnapshot.fantasyName ?? o.clientSnapshot.name} · {nameOfUser(o.createdBy)}</p>
+                  <p className="text-[11px] text-brass-700 truncate">{o.approval?.reasons.join(' · ')}</p>
+                </div>
+                <Button size="sm" onClick={() => setDialog({ kind: 'approve', order: o })}>Revisar</Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {flash?.justCreated && (
         <div className="mx-4 sm:mx-6 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-3 relative pr-9">
           <button onClick={dismissFlash} className="absolute right-2 top-2 text-emerald-800/60 hover:text-emerald-900" aria-label="Cerrar">×</button>
-          Pedido <span className="font-mono">{flash.justCreated}</span> creado — estado <strong>{flash.status ? ORDER_STATUS_LABEL[flash.status] : ''}</strong>.
+          Pedido <span className="font-mono">{flash.justCreated}</span> creado — {flash.awaitingApproval ? <strong>esperando la aprobación de Ciro (no lo confirme al cliente todavía)</strong> : <>estado <strong>{flash.status ? ORDER_STATUS_LABEL[flash.status] : ''}</strong></>}.
           {flash.parcialLines && flash.parcialLines.length > 0 && (
             <ul className="mt-1 text-xs list-disc pl-4">{flash.parcialLines.map((p, i) => <li key={i}>{p.productName} · {p.formatLabel}: {p.missing} esperando stock</li>)}</ul>
           )}
@@ -397,6 +415,7 @@ export default function Tablero() {
       )}
 
       {dialog?.kind === 'transfer' && <TrasladoDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'approve' && <ApprovalDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'samples' && <SalidaMuestrasDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'link' && <VincularDocumentoDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} onDeferDispatch={can(role, 'order.invoiceLate') ? () => setDialog({ kind: 'dispatch', order: dialog.order, defer: true }) : undefined} />}
       {dialog?.kind === 'dispatch' && <DispatchDialog order={dialog.order} uid={uid} defer={dialog.defer} onClose={() => setDialog(null)} />}

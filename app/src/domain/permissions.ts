@@ -15,6 +15,7 @@ export type Capability =
   | 'order.pack'            // tomar, ingresar pesos reales, marcar armado
   | 'order.link'            // vincular / emitir documento Bsale
   | 'order.invoiceLate'     // despachar sin factura y facturar después de entregar
+  | 'order.approve'         // aprobar o rechazar pedidos con excepción
   | 'order.dispatch'        // marcar salida (despachado)
   | 'order.deliver'         // marcar entregado con nota
   | 'transfer.receive'      // tienda confirma recepción del traslado
@@ -52,7 +53,7 @@ const ROLE_CAPS: Record<Role, Capability[]> = {
     'order.create', 'order.createTransfer', 'order.cancelOwn', 'order.cancelAny', 'order.pack', 'order.link',
     'order.dispatch', 'order.deliver', 'transfer.receive', 'client.quickCreate', 'client.edit', 'stock.sync',
     'production.receive', 'catalog.map', 'bsale.explore', 'bsale.configure', 'panel.view', 'users.manage',
-    'settings.edit', 'order.invoiceLate',
+    'settings.edit', 'order.invoiceLate', 'order.approve',
   ],
   // Auditor: ve todo, no escribe nada.
   consultor: ['bsale.explore', 'panel.view'],

@@ -269,7 +269,7 @@ function Flow() {
 // ---------- Funcionalidades ----------
 
 const FEATURES: Array<{ icon: ReactNode; title: string; text: string }> = [
-  { icon: <IconPhone />, title: 'Pedido en 4 pasos', text: 'Cliente, productos, entrega y confirmar. Con una mano, desde el teléfono, "Repetir último pedido" para los habituales y muestras sin cargo en el mismo pedido.' },
+  { icon: <IconPhone />, title: 'Pedido en 4 pasos', text: 'Cliente, productos, entrega y confirmar. Con una mano, desde el teléfono, "Repetir último pedido" para los habituales, muestras sin cargo y condiciones especiales que Ciro aprueba antes de confirmar.' },
   { icon: <IconSpark />, title: 'Pedido IA', text: 'Pegue el mensaje de WhatsApp del cliente y la app lo convierte en un pedido con productos, cantidades, muestras ("incluir muestra de…") y datos del cliente.' },
   { icon: <IconBox />, title: 'Stock real de Bsale', text: 'Semáforo por producto con lo que reporta Bsale menos lo ya reservado. Nadie vende lo que no hay.' },
   { icon: <IconBoard />, title: 'Tablero con visión y detalle', text: 'Resumen por etapa con montos y kilos, vista en tarjetas, compacta o lista, y el detalle del pedido a un clic. Rojo si se atrasa.' },

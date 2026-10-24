@@ -1,4 +1,5 @@
 import type { DeliveryWindow } from './delivery';
+import type { Approval } from './exceptions';
 // Un perfil por usuario. Ver domain/permissions.ts para lo que puede cada uno.
 export type Role =
   | 'vendedor' | 'tienda' | 'despacho' | 'reparto' | 'produccion' | 'admin' | 'superAdmin' | 'consultor';
@@ -191,6 +192,8 @@ export interface Order {
   rawText?: string;
   // Historial importado archivado en la puesta en marcha (fuera del Tablero).
   archived?: boolean;
+  // Pedido con excepción: espera la aprobación de super administración.
+  approval?: Approval;
   // Consumo interno de las muestras en Bsale (una vez por pedido).
   samplesConsumption?: { at: number; by: string; ref: string; dryRun?: boolean; skipped?: boolean; logId?: string };
   invoicingComplete: boolean;

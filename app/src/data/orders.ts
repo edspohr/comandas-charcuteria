@@ -7,6 +7,7 @@ import {
   query,
   runTransaction,
   updateDoc,
+  getDoc,
   where,
   limit,
 } from 'firebase/firestore';
@@ -18,6 +19,7 @@ import { computeLineSubtotal } from '@/lib/pricing';
 import { DOCUMENTS_PATH, isRealBsale } from '@/integrations/bsale/client';
 import { hasSamples, isSampleOnly, lineKey } from '@/domain/samples';
 import { formatWindow, type DeliveryWindow } from '@/domain/delivery';
+import { autoReasons, EXCEPTION_KINDS, type Approval, type ExceptionKind } from '@/domain/exceptions';
 import type { DocumentReference, Transaction } from 'firebase/firestore';
 
 // One read per stock doc, even when several lines share it (a Coppa line and
@@ -72,6 +74,8 @@ export interface DraftOrderInput {
   deliveryWindow?: DeliveryWindow;
   // Nombre de fantasía con que despacho reconoce al cliente (opcional).
   fantasyName?: string;
+  // Condición especial declarada por el vendedor (pide aprobación).
+  exception?: { kinds: ExceptionKind[]; note: string };
   source: 'app' | 'pasted';
   rawText?: string;
 }
@@ -80,6 +84,7 @@ export interface CreateOrderResult {
   orderId: string;
   status: OrderStatus;
   parcialLines: Array<{ productName: string; formatLabel: string; missing: number }>;
+  awaitingApproval?: boolean;
 }
 
 // Single transaction: read counter + all touched stock docs, decide reserved
@@ -171,6 +176,7 @@ export async function createOrder(
       deliveryAddress: input.deliveryAddress ?? input.client.address,
       receivingHours: input.deliveryWindow ? formatWindow(input.deliveryWindow) : input.receivingHours ?? input.client.receivingHours,
       ...(input.deliveryWindow ? { deliveryWindow: stripEmpty(input.deliveryWindow) } : {}),
+      ...approvalFor(input, createdByUid, now),
       status,
       statusHistory: [
         { status: 'recibido',     by: createdByUid, at: now },
@@ -212,10 +218,46 @@ export async function createOrder(
     tx.set(counterRef, { last: nextN }, { merge: true });
     tx.set(doc(db, 'orders', orderId), order);
 
-    return { orderId, status, parcialLines };
+    return { orderId, status, parcialLines, awaitingApproval: !!order.approval };
   });
   await rememberClientHabits(input);
   return result;
+}
+
+// Exceptions (auto by quantity, or declared by the seller) wait for approval.
+function approvalFor(input: DraftOrderInput, by: string, now: number): { approval?: Approval } {
+  const reasons = [...autoReasons(input.lines)];
+  const kinds = input.exception?.kinds ?? [];
+  if (input.exception?.note?.trim()) reasons.unshift(`${kinds.map((k) => EXCEPTION_KINDS.find(([id]) => id === k)?.[1] ?? k).join(', ') || 'Condición especial'}: ${input.exception.note.trim()}`);
+  if (!reasons.length) return {};
+  return { approval: { status: 'pendiente', reasons, ...(kinds.length ? { kinds } : {}), ...(input.exception?.note?.trim() ? { note: input.exception.note.trim() } : {}), requestedBy: by, requestedAt: now } };
+}
+
+// Super administración aprueba: el pedido queda libre para armar.
+export async function approveOrder(orderId: string, by: string, note?: string): Promise<void> {
+  const ref = doc(db, 'orders', orderId);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error('Pedido no encontrado');
+    const o = snap.data() as Order;
+    if (o.approval?.status !== 'pendiente') throw new Error('El pedido no está esperando aprobación.');
+    const now = Date.now();
+    tx.update(ref, {
+      approval: { ...o.approval, status: 'aprobado', decidedBy: by, decidedAt: now, ...(note?.trim() ? { decisionNote: note.trim() } : {}) },
+      updatedAt: now,
+      statusHistory: [...o.statusHistory, { status: o.status, by, at: now, note: `Excepción aprobada${note?.trim() ? ` · ${note.trim()}` : ''}` }],
+    });
+  });
+}
+
+// Rechazar = anular con el motivo (libera reservas). El vendedor lo ve en anulados.
+export async function rejectOrder(orderId: string, by: string, note: string): Promise<void> {
+  const ref = doc(db, 'orders', orderId);
+  const now = Date.now();
+  await anularOrder(orderId, by, `Excepción rechazada: ${note.trim()}`);
+  const snap = await getDoc(ref);
+  const o = snap.data() as Order | undefined;
+  if (o?.approval) await updateDoc(ref, { approval: { ...o.approval, status: 'rechazado', decidedBy: by, decidedAt: now, decisionNote: note.trim() } });
 }
 
 const stripEmpty = (w: DeliveryWindow): DeliveryWindow => (w.note?.trim() ? { from: w.from, to: w.to, note: w.note.trim() } : { from: w.from, to: w.to });

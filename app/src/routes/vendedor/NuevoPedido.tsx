@@ -18,6 +18,7 @@ import { describeFirestoreError } from '@/lib/errors';
 import { categoryLabel, categoryOrder } from '@/domain/categories';
 import { computeLineSubtotal, formatCLP, unitPriceLabel } from '@/lib/pricing';
 import { formatWindow, parseWindow, windowValid } from '@/domain/delivery';
+import { autoReasons, EXCEPTION_KINDS, type ExceptionKind } from '@/domain/exceptions';
 import { SAMPLE_DEFAULT_GRAMS, SAMPLE_GRAM_OPTIONS, lineKey, sampleLabel, sampleLine, sampleSourceFor } from '@/domain/samples';
 import { isSellable, type Client, type Product, type ProductFormat, type StockDoc } from '@/domain/types';
 
@@ -34,6 +35,10 @@ interface Draft {
   deliveryTo?: string;
   deliveryNote?: string;
   fantasyName?: string;
+  // Condición especial (pide aprobación de super administración).
+  exceptionOn?: boolean;
+  exceptionKinds?: ExceptionKind[];
+  exceptionNote?: string;
   step: number;
 }
 
@@ -96,6 +101,7 @@ export default function NuevoPedido() {
     if (!client) return;
     const window = { from: draft.deliveryFrom ?? '', to: draft.deliveryTo ?? '', note: draft.deliveryNote };
     if (!windowValid(window)) { setError('Indique el horario de entrega: desde y hasta (el primero antes que el segundo).'); goto(3); return; }
+    if (draft.exceptionOn && !draft.exceptionNote?.trim()) { setError('Describa la condición especial para que Ciro pueda aprobarla.'); return; }
     setSubmitting(true);
     setError(null);
     try {
@@ -108,11 +114,12 @@ export default function NuevoPedido() {
         receivingHours: draft.receivingHours || client.receivingHours,
         deliveryWindow: window,
         fantasyName: draft.fantasyName?.trim() || undefined,
+        ...(draft.exceptionOn && draft.exceptionNote?.trim() ? { exception: { kinds: draft.exceptionKinds ?? [], note: draft.exceptionNote.trim() } } : {}),
         source: 'app',
       });
       clearDraft(uid);
       navigate('/tablero', {
-        state: { justCreated: res.orderId, status: res.status, parcialLines: res.parcialLines },
+        state: { justCreated: res.orderId, status: res.status, parcialLines: res.parcialLines, awaitingApproval: res.awaitingApproval },
       });
     } catch (e: unknown) {
       setError(describeFirestoreError(e));
@@ -196,6 +203,7 @@ export default function NuevoPedido() {
           stock={stock}
           submitting={submitting}
           error={error}
+          onUpdate={update}
           onBack={() => goto(3)}
           onSubmit={submit}
         />
@@ -768,13 +776,14 @@ function StepEntrega({
 // ---------- Step 4: Confirmar ----------
 
 function StepConfirmar({
-  client, draft, stock, submitting, error, onBack, onSubmit,
+  client, draft, stock, submitting, error, onUpdate, onBack, onSubmit,
 }: {
   client: Client;
   draft: Draft;
   stock: Map<string, StockDoc>;
   submitting: boolean;
   error: string | null;
+  onUpdate: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
   onBack: () => void;
   onSubmit: () => void;
 }) {
@@ -786,6 +795,7 @@ function StepConfirmar({
   }), [draft.lines, stock]);
 
   const anyPending = preview.some((p) => p.pending > 0);
+  const autoExceptions = useMemo(() => autoReasons(draft.lines), [draft.lines]);
   const totalCLP = preview.reduce((s, p) => s + (p.subtotalCLP ?? 0), 0);
 
   return (
@@ -868,6 +878,31 @@ function StepConfirmar({
         </div>
       )}
 
+      <div className="card p-4 space-y-3">
+        <label className="flex items-start gap-2 text-sm text-charcoal-800">
+          <input type="checkbox" className="mt-1 w-4 h-4" checked={!!draft.exceptionOn} onChange={(e) => onUpdate('exceptionOn', e.target.checked)} />
+          <span><strong>Condición especial</strong> — precio, formato o corte, pago o entrega fuera de lo habitual. Ciro la aprueba antes de confirmarle al cliente.</span>
+        </label>
+        {draft.exceptionOn && (
+          <>
+            <div className="flex flex-wrap gap-1.5">
+              {EXCEPTION_KINDS.map(([id, label]) => {
+                const on = draft.exceptionKinds?.includes(id) ?? false;
+                return <button key={id} type="button" onClick={() => onUpdate('exceptionKinds', on ? (draft.exceptionKinds ?? []).filter((k) => k !== id) : [...(draft.exceptionKinds ?? []), id])}
+                  className={'rounded-md border px-2.5 py-1 text-xs ' + (on ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-600')}>{label}</button>;
+              })}
+            </div>
+            <textarea value={draft.exceptionNote ?? ''} onChange={(e) => onUpdate('exceptionNote', e.target.value)} rows={2} placeholder="Qué se le ofreció al cliente: ej. 10% de descuento por volumen, laminado de 1 mm, pago a 30 días…" className="field h-auto py-2 text-sm resize-none" />
+          </>
+        )}
+        {(autoExceptions.length > 0 || (draft.exceptionOn && draft.exceptionNote?.trim())) && (
+          <div className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 px-3 py-2 text-xs">
+            <p className="font-semibold">Este pedido queda por aprobar: no se confirma al cliente ni se arma hasta que Ciro lo apruebe.</p>
+            {autoExceptions.map((r) => <p key={r}>· {r}</p>)}
+          </div>
+        )}
+      </div>
+
       {error && (
         <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-3 text-sm">{error}</div>
       )}
@@ -875,7 +910,7 @@ function StepConfirmar({
       <div className="flex gap-2 pt-2">
         <Button variant="secondary" onClick={onBack} disabled={submitting} className="flex-1">Volver</Button>
         <Button onClick={onSubmit} disabled={submitting} className="flex-1">
-          {submitting ? 'Enviando…' : 'Enviar pedido'}
+          {submitting ? 'Enviando…' : autoExceptions.length || (draft.exceptionOn && draft.exceptionNote?.trim()) ? 'Enviar a aprobación' : 'Enviar pedido'}
         </Button>
       </div>
     </section>

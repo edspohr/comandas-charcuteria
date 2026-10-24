@@ -15,6 +15,7 @@ import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions } from './firebase';
 import { resetUsersDirectory } from './users';
 import { resetClientsStore } from './clients';
+import { rememberPin } from './pin';
 import type { AppUser } from '@/domain/types';
 
 export { ROLE_HOME, ROLE_LABEL } from '@/domain/permissions';
@@ -152,6 +153,7 @@ export async function signInWithPin(email: string, pin: string) {
   const { token } = (await pinLoginFn({ email: email.trim().toLowerCase(), pin })).data;
   await signInWithCustomToken(auth, token);
   markUnlocked();
+  rememberPin(pin);
 }
 
 const RECENT_KEY = 'comandas.recentUsers';

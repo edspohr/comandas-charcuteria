@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
-import { anularOrder, consumeSamplesAfterInvoice, despacharOrder, entregarOrder, registrarSalidaMuestras, registrarTraslado, vincularDocumento } from '@/data/orders';
+import { approveOrder, rejectOrder, anularOrder, consumeSamplesAfterInvoice, despacharOrder, entregarOrder, registrarSalidaMuestras, registrarTraslado, vincularDocumento } from '@/data/orders';
 import { lineKey, sampleLabel } from '@/domain/samples';
 import { confirmPin } from '@/data/pin';
 import { useBsaleDocuments } from '@/data/bsale';
@@ -196,6 +196,54 @@ export function SalidaMuestrasDialog({ order, uid, onClose }: { order: Order; ui
             </div>
           </>
         )}
+      </div>
+    </ModalShell>
+  );
+}
+
+// Pedido con excepción → super administración aprueba o rechaza (con PIN).
+export function ApprovalDialog({ order, uid, onClose }: { order: Order; uid: string; onClose: () => void }) {
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const a = order.approval;
+  async function decide(ok: boolean) {
+    if (!ok && note.trim().length < 3) { setError('Para rechazar indique el motivo: el vendedor lo verá.'); return; }
+    setBusy(true); setError(null);
+    try {
+      await confirmPin(ok ? 'aprobar_excepcion' : 'rechazar_excepcion', `${ok ? 'Aprobar' : 'Rechazar'} ${order.id}`, order.id);
+      if (ok) await approveOrder(order.id, uid, note || undefined); else await rejectOrder(order.id, uid, note);
+      onClose();
+    } catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
+  }
+  return (
+    <ModalShell title="Pedido por aprobar" eyebrow={order.id} onClose={onClose} wide>
+      <div className="space-y-4">
+        <div>
+          <p className="font-semibold text-charcoal-900">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</p>
+          <p className="text-xs text-charcoal-500">{order.requestedDate}{order.receivingHours ? ` · ${order.receivingHours}` : ''}{order.totalCLP ? ` · ${formatCLP(order.totalCLP)}` : ''}</p>
+        </div>
+        <div className="rounded-md bg-brass-50 border border-brass-300 text-brass-800 px-3 py-2 text-sm space-y-0.5">
+          {(a?.reasons ?? []).map((r) => <p key={r}>· {r}</p>)}
+        </div>
+        <ul className="card divide-y divide-charcoal-100 text-sm">
+          {order.lines.map((l) => (
+            <li key={lineKey(l)} className="px-3 py-2 flex justify-between gap-3">
+              <span className="text-charcoal-700">{l.productName} · {l.formatLabel}{l.notes ? <em className="text-charcoal-400"> · {l.notes}</em> : null}</span>
+              <span className="font-semibold tabular-nums">{l.sample ? sampleLabel(l) : `${l.qty}${l.unit === 'kg' ? ' kg' : ''}`}</span>
+            </li>
+          ))}
+        </ul>
+        <div>
+          <label className="eyebrow block mb-1.5">Nota (obligatoria para rechazar)</label>
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ej: ok el descuento solo en este pedido / no hay corte de 1 mm esta semana" className="field h-10 text-sm" />
+        </div>
+        {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-2 text-sm">{error}</div>}
+        <div className="flex gap-2">
+          <Button variant="danger" onClick={() => decide(false)} disabled={busy} className="flex-1">Rechazar</Button>
+          <Button onClick={() => decide(true)} disabled={busy} className="flex-1">{busy ? '…' : 'Aprobar'}</Button>
+        </div>
+        <p className="text-[11px] text-charcoal-300">Rechazar anula el pedido y libera el stock. Aprobar lo deja listo para armar.</p>
       </div>
     </ModalShell>
   );

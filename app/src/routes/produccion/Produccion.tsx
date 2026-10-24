@@ -103,7 +103,7 @@ export default function Produccion() {
         <div>
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Producción</h1>
           <p className="text-xs text-charcoal-300 mt-1 first-letter:uppercase">
-            {formatDateLong(today)} · {sync?.at ? `stock Bsale ${new Date(sync.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : 'sin sincronizar'}
+            {formatDateLong(today)} · {sync?.at ? `stock Bsale ${new Date(sync.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}` : 'sin sincronizar'}
           </p>
         </div>
         {can(me.role, 'stock.sync') && (
@@ -265,7 +265,7 @@ function ProductionHistory({ entries, startToday, canMark, uid }: { entries: Pro
               <li key={e.id} className="card p-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <p className="text-xs text-charcoal-500">
-                    <span className="font-semibold text-charcoal-900">{new Date(e.at).toLocaleString('es-CL', e.at >= startToday ? { hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span> · {e.byName} · {SOURCE[e.source]}
+                    <span className="font-semibold text-charcoal-900">{new Date(e.at).toLocaleString('es-CL', e.at >= startToday ? { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' } : { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span> · {e.byName} · {SOURCE[e.source]}
                   </p>
                   <Pill tone={tone}>{label}</Pill>
                 </div>

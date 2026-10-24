@@ -143,7 +143,7 @@ export default function BsaleConsolaMock() {
               {receptions.map((r) => (
                 <li key={r.id} className="py-2 flex justify-between gap-2">
                   <span className="text-charcoal-700 truncate">{skuLabel(r.sku)}{r.note ? <span className="text-charcoal-300"> · {r.note}</span> : null}</span>
-                  <span className="shrink-0 text-charcoal-500">+{r.quantity} · {new Date(r.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="shrink-0 text-charcoal-500">+{r.quantity} · {new Date(r.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}</span>
                 </li>
               ))}
             </ul>

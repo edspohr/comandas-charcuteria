@@ -213,6 +213,16 @@ export default function Tablero() {
   const toneOf = (o: Order) => cardTone(o, stock, thresholds, now, today);
   const actionOf = (o: Order) => nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId), strictStock });
   const [activeCol, setActiveCol] = useState<ColumnId>(can(role, 'order.link') ? 'por_facturar' : role === 'reparto' ? 'por_despachar' : 'pendiente');
+  // Phone: open on the column this profile works on (reparto → por despachar,
+  // administración → por facturar) instead of always «Pendiente».
+  const initScrolled = useRef(false);
+  useEffect(() => {
+    if (loading || initScrolled.current || wide || activeCol === 'pendiente') return;
+    initScrolled.current = true;
+    const box = scroller.current;
+    const el = box?.querySelector<HTMLElement>(`[data-col="${activeCol}"]`);
+    if (box && el) box.scrollLeft = el.offsetLeft - box.offsetLeft - 16;
+  }, [loading, wide, activeCol]);
   function scrollToCol(id: ColumnId) {
     setActiveCol(id);
     const el = scroller.current?.querySelector<HTMLElement>(`[data-col="${id}"]`);
@@ -229,13 +239,13 @@ export default function Tablero() {
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">{mine && isSeller(role) ? 'Mis pedidos' : 'Pedidos'}</h1>
           <p className="text-xs text-charcoal-300 mt-1">
             {totalOpen} abierto{totalOpen === 1 ? '' : 's'}{redCount > 0 && <span className="text-red-700 font-semibold"> · {redCount} en rojo</span>}
-            {sync?.at && <> · stock Bsale {new Date(sync.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</>}
+            {sync?.at && <> · stock Bsale {new Date(sync.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}</>}
             {sync?.compromised?.length ? <span className="text-red-700"> · {sync.compromised.length} formato{sync.compromised.length === 1 ? '' : 's'} con stock comprometido</span> : null}
           </p>
         </div>
         {canSync && (
           <button onClick={doSync} disabled={syncing} title="Sincronizar stock y documentos con Bsale" className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-charcoal-200 bg-white px-2.5 py-1.5 text-[11px] uppercase tracking-display text-charcoal-600 hover:border-charcoal-300 disabled:opacity-60">
-            <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Sincronizando' : 'Bsale'}
+            <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} /> {syncing ? <span className="hidden sm:inline">Sincronizando</span> : 'Bsale'}
           </button>
         )}
       </header>
@@ -278,7 +288,7 @@ export default function Tablero() {
 
       {/* Visión general */}
       <div className="px-4 sm:px-6 mb-3">
-        <SummaryStrip byColumn={byColumn.columns} toneOf={toneOf} showMoney={isAdmin || isSeller(role)} active={etapa}
+        <SummaryStrip byColumn={byColumn.columns} toneOf={toneOf} showMoney={isAdmin || isSeller(role)} active={etapa ?? (wide || view === 'lista' ? null : activeCol)}
           onPick={(c) => {
             // Phone + board: the strip doubles as column tabs (scroll, no filter).
             if (window.innerWidth < 1024 && view !== 'lista') { if (c) scrollToCol(c); return; }

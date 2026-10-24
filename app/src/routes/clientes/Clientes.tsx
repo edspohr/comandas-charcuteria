@@ -111,10 +111,11 @@ export default function Clientes() {
               <div className="min-w-0">
                 <Link to={`/clientes/${r.id}`} onClick={(e) => e.stopPropagation()} className="font-semibold text-charcoal-900 hover:text-brass-700">{r.name}</Link>
                 <p className="text-[11px] text-charcoal-300 truncate">{c?.rut ?? 'Sin RUT'}{c?.fantasyName && c.fantasyName !== c.name ? ` · ${c.name}` : ''}</p>
+                <span className="md:hidden mt-1 flex flex-wrap gap-1"><HealthPills r={r} /></span>
               </div>
             );
           } },
-          { key: 'health', label: 'Estado', mobile: true, render: (r) => <span className="flex flex-col gap-1 items-start"><Pill tone={HEALTH_TONE[r.health]}>{HEALTH_LABEL[r.health]}</Pill>{(r.needsReview || !r.invoicingComplete) && <Pill tone="warn">{r.needsReview ? 'Revisar' : 'Fact. incompleta'}</Pill>}</span> },
+          { key: 'health', label: 'Estado', render: (r) => <span className="flex flex-col gap-1 items-start"><HealthPills r={r} /></span> },
           { key: 'owner', label: 'Vendedor', render: (r) => r.owner, muted: true },
           { key: 'orders', label: 'Pedidos', align: 'right', render: (r) => r.orders },
           { key: 'revenue', label: 'Ventas 90 d', align: 'right', mobile: true, render: (r) => <span className="font-semibold">{formatCLP(r.revenue)}</span> },
@@ -129,6 +130,15 @@ export default function Clientes() {
       {creating && <NuevoClienteDialog uid={uid} onClose={() => setCreating(false)} onCreated={() => setCreating(false)} />}
       {editing && <EditarClienteDialog client={editing} uid={uid} onClose={() => setEditing(null)} />}
     </div>
+  );
+}
+
+function HealthPills({ r }: { r: ClientRow }) {
+  return (
+    <>
+      <Pill tone={HEALTH_TONE[r.health]}>{HEALTH_LABEL[r.health]}</Pill>
+      {(r.needsReview || !r.invoicingComplete) && <Pill tone="warn">{r.needsReview ? 'Revisar' : 'Fact. incompleta'}</Pill>}
+    </>
   );
 }
 

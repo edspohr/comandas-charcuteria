@@ -105,7 +105,18 @@ export default function FichaCliente() {
             <Row k="Giro" v={client.giro ?? '—'} warn={!client.giro} />
             <Row k="Dirección" v={client.address ?? '—'} warn={!client.address} />
             <Row k="Entrega" v={`${client.deliveryMode === 'retiro' ? 'Retiro en tienda' : 'Despacho'}${client.receivingHours ? ` · ${client.receivingHours}` : ''}`} />
-            <Row k="Contacto" v={[client.contactPhone, client.email].filter(Boolean).join(' · ') || '—'} />
+            <dt className="eyebrow pt-0.5">Contacto</dt>
+            <dd className="text-charcoal-700">
+              {!client.contactPhone && !client.email && '—'}
+              {client.contactPhone && (
+                <span className="flex flex-wrap items-center gap-2">
+                  <span>{client.contactPhone}</span>
+                  <a href={`tel:${client.contactPhone.replace(/[^\d+]/g, '')}`} className="rounded-md border border-charcoal-200 bg-white px-2 py-0.5 text-xs">Llamar</a>
+                  <a href={`https://wa.me/${waNumber(client.contactPhone)}`} target="_blank" rel="noreferrer" className="rounded-md border border-emerald-200 bg-emerald-50 text-emerald-800 px-2 py-0.5 text-xs">WhatsApp</a>
+                </span>
+              )}
+              {client.email && <a href={`mailto:${client.email}`} className="block underline text-sm">{client.email}</a>}
+            </dd>
             <Row k="Vendedor" v={client.ownerUid ? nameOf(client.ownerUid) : 'Sin asignar'} />
             {client.notes && <Row k="Notas" v={client.notes} />}
           </dl>
@@ -164,6 +175,12 @@ export default function FichaCliente() {
       {editing && <EditarClienteDialog client={client} uid={uid} onClose={() => setEditing(false)} />}
     </div>
   );
+}
+
+// Chilean numbers: 9 digits for mobiles → +56 9 XXXX XXXX.
+function waNumber(phone: string) {
+  const d = phone.replace(/\D/g, '');
+  return d.startsWith('56') ? d : `56${d}`;
 }
 
 function Row({ k, v, warn }: { k: string; v: string; warn?: boolean }) {

@@ -1,6 +1,6 @@
 import SampleTag from './SampleTag';
 import { sampleLabel } from '@/domain/samples';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Button from '@/components/ui/Button';
 import { useUsers } from '@/data/users';
@@ -24,8 +24,15 @@ const TONE_DOT: Record<Tone, string> = { red: 'bg-red-600', amber: 'bg-brass-500
 export function SummaryStrip({ byColumn, toneOf, showMoney, active, onPick }: {
   byColumn: Map<ColumnId, Order[]>; toneOf: (o: Order) => ToneInfo; showMoney: boolean; active: ColumnId | null; onPick: (c: ColumnId | null) => void;
 }) {
+  // Keep the active tile in view on the phone (the strip scrolls sideways).
+  const strip = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = strip.current; const el = box?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!box || !el || box.scrollWidth <= box.clientWidth) return;
+    if (el.offsetLeft < box.scrollLeft || el.offsetLeft + el.offsetWidth > box.scrollLeft + box.clientWidth) box.scrollTo({ left: el.offsetLeft - 8, behavior: 'smooth' });
+  }, [active]);
   return (
-    <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1 sm:grid sm:grid-cols-5 sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0">
+    <div ref={strip} className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1 sm:grid sm:grid-cols-5 sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0">
       {COLUMNS.map((c) => {
         const list = byColumn.get(c.id) ?? [];
         const red = list.filter((o) => toneOf(o).tone === 'red').length;
@@ -39,7 +46,7 @@ export function SummaryStrip({ byColumn, toneOf, showMoney, active, onPick }: {
             <p className="text-[10px] uppercase tracking-display text-charcoal-300 font-semibold">{c.label}</p>
             <p className="text-xl font-semibold text-charcoal-900 tabular-nums leading-tight">{list.length}</p>
             <p className="text-[11px] text-charcoal-500 tabular-nums truncate">
-              {showMoney && clp > 0 ? formatCLP(clp) : '—'}{kg > 0 ? ` · ${Math.round(kg)} kg` : ''}
+              {[showMoney && clp > 0 ? formatCLP(clp) : null, kg > 0 ? `${Math.round(kg)} kg` : null].filter(Boolean).join(' · ') || '—'}
             </p>
             <p className="text-[10px] mt-0.5 h-3.5">
               {red > 0 && <span className="text-red-700 font-semibold mr-2">● {red}</span>}

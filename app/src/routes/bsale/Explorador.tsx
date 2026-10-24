@@ -163,13 +163,13 @@ function GroupTable({ title, name, rows, cols, period }: { title: string; name: 
   const [all, setAll] = useState(false);
   const shown = all ? rows : rows.slice(0, 10);
   return (
-    <section className="card p-4">
+    <section className="card p-4 min-w-0">
       <div className="flex justify-between items-center mb-2"><p className="eyebrow">{title}</p><Csv name={name} rows={rows} cols={cols} period={period} /></div>
       <ul className="divide-y divide-charcoal-100/70 text-sm">
         {shown.length === 0 && <li className="py-2 text-xs text-charcoal-300">Sin datos.</li>}
         {shown.map((r) => (
           <li key={r.key} className="py-1.5 flex justify-between gap-3">
-            <span className="text-charcoal-700 truncate">{r.name}</span>
+            <span className="text-charcoal-700 truncate min-w-0">{r.name}</span>
             <span className="shrink-0 tabular-nums"><span className="text-charcoal-300 text-xs mr-2">{r.quantity != null ? formatQty(r.quantity, 'unidad') : `${r.docs} doc.`}</span><span className="font-semibold text-charcoal-900">{formatCLP(r.totalCLP)}</span></span>
           </li>
         ))}

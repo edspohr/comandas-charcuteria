@@ -37,8 +37,11 @@ const GUIDES: Record<Role, Guide> = {
   ] },
   tienda: { title: 'Tienda', sections: [
     ACCESS,
-    ['Reposición', ['Toque «＋» para pedir reposición a la fábrica. Cuando llegue, en «Pedidos» toque «Recibir en tienda».']],
-    ['Ventas a clientes', ['Igual que ventas: «＋», cliente, productos, horario de entrega y confirmar.']],
+    ['Pedir reposición', [
+      'Toque «＋»: la tienda ya viene elegida. Agregue productos y cantidades, indique el día y confirme con su PIN.',
+      'Despacho lo arma y registra el traslado. Cuando llegue, en «Pedidos» toque «Recibir en tienda» y revise lo recibido.',
+    ]],
+    ['Seguir sus pedidos', ['«Pedidos» muestra los pedidos de la tienda por etapa. Rojo = atrasado o con problema.']],
   ] },
   despacho: { title: 'Despacho y armado', sections: [
     ACCESS,

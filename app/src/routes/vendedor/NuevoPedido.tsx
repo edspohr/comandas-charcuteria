@@ -1,3 +1,7 @@
+import { Backdrop, SHEET_ACTIONS, SHEET_PANEL } from '@/components/ui/Sheet';
+import { Icon } from '@/components/ui/Icon';
+
+const normText = (x: string) => x.toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 import { confirmPin } from '@/data/pin';
 import NewOrderTabs from '@/components/orders/NewOrderTabs';
 import { useEffect, useMemo, useState } from 'react';
@@ -97,7 +101,7 @@ export default function NuevoPedido() {
   function update<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
   }
-  function goto(step: number) { update('step', step); }
+  function goto(step: number) { update('step', step); window.scrollTo(0, 0); }
 
   async function submit() {
     if (!client) return;
@@ -145,6 +149,13 @@ export default function NuevoPedido() {
       {!isTienda && <NewOrderTabs active="manual" />}
 
       <Steps current={draft.step} onGo={goto} />
+
+      {draft.step > 1 && client && (
+        <button onClick={() => goto(1)} className="mb-4 w-full card px-3.5 py-2.5 flex items-center justify-between gap-2 text-left">
+          <span className="min-w-0 text-sm text-charcoal-500 truncate">Cliente · <span className="font-semibold text-charcoal-900">{client.fantasyName ?? client.name}</span></span>
+          <span className="text-xs underline text-charcoal-500 shrink-0">Cambiar</span>
+        </button>
+      )}
 
       {draft.step === 1 && (
         <StepCliente
@@ -220,7 +231,7 @@ const STEP_LABELS = ['Cliente', 'Productos', 'Entrega', 'Confirmar'];
 
 function Steps({ current, onGo }: { current: number; onGo: (n: number) => void }) {
   return (
-    <ol className="flex items-center gap-3 mb-8">
+    <ol className="flex items-center gap-2 sm:gap-3 mb-5 sm:mb-8">
       {STEP_LABELS.map((label, i) => {
         const n = i + 1;
         const active = current === n;
@@ -232,7 +243,7 @@ function Steps({ current, onGo }: { current: number; onGo: (n: number) => void }
               disabled={n > current}
               className="w-full text-left group disabled:cursor-not-allowed"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-3">
                 <span
                   className={
                     'shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border transition ' +
@@ -247,7 +258,7 @@ function Steps({ current, onGo }: { current: number; onGo: (n: number) => void }
                 </span>
                 <span
                   className={
-                    'hidden sm:block text-[11px] uppercase tracking-display font-medium truncate ' +
+                    'text-[10px] sm:text-[11px] uppercase tracking-display font-medium truncate ' +
                     (active ? 'text-charcoal-900' : done ? 'text-brass-600' : 'text-charcoal-300')
                   }
                 >
@@ -276,7 +287,11 @@ function StepCliente({
 }) {
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(false);
-  const results = useMemo(() => searchClients(clients, q), [clients, q]);
+  // Su cartera primero; el resto después, en el orden de la búsqueda.
+  const results = useMemo(() => {
+    const r = searchClients(clients, q);
+    return [...r.filter((c) => c.ownerUid === uid), ...r.filter((c) => c.ownerUid !== uid)];
+  }, [clients, q, uid]);
 
   return (
     <section className="space-y-4">
@@ -330,6 +345,9 @@ function StepCliente({
             >
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-charcoal-700">{c.fantasyName ?? c.name}</span>
+                {c.ownerUid === uid && (
+                  <span className="text-[10px] uppercase tracking-display bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded">Mi cartera</span>
+                )}
                 {c.isInternalShop && (
                   <span className="text-[10px] uppercase tracking-display bg-charcoal-900 text-cream-50 px-2 py-0.5 rounded">Tienda</span>
                 )}
@@ -364,7 +382,10 @@ function StepProductos({
 }) {
   const [openProductId, setOpenProductId] = useState<string | null>(null);
   const [sampleOpen, setSampleOpen] = useState(false);
+  const [q, setQ] = useState('');
   const active = products.filter(isSellable);
+  const nq = normText(q.trim());
+  const shown = nq ? active.filter((p) => normText(`${p.name} ${(p.aliases ?? []).join(' ')}`).includes(nq)) : active;
   const showRepeat = !!(lastOrder && onRepeat && lines.length === 0);
 
   function addOrUpdate(product: Product, format: ProductFormat, qty: number, notes?: string) {
@@ -401,7 +422,13 @@ function StepProductos({
         </button>
       )}
 
-      <ProductGrid products={active} lines={lines} openId={openProductId} onOpen={setOpenProductId} />
+      <div className="relative">
+        <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-300" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar producto (ej.: jamón, coppa)" className="field h-11 pl-9 text-base" aria-label="Buscar producto" />
+      </div>
+
+      <ProductGrid products={shown} lines={lines} openId={openProductId} onOpen={setOpenProductId} />
+      {nq && shown.length === 0 && <p className="text-sm text-charcoal-300">Sin productos que coincidan con «{q.trim()}».</p>}
 
       <button type="button" onClick={() => setSampleOpen(true)} className="w-full rounded-md border border-dashed border-brass-300 bg-white px-3 py-2.5 text-sm text-brass-700 hover:bg-brass-50 text-left">
         <span className="font-semibold">+ Muestra</span> <span className="text-charcoal-500">· sin cargo, {SAMPLE_DEFAULT_GRAMS} g por defecto, sale del granel</span>
@@ -413,7 +440,7 @@ function StepProductos({
       <div className="flex gap-2 pt-2 sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] lg:bottom-0 bg-cream-50 py-3 border-t border-charcoal-100 z-10">
         <Button variant="secondary" onClick={onBack} className="flex-1">Volver</Button>
         <Button onClick={onNext} disabled={lines.length === 0} className="flex-1">
-          Siguiente ({lines.length} {lines.length === 1 ? 'línea' : 'líneas'})
+          Siguiente{lines.length > 0 ? ` · ${lines.length}` : ''}
         </Button>
       </div>
 
@@ -512,8 +539,8 @@ function FormatPicker({
   }
 
   return (
-    <div className="fixed inset-0 z-20 bg-charcoal-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div className="w-full max-w-md bg-cream-50 rounded-t-xl sm:rounded-xl shadow-lift p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <Backdrop onClose={onClose}>
+      <div className={`max-w-md ${SHEET_PANEL}`} onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between mb-3">
         <div>
           <p className="eyebrow">Formatos</p>
@@ -561,12 +588,12 @@ function FormatPicker({
           );
         })}
       </ul>
-      <div className="flex gap-2 mt-5">
+      <div className={SHEET_ACTIONS}>
         <Button variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
         <Button onClick={commit} className="flex-1">Agregar</Button>
       </div>
       </div>
-    </div>
+    </Backdrop>
   );
 }
 
@@ -584,8 +611,8 @@ function SamplePicker({ products, stock, onAdd, onClose }: { products: Product[]
   const line = product ? sampleLine(product, grams, notes.trim() || undefined) : null;
   const av = product && src ? availableFor(stock, product.id, src.format.formatId) : 0;
   return (
-    <div className="fixed inset-0 z-20 bg-charcoal-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div className="w-full max-w-md bg-cream-50 rounded-t-xl sm:rounded-xl shadow-lift p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <Backdrop onClose={onClose}>
+      <div className={`max-w-md ${SHEET_PANEL}`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="eyebrow">Sin cargo</p>
@@ -631,7 +658,7 @@ function SamplePicker({ products, stock, onAdd, onClose }: { products: Product[]
           </div>
         )}
       </div>
-    </div>
+    </Backdrop>
   );
 }
 
@@ -912,7 +939,7 @@ function StepConfirmar({
       <div className="flex gap-2 pt-2">
         <Button variant="secondary" onClick={onBack} disabled={submitting} className="flex-1">Volver</Button>
         <Button onClick={onSubmit} disabled={submitting} className="flex-1">
-          {submitting ? 'Enviando…' : autoExceptions.length || (draft.exceptionOn && draft.exceptionNote?.trim()) ? 'Enviar a aprobación' : 'Enviar pedido'}
+          {!submitting && <Icon name="lock" size={16} />}{submitting ? 'Enviando…' : autoExceptions.length || (draft.exceptionOn && draft.exceptionNote?.trim()) ? 'Enviar a aprobación' : 'Enviar pedido'}
         </Button>
       </div>
     </section>

@@ -59,6 +59,12 @@ const verifyFn = httpsCallable<{ action: string; ref?: string; pin?: string }, {
 // Important actions that run in the app (anular, vincular, despachar sin
 // factura, salidas): confirm the person's PIN on the server first.
 export async function confirmPin(action: string, reason: string, ref?: string): Promise<void> {
+  // Without a remembered PIN, ask first: saves a round trip to the server.
+  if (!(cached && Date.now() - cached.at < CACHE_MS)) {
+    const entered = await requestPin(reason);
+    if (!entered) throw new PinCancelled();
+    cached = { pin: entered, at: Date.now() }; // cleared by withPin if the server rejects it
+  }
   await withPin(reason, (pin) => verifyFn({ action, ref, pin }));
 }
 

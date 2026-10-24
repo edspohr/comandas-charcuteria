@@ -5,11 +5,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/ui/Button';
 import StatusPill from '@/components/ui/StatusPill';
 import { useCurrentUser } from '@/data/auth';
-import { anularOrder, useOrder } from '@/data/orders';
+import { useOrder } from '@/data/orders';
+import { AnularDialog } from '@/components/orders/OrderDialogs';
 import { useUsers } from '@/data/users';
 import { formatDateLong, formatQty } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
-import { describeFirestoreError } from '@/lib/errors';
 import ErrorBannerLazy from '@/components/ui/ErrorBanner';
 import { ORDER_STATUS_LABEL, type OrderStatus } from '@/domain/types';
 
@@ -34,7 +34,7 @@ export default function DetallePedido() {
     <div className="max-w-2xl mx-auto">
       <div className="mb-4">
         <Link to="/tablero" className="text-[11px] uppercase tracking-display text-charcoal-300 hover:text-charcoal-700">
-          ← Tablero
+          ← Pedidos
         </Link>
       </div>
 
@@ -134,7 +134,7 @@ export default function DetallePedido() {
           </Button>
           {anularOpen && (
             <AnularDialog
-              orderId={order.id}
+              order={order}
               uid={uid}
               onClose={() => setAnularOpen(false)}
               onDone={() => navigate('/tablero')}
@@ -142,51 +142,6 @@ export default function DetallePedido() {
           )}
         </>
       )}
-    </div>
-  );
-}
-
-function AnularDialog({ orderId, uid, onClose, onDone }: { orderId: string; uid: string; onClose: () => void; onDone: () => void }) {
-  const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit() {
-    if (reason.trim().length < 3) { setError('Indique un motivo (mínimo 3 caracteres)'); return; }
-    setBusy(true); setError(null);
-    try { await anularOrder(orderId, uid, reason.trim()); onDone(); }
-    catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
-  }
-
-  return (
-    <div className="fixed inset-0 z-20 bg-charcoal-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="w-full max-w-md bg-cream-50 rounded-t-xl sm:rounded-xl shadow-lift p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="eyebrow">Anular</p>
-            <h2 className="text-lg font-semibold text-charcoal-900 tracking-display uppercase mt-0.5">{orderId}</h2>
-          </div>
-          <button onClick={onClose} className="text-charcoal-300 hover:text-charcoal-700 text-xl w-8 h-8 flex items-center justify-center">×</button>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <label className="eyebrow block mb-1.5">Motivo</label>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Ej: cliente reprogramó, error de captura…"
-              rows={3}
-              className="field h-auto py-2 text-sm resize-none"
-            />
-          </div>
-          {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-2 text-sm">{error}</div>}
-          <p className="text-xs text-charcoal-300">Las reservas de stock se liberan automáticamente.</p>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
-            <Button variant="danger" onClick={submit} disabled={busy} className="flex-1">{busy ? '…' : 'Anular'}</Button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

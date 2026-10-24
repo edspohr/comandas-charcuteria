@@ -1,3 +1,5 @@
+import { ORDER_STATUS_LABEL } from '@/domain/types';
+import { Backdrop, SHEET_PANEL } from '@/components/ui/Sheet';
 import { useEffect, useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
 import { approveOrder, rejectOrder, anularOrder, consumeSamplesAfterInvoice, despacharOrder, entregarOrder, registrarSalidaMuestras, registrarTraslado, vincularDocumento } from '@/data/orders';
@@ -20,9 +22,9 @@ import type { BsaleDocument } from '@/integrations/bsale/BsaleClient';
 
 export function ModalShell({ title, eyebrow, onClose, children, wide }: { title: string; eyebrow: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-30 bg-charcoal-900/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+    <Backdrop onClose={onClose} label={title}>
       <div
-        className={`w-full ${wide ? 'max-w-2xl' : 'max-w-md'} bg-cream-50 rounded-t-xl sm:rounded-xl shadow-lift p-5 max-h-[90vh] overflow-y-auto`}
+        className={`${wide ? 'max-w-2xl' : 'max-w-md'} ${SHEET_PANEL}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -34,7 +36,7 @@ export function ModalShell({ title, eyebrow, onClose, children, wide }: { title:
         </div>
         {children}
       </div>
-    </div>
+    </Backdrop>
   );
 }
 
@@ -353,8 +355,8 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked, onDefer
         <p className="text-sm text-charcoal-700">
           La venta se emite en el POS de Bsale. Elija el documento que corresponde a{' '}
           <span className="font-semibold">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</span>
-          {order.totalCLP ? <> · total esperado <span className="font-semibold">{formatCLP(order.totalCLP)}</span></> : null}.
-          {order.status === 'armado' ? <>Al vincularlo se libera la reserva y el pedido pasa a <em>facturado</em>.</> : <>Al vincularlo se libera la reserva; el pedido sigue <em>{order.status}</em>, ahora con su documento.</>}
+          {order.totalCLP ? <> · total esperado <span className="font-semibold">{formatCLP(order.totalCLP)}</span></> : null}.{' '}
+          {order.status === 'armado' ? <>Al vincularlo se libera la reserva y el pedido pasa a <em>facturado</em>.</> : <>Al vincularlo se libera la reserva; el pedido sigue <em>{ORDER_STATUS_LABEL[order.status].toLowerCase()}</em>, ahora con su documento.</>}
         </p>
         {!order.invoicingComplete && (
           <div className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 p-2.5 text-xs">
@@ -366,7 +368,7 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked, onDefer
           <p className="eyebrow mb-1.5">Documentos sin vincular en Bsale</p>
           {loading && <p className="text-xs text-charcoal-300">Consultando Bsale…</p>}
           {!loading && candidates.length === 0 && (
-            <p className="text-xs text-charcoal-300">No hay documentos sin vincular. Emitilo en el POS y volvé a abrir este diálogo, o usá el atajo de simulación.</p>
+            <p className="text-xs text-charcoal-300">Todavía no hay documentos nuevos en Bsale. Emítalo en el POS: aparecerá aquí en unos minutos. También puede escribir el número abajo.</p>
           )}
           <ul className="divide-y divide-charcoal-100 card">
             {candidates.map(({ d, s }) => (

@@ -83,7 +83,7 @@ export default function Usuarios() {
           {!manage && <p className="eyebrow">Consulta · solo lectura</p>}
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Usuarios</h1>
           <p className="text-xs text-charcoal-300 mt-1">
-            {users.filter((u) => u.active !== false && !u.placeholder).length} con cuenta{users.some((u) => u.placeholder && !u.mergedInto) ? ` · ${users.filter((u) => u.placeholder && !u.mergedInto).length} sin cuenta (historial WhatsApp)` : ''} · {byRole.filter(([, n]) => n > 0).map(([r, n]) => `${n} ${ROLE_LABEL[r].toLowerCase()}`).join(' · ')}
+            {users.filter((u) => u.active !== false && !u.placeholder).length} con cuenta{users.some((u) => u.placeholder && !u.mergedInto) ? ` · ${users.filter((u) => u.placeholder && !u.mergedInto).length} sin cuenta (historial WhatsApp)` : ''} · {byRole.filter(([, n]) => n > 0).map(([r, n]) => `${ROLE_LABEL[r]} ${n}`).join(' · ')}
           </p>
         </div>
         {manage && <Button size="sm" onClick={() => setAdding({})}>+ Agregar persona</Button>}
@@ -124,8 +124,8 @@ export default function Usuarios() {
         rowTone={(r) => (r.active === false ? 'bad' : undefined)}
         emptyText="Todavía no hay usuarios. Agregue a la primera persona."
         columns={[
-          { key: 'name', label: 'Usuario', mobile: true, render: (r) => <div><p className="font-semibold text-charcoal-900">{r.displayName}{r.active === false && <span className="ml-2 text-[10px] uppercase text-red-700">desactivado</span>}{r.placeholder && <span className="ml-2 text-[10px] uppercase text-brass-700">sin cuenta</span>}{!r.placeholder && r.pinDisabled && <span className="ml-2 text-[10px] uppercase text-red-700">PIN desactivado</span>}{!r.placeholder && !r.hasPin && !r.pinDisabled && <span className="ml-2 text-[10px] uppercase text-charcoal-300">sin PIN</span>}</p><p className="text-[11px] text-charcoal-300 truncate">{r.placeholder ? 'Aparece en el historial de WhatsApp' : r.email}</p></div> },
-          { key: 'role', label: 'Perfil', mobile: true, render: (r) => <Pill tone={ROLE_TONE[r.role]}>{ROLE_LABEL[r.role]}</Pill> },
+          { key: 'name', label: 'Usuario', mobile: true, render: (r) => <div><p className="font-semibold text-charcoal-900">{r.displayName}{r.active === false && <span className="ml-2 text-[10px] uppercase text-red-700">desactivado</span>}{r.placeholder && <span className="ml-2 text-[10px] uppercase text-brass-700">sin cuenta</span>}{!r.placeholder && r.pinDisabled && <span className="ml-2 text-[10px] uppercase text-red-700">PIN desactivado</span>}{!r.placeholder && !r.hasPin && !r.pinDisabled && <span className="ml-2 text-[10px] uppercase text-charcoal-300">sin PIN</span>}</p><p className="text-[11px] text-charcoal-300 truncate">{r.placeholder ? 'Aparece en el historial de WhatsApp' : r.email}</p><span className="md:hidden mt-1 inline-block"><Pill tone={ROLE_TONE[r.role]}>{ROLE_LABEL[r.role]}</Pill></span></div> },
+          { key: 'role', label: 'Perfil', render: (r) => <Pill tone={ROLE_TONE[r.role]}>{ROLE_LABEL[r.role]}</Pill> },
           { key: 'cartera', label: 'Cartera', align: 'right', render: (r) => isSeller(r.role) ? r.cartera : '—', muted: true },
           { key: 'creados', label: 'Pedidos 30 d', align: 'right', render: (r) => r.creados30 || '—' },
           { key: 'ventas', label: 'Ventas 30 d', align: 'right', mobile: true, render: (r) => r.ventas30 ? <span className="font-semibold">{formatCLP(r.ventas30)}</span> : '—' },

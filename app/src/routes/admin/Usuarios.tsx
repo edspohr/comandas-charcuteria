@@ -42,12 +42,16 @@ export default function Usuarios() {
   const [editing, setEditing] = useState<AppUser | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // People from the WhatsApp history without an account stay out of the way
+  // until someone has to invite them with their history.
+  const [showPlaceholders, setShowPlaceholders] = useState(false);
+  const placeholderCount = users.filter((u) => u.placeholder && !u.mergedInto).length;
 
   useEffect(() => onSnapshot(collection(db, 'orders'), (snap) => { const l: Order[] = []; snap.forEach((d) => l.push(d.data() as Order)); setOrders(l); }), []);
 
   const rows = useMemo<UserRow[]>(() => {
     const since = addDaysIso(todayInSantiago(), -30);
-    return users.filter((u) => !u.mergedInto).map((u) => {
+    return users.filter((u) => !u.mergedInto && (showPlaceholders || !u.placeholder)).map((u) => {
       const created = orders.filter((o) => o.createdBy === u.uid);
       const packed = orders.filter((o) => o.assignedPackerId === u.uid && o.statusHistory.some((h) => h.status === 'armado' && h.by === u.uid));
       const touched = orders.filter((o) => o.statusHistory.some((h) => h.by === u.uid));
@@ -63,7 +67,7 @@ export default function Usuarios() {
         lastActivity: lastAt ? new Date(lastAt).toISOString().slice(0, 10) : null,
       };
     }).sort((a, b) => Number(a.active === false) - Number(b.active === false) || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.displayName.localeCompare(b.displayName, 'es'));
-  }, [users, orders, clients]);
+  }, [users, orders, clients, showPlaceholders]);
 
   const byRole = useMemo(() => ROLE_ORDER.map((r) => [r, users.filter((u) => u.role === r && u.active !== false).length] as const), [users]);
 
@@ -104,6 +108,14 @@ export default function Usuarios() {
             ))}
           </div>
         </section>
+      )}
+
+      {placeholderCount > 0 && (
+        <div className="mb-2 flex justify-end">
+          <button onClick={() => setShowPlaceholders((v) => !v)} className="text-[11px] uppercase tracking-display text-charcoal-500 hover:text-charcoal-900 underline">
+            {showPlaceholders ? 'Ocultar' : 'Mostrar'} personas del historial sin cuenta ({placeholderCount})
+          </button>
+        </div>
       )}
 
       <DataTable<UserRow>

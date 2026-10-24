@@ -1,3 +1,4 @@
+import { confirmPin } from '@/data/pin';
 import NewOrderTabs from '@/components/orders/NewOrderTabs';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -106,6 +107,7 @@ export default function NuevoPedido() {
     setSubmitting(true);
     setError(null);
     try {
+      await confirmPin('crear_pedido', `${isTienda ? 'Enviar reposición' : 'Enviar pedido'} · ${client.fantasyName ?? client.name}`);
       const res = await createOrder(uid, {
         client,
         lines: draft.lines,

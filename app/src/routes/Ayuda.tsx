@@ -24,6 +24,7 @@ const GUIDES: Record<Role, Guide> = {
       'Toque el botón «＋» (abajo al centro). Elija «Paso a paso» o «Pegar mensaje (IA)» si el cliente le escribió por WhatsApp.',
       'Cliente → productos → entrega → confirmar. El stock que ve es el real de Bsale; si falta, el pedido igual se envía y despacho decide.',
       'Horario de entrega obligatorio: desde y hasta qué hora recibe el cliente. Queda como habitual en su ficha. El nombre de fantasía es opcional.',
+      'Al enviar el pedido se pide su PIN: el pedido queda a su nombre.',
       'Muestras: en Productos toque «+ Muestra» (80 g por defecto, sin cargo).',
       'Condición especial (precio, corte, pago o entrega fuera de lo normal): márquela en Confirmar con una nota. El pedido queda «por aprobar» hasta que Ciro lo aprueba: no lo confirme al cliente antes.',
     ]],
@@ -56,10 +57,15 @@ const GUIDES: Record<Role, Guide> = {
   ] },
   produccion: { title: 'Producción', sections: [
     ACCESS,
-    ['Qué producir', ['«Producción» → «Demanda y stock»: lo que piden los pedidos contra el stock de Bsale. Lo marcado «a producir» va primero.']],
-    ['Registrar lo producido', [
-      '«Foto o texto (IA)»: toque «Fotografiar planilla», revise las líneas que propone la IA y confirme. También puede pegar el reporte como texto.',
-      '«Registrar a mano» si prefiere tipear producto y cantidad.',
+    ['Qué producir', [
+      '«Producción» abre con lo que esperan los pedidos, separado en «Para hoy», «Para mañana» y «Próximos días». Arriba de cada tarjeta, la cantidad a producir; abajo, cuántos pedidos esperan y el primero en entregarse.',
+      'Una franja roja a la izquierda = pedido atrasado. Toque la tarjeta para ver los pedidos.',
+      '«Todo el stock» muestra el stock de Bsale, lo reservado y lo disponible de cada formato, con buscador.',
+    ]],
+    ['Cargar lo producido', [
+      '«Fotografiar planilla»: tome la foto, toque «Leer la foto», revise las cantidades (lo dudoso aparece en dorado) y toque «Cargar».',
+      '«Registrar a mano»: busque el producto, elija el formato y escriba la cantidad. Los productos que esperan los pedidos aparecen arriba para agregarlos con un toque. El botón «Registrar» de cada tarjeta deja la cantidad lista.',
+      'Toda carga se confirma con su PIN y queda en «Cargado hoy» a su nombre. Si dice «Por cargar en Bsale», la oficina la pasa a Bsale.',
     ]],
   ] },
   admin: { title: 'Administración', sections: [

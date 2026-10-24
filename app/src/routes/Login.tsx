@@ -244,7 +244,7 @@ function LoginCard({ onPin }: { onPin: () => void }) {
 
 const STEPS: Array<{ who: string; title: string; text: string }> = [
   { who: 'Vendedor', title: 'Toma el pedido', text: 'Elige cliente, productos, fecha y horario en que el cliente recibe, viendo el stock disponible. Si falta, la app avisa a producción.' },
-  { who: 'Producción', title: 'Ve lo que falta', text: 'La demanda pendiente por producto y fecha. Registra lo producido y entra al stock de Bsale sin volver a digitarlo.' },
+  { who: 'Producción', title: 'Ve lo que falta', text: 'Lo que esperan los pedidos para hoy, mañana y los próximos días. Carga lo producido con una foto de la planilla o a mano, con su PIN, y queda registrado lo cargado en el día.' },
   { who: 'Despacho', title: 'Arma con peso real', text: 'Ve los pedidos ordenados por hora de entrega, registra lo que realmente se empacó y lo deja listo para facturar.' },
   { who: 'Administración', title: 'Factura desde Comandas', text: 'Revisa la vista previa y emite la factura o boleta en Bsale con los pesos empacados. La reserva se libera sola.' },
   { who: 'Reparto', title: 'Entrega', text: 'Marca la salida y la entrega con una nota. El vendedor ve el estado sin preguntar.' },

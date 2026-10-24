@@ -39,6 +39,7 @@ export interface DemandRow {
     orderId: string;
     clientName: string;
     requestedDate: string;
+    window?: string;
     reservedQty: number;
     pendingProductionQty: number;
   }>;
@@ -111,6 +112,7 @@ export function useProduccionData(): {
             orderId: o.id,
             clientName: o.clientSnapshot.fantasyName ?? o.clientSnapshot.name,
             requestedDate: o.requestedDate,
+            window: o.deliveryWindow?.from && o.deliveryWindow?.to ? `${o.deliveryWindow.from}–${o.deliveryWindow.to}` : undefined,
             reservedQty: l.reservedQty,
             pendingProductionQty: l.pendingProductionQty,
           });

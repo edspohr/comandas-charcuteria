@@ -150,6 +150,15 @@ service cloud.firestore {
       allow delete: if isSupervisor();
     }
 
+    // -------- Producción cargada desde Comandas (la oficina marca lo que cargó a mano en Bsale)
+    match /productionLog/{id} {
+      allow read:   if canRead();
+      allow create: if canReceiveProd() && request.resource.data.by == request.auth.uid;
+      allow update: if isSupervisor()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bsaleStatus', 'bsaleMarkedBy', 'bsaleMarkedAt']);
+      allow delete: if false;
+    }
+
     // -------- Bitácora de stock (append-only, firmada por quien la escribe)
     match /stockMovements/{id} {
       allow read:   if canRead();

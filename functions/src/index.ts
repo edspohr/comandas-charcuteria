@@ -10,7 +10,7 @@ export const parseOrder = onCall({ region: 'us-central1' }, async (req) => {
 
 export { bsaleProxy } from './bsaleProxy';
 export { claimInvite, adminInviteUser, adminUpdateUser, adminDeleteInvite } from './users';
-export { adminSetPin, verifyPin } from './pin';
+export { setOwnPin, pinLogin, adminResetPin, verifyPin } from './pin';
 export {
   bsaleDiagnose, bsaleSyncNow, bsaleScheduledSync, bsaleWebhook, bsaleWebhookInfo,
   bsaleReceiveProduction, bsaleTransferToStore, bsaleCreateClient, bsaleUpdateClient,

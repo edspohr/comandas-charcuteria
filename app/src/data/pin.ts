@@ -25,6 +25,8 @@ function requestPin(reason: string, error?: string): Promise<string | null> {
 const CACHE_MS = 2 * 60_000;
 let cached: { pin: string; at: number } | null = null;
 export const forgetPin = () => { cached = null; };
+// A PIN just verified (app unlock) also covers the next key action.
+export const rememberPin = (pin: string) => { cached = { pin, at: Date.now() }; };
 
 interface PinError { code?: string; message?: string; details?: { pin?: 'required' | 'invalid' | 'locked' | 'unset' } }
 const pinState = (e: unknown) => (e as PinError)?.details?.pin;
@@ -60,5 +62,14 @@ export async function confirmPin(action: string, reason: string, ref?: string): 
   await withPin(reason, (pin) => verifyFn({ action, ref, pin }));
 }
 
-const setPinFn = httpsCallable<{ uid: string; pin: string }, { ok: true }>(functions, 'adminSetPin');
-export async function setUserPin(uid: string, pin: string) { await setPinFn({ uid, pin }); }
+// Mirrors functions/src/pin.ts (the server checks the version).
+export const RESPONSIBILITY_VERSION = 'v1-2026-10-24';
+export const RESPONSIBILITY_TEXT = 'Declaro que este PIN es personal e intransferible y que todo lo que se haga con mi cuenta y con mi PIN en Comandas es de mi plena responsabilidad.';
+
+const setOwnFn = httpsCallable<{ pin: string; accept: boolean; version: string }, { ok: true }>(functions, 'setOwnPin');
+export async function setOwnPin(pin: string) { await setOwnFn({ pin, accept: true, version: RESPONSIBILITY_VERSION }); rememberPin(pin); }
+
+const resetFn = httpsCallable<{ uid: string }, { ok: true }>(functions, 'adminResetPin');
+export async function resetUserPin(uid: string) { await resetFn({ uid }); }
+
+export async function unlockWithPin(pin: string) { await verifyFn({ action: 'desbloqueo', pin }); rememberPin(pin); }

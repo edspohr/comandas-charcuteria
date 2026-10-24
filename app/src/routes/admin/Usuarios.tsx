@@ -1,4 +1,4 @@
-import { setUserPin } from '@/data/pin';
+import { resetUserPin } from '@/data/pin';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
@@ -112,7 +112,7 @@ export default function Usuarios() {
         rowTone={(r) => (r.active === false ? 'bad' : undefined)}
         emptyText="Todavía no hay usuarios. Agregue a la primera persona."
         columns={[
-          { key: 'name', label: 'Usuario', mobile: true, render: (r) => <div><p className="font-semibold text-charcoal-900">{r.displayName}{r.active === false && <span className="ml-2 text-[10px] uppercase text-red-700">desactivado</span>}{r.placeholder && <span className="ml-2 text-[10px] uppercase text-brass-700">sin cuenta</span>}{!r.placeholder && !r.hasPin && <span className="ml-2 text-[10px] uppercase text-charcoal-300">sin PIN</span>}</p><p className="text-[11px] text-charcoal-300 truncate">{r.placeholder ? 'Aparece en el historial de WhatsApp' : r.email}</p></div> },
+          { key: 'name', label: 'Usuario', mobile: true, render: (r) => <div><p className="font-semibold text-charcoal-900">{r.displayName}{r.active === false && <span className="ml-2 text-[10px] uppercase text-red-700">desactivado</span>}{r.placeholder && <span className="ml-2 text-[10px] uppercase text-brass-700">sin cuenta</span>}{!r.placeholder && r.pinDisabled && <span className="ml-2 text-[10px] uppercase text-red-700">PIN desactivado</span>}{!r.placeholder && !r.hasPin && !r.pinDisabled && <span className="ml-2 text-[10px] uppercase text-charcoal-300">sin PIN</span>}</p><p className="text-[11px] text-charcoal-300 truncate">{r.placeholder ? 'Aparece en el historial de WhatsApp' : r.email}</p></div> },
           { key: 'role', label: 'Perfil', mobile: true, render: (r) => <Pill tone={ROLE_TONE[r.role]}>{ROLE_LABEL[r.role]}</Pill> },
           { key: 'cartera', label: 'Cartera', align: 'right', render: (r) => isSeller(r.role) ? r.cartera : '—', muted: true },
           { key: 'creados', label: 'Pedidos 30 d', align: 'right', render: (r) => r.creados30 || '—' },
@@ -174,14 +174,13 @@ function AgregarDialog({ preset, onClose, onDone }: { preset: { displayName?: st
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role>(preset.role ?? 'vendedor');
   const [withPassword, setWithPassword] = useState(false);
-  const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const valid = displayName.trim().length >= 2 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()) && (!pin || /^\d{4,6}$/.test(pin));
+  const valid = displayName.trim().length >= 2 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
 
   async function submit() {
     setBusy(true); setError(null);
-    try { onDone(await inviteUser({ email, displayName, role, withPassword, legacyUid: preset.legacyUid, pin: pin || undefined })); } catch (e) { setError(callableMessage(e)); setBusy(false); }
+    try { onDone(await inviteUser({ email, displayName, role, withPassword, legacyUid: preset.legacyUid })); } catch (e) { setError(callableMessage(e)); setBusy(false); }
   }
 
   return (
@@ -198,7 +197,7 @@ function AgregarDialog({ preset, onClose, onDone }: { preset: { displayName?: st
           </div>
         </div>
         <div><p className="text-xs text-charcoal-500 mb-1">Perfil</p><RoleSelect value={role} onChange={setRole} /></div>
-        <PinField value={pin} onChange={setPin} />
+        <p className="text-[11px] text-charcoal-300">En su primer ingreso la persona crea su propio PIN de 4 dígitos y acepta la declaración de responsabilidad. Nadie más lo conoce.</p>
         {error && <ErrorBanner message={error} />}
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
@@ -209,25 +208,12 @@ function AgregarDialog({ preset, onClose, onDone }: { preset: { displayName?: st
   );
 }
 
-// PIN personal: 4–6 dígitos, lo pide la app antes de escribir en Bsale y en
-// acciones importantes. Se entrega en persona; no viaja por correo.
-function PinField({ value, onChange, label = 'PIN personal (4–6 dígitos, opcional: se puede asignar después)' }: { value: string; onChange: (v: string) => void; label?: string }) {
-  return (
-    <label className="block">
-      <span className="text-xs text-charcoal-500">{label}</span>
-      <input type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={value} onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))} className="field mt-1 w-40 tracking-[0.4em]" />
-      <span className="block text-[11px] text-charcoal-300 mt-1">Lo pide antes de facturar, anular, registrar en Bsale y otras acciones importantes. La persona responde por lo que se haga con su PIN.</span>
-    </label>
-  );
-}
-
 function EditarDialog({ user, isSelf, onClose, onDone }: { user: AppUser; isSelf: boolean; onClose: () => void; onDone: (msg: string) => void }) {
   const [displayName, setDisplayName] = useState(user.displayName);
   const [role, setRole] = useState<Role>(user.role);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const active = user.active !== false;
-  const [pin, setPin] = useState('');
 
   async function save(patch: { role?: Role; active?: boolean; displayName?: string }, msg: string) {
     setBusy(true); setError(null);
@@ -240,14 +226,17 @@ function EditarDialog({ user, isSelf, onClose, onDone }: { user: AppUser; isSelf
         <label className="block"><span className="text-xs text-charcoal-500">Nombre</span><input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="field mt-1 w-full" /></label>
         <div><p className="text-xs text-charcoal-500 mb-1">Perfil</p><RoleSelect value={role} onChange={setRole} /></div>
         <p className="text-[11px] text-charcoal-300">El cambio de perfil se aplica de inmediato en la sesión abierta de la persona.</p>
-        <div className="rounded-md border border-charcoal-100 p-3 space-y-2">
-          <PinField value={pin} onChange={setPin} label={user.hasPin ? 'PIN personal (ya tiene; escriba uno nuevo para cambiarlo)' : 'PIN personal (no tiene)'} />
-          <div className="flex justify-end">
-            <Button size="sm" variant="secondary" disabled={busy || !/^\d{4,6}$/.test(pin)} onClick={async () => {
+        <div className="rounded-md border border-charcoal-100 p-3 flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-xs text-charcoal-600">
+            {user.pinDisabled ? 'PIN desactivado por intentos fallidos.' : user.hasPin ? `PIN creado${user.pinAcceptedAt ? ` · aceptó la responsabilidad el ${new Date(user.pinAcceptedAt).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}` : ''}.` : 'Todavía no crea su PIN (lo hace en su primer ingreso).'}
+          </p>
+          {(user.hasPin || user.pinDisabled) && (
+            <Button size="sm" variant="secondary" disabled={busy} onClick={async () => {
+              if (!window.confirm(`¿Borrar el PIN de ${user.displayName}? En su próximo ingreso con Google o contraseña creará uno nuevo.`)) return;
               setBusy(true); setError(null);
-              try { await setUserPin(user.uid, pin); onDone(`PIN asignado a ${user.displayName}. Entrégueselo en persona.`); } catch (e) { setError(callableMessage(e)); setBusy(false); }
-            }}>{user.hasPin ? 'Cambiar PIN' : 'Asignar PIN'}</Button>
-          </div>
+              try { await resetUserPin(user.uid); onDone(`PIN de ${user.displayName} borrado: creará uno nuevo al entrar con Google o contraseña.`); } catch (e) { setError(callableMessage(e)); setBusy(false); }
+            }}>Borrar PIN</Button>
+          )}
         </div>
         {error && <ErrorBanner message={error} />}
         <div className="flex justify-between gap-2 pt-1 flex-wrap">

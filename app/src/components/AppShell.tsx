@@ -6,6 +6,7 @@ import type { Role } from '@/domain/types';
 import { ROUTE_ACCESS, can, canAny, type RouteKey } from '@/domain/permissions';
 import IntegrationHealth from '@/components/IntegrationHealth';
 import PinPrompt from '@/components/PinPrompt';
+import AppLock from '@/components/AppLock';
 
 // Navegación en dos formas:
 //   - Escritorio (lg+): sidebar fijo con grupos. El superadmin tiene 11
@@ -179,6 +180,7 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
           {children}
         </main>
         <PinPrompt />
+        <AppLock />
         <footer className="text-center py-6 text-[10px] uppercase tracking-display text-charcoal-300">
           La Charcutería Artesanal · Barrio Franklin
         </footer>

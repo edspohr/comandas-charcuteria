@@ -8,11 +8,11 @@ import type { Invite, Role } from '@/domain/types';
 // Thin wrappers over the admin callables (functions/src/users.ts). Only a
 // superAdmin token passes them; the rules forbid writing users/invites here.
 
-const inviteFn = httpsCallable<{ email: string; displayName: string; role: Role; withPassword: boolean; legacyUid?: string; pin?: string }, { status: 'invited' | 'created'; uid?: string }>(functions, 'adminInviteUser');
+const inviteFn = httpsCallable<{ email: string; displayName: string; role: Role; withPassword: boolean; legacyUid?: string }, { status: 'invited' | 'created'; uid?: string }>(functions, 'adminInviteUser');
 const updateFn = httpsCallable<{ uid: string; role?: Role; active?: boolean; displayName?: string }, { ok: true }>(functions, 'adminUpdateUser');
 const deleteInviteFn = httpsCallable<{ email: string }, { ok: true }>(functions, 'adminDeleteInvite');
 
-export async function inviteUser(input: { email: string; displayName: string; role: Role; withPassword: boolean; legacyUid?: string; pin?: string }): Promise<string> {
+export async function inviteUser(input: { email: string; displayName: string; role: Role; withPassword: boolean; legacyUid?: string }): Promise<string> {
   const res = await inviteFn(input);
   if (res.data.status === 'created') {
     // The account exists with a throwaway password: the person receives

@@ -4,6 +4,7 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   signInWithPopup,
   signInWithRedirect,
   signOut as fbSignOut,
@@ -77,6 +78,11 @@ function watchUserDoc(fbUser: FbUser) {
       return;
     }
     await ensureFreshClaim(fbUser, appUser.role);
+    // A sign-in that just happened (e.g. Google via redirect) already proved
+    // who this is: don't ask the PIN on top of it.
+    const signedInAt = Date.parse(fbUser.metadata.lastSignInTime ?? '');
+    if (signedInAt && Date.now() - signedInAt < 2 * 60_000) markUnlocked();
+    if (appUser.email) rememberUser({ email: appUser.email, name: appUser.displayName });
     emit({ current: { fbUser, appUser }, loading: false, denied: null });
   }, async () => {
     // Rules deny reading users/* until the claim exists; retry after refresh.
@@ -117,6 +123,7 @@ export function useCurrentUser(): AuthState {
 export async function signInWithPassword(email: string, password: string) {
   emit({ ...authState, denied: null });
   await signInWithEmailAndPassword(auth, email.trim(), password);
+  markUnlocked();
 }
 
 export async function signInWithGoogle() {
@@ -125,6 +132,7 @@ export async function signInWithGoogle() {
   provider.setCustomParameters({ prompt: 'select_account' });
   try {
     await signInWithPopup(auth, provider);
+    markUnlocked();
   } catch (e) {
     // Installed PWAs (iOS standalone) and some mobile browsers block popups.
     const code = (e as { code?: string }).code;
@@ -136,17 +144,54 @@ export async function signInWithGoogle() {
   }
 }
 
+// Correo + PIN (functions/src/pin.ts pinLogin): the server checks the PIN and
+// hands back a session token. The device remembers who signed in.
+const pinLoginFn = httpsCallable<{ email: string; pin: string }, { token: string }>(functions, 'pinLogin');
+export async function signInWithPin(email: string, pin: string) {
+  emit({ ...authState, denied: null });
+  const { token } = (await pinLoginFn({ email: email.trim().toLowerCase(), pin })).data;
+  await signInWithCustomToken(auth, token);
+  markUnlocked();
+}
+
+const RECENT_KEY = 'comandas.recentUsers';
+export interface RecentUser { email: string; name: string }
+export function recentUsers(): RecentUser[] {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as RecentUser[]; } catch { return []; }
+}
+export function rememberUser(u: RecentUser) {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify([u, ...recentUsers().filter((x) => x.email !== u.email)].slice(0, 8))); } catch { /* private mode */ }
+}
+export function forgetRecentUser(email: string) {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(recentUsers().filter((x) => x.email !== email))); } catch { /* private mode */ }
+}
+
+// App lock (components/AppLock): the PIN is asked when the app opens and
+// after 30 minutes without use. sessionStorage dies with the app/tab, so a
+// fresh open is always locked; a login in this session counts as unlocking.
+const UNLOCK_KEY = 'comandas.lastActive';
+export const LOCK_AFTER_MS = 30 * 60_000;
+export function markUnlocked() { try { sessionStorage.setItem(UNLOCK_KEY, String(Date.now())); } catch { /* ignore */ } }
+export function touchActivity() { try { if (sessionStorage.getItem(UNLOCK_KEY)) sessionStorage.setItem(UNLOCK_KEY, String(Date.now())); } catch { /* ignore */ } }
+export function isLocked(): boolean {
+  try { const t = Number(sessionStorage.getItem(UNLOCK_KEY) ?? 0); return !t || Date.now() - t > LOCK_AFTER_MS; } catch { return false; }
+}
+export function lockNow() { try { sessionStorage.removeItem(UNLOCK_KEY); } catch { /* ignore */ } }
+
 export async function requestPasswordReset(email: string) {
   await sendPasswordResetEmail(auth, email.trim());
 }
 
 export async function signOut() {
   emit({ ...authState, denied: null });
+  lockNow();
   await fbSignOut(auth);
 }
 
 export function authErrorMessage(e: unknown): string {
   const code = (e as { code?: string }).code ?? '';
+  // Callable errors (pinLogin) already carry a message in Spanish.
+  if (code.startsWith('functions/')) return code === 'functions/unavailable' || code === 'functions/internal' ? 'No se pudo conectar. Revise su internet e intente de nuevo.' : (e as Error).message;
   if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') return 'Correo o contraseña incorrectos.';
   if (code === 'auth/too-many-requests') return 'Demasiados intentos. Espere unos minutos o restablezca su contraseña.';
   if (code === 'auth/user-disabled') return 'Su usuario está desactivado. Contacte a un administrador.';

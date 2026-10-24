@@ -228,6 +228,8 @@ export interface AppUser {
   placeholder?: boolean;
   // Tiene PIN personal asignado (functions/src/pin.ts).
   hasPin?: boolean;
+  pinDisabled?: boolean;
+  pinAcceptedAt?: number;
   mergedInto?: string;
 }
 

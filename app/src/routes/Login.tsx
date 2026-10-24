@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { DEMO_PASSWORD, demoUsers, type DemoUser } from '@/data/demo-users';
-import { authErrorMessage, requestPasswordReset, signInWithGoogle, signInWithPassword, useCurrentUser } from '@/data/auth';
+import { authErrorMessage, forgetRecentUser, recentUsers, requestPasswordReset, signInWithGoogle, signInWithPassword, signInWithPin, useCurrentUser, type RecentUser } from '@/data/auth';
 import { ROLES, ROLE_DESCRIPTION, ROLE_LABEL } from '@/domain/permissions';
 import Logo, { LogoLockup } from '@/components/ui/Logo';
 import Button from '@/components/ui/Button';
@@ -59,7 +59,7 @@ function Hero() {
         </div>
         {/* En móvil el acceso va antes de las cifras: el equipo entra sin scroll. */}
         <div id="ingresar" className="scroll-mt-4">
-          <LoginCard />
+          <AccessCard />
           {DEMO_LOGIN && <DemoTiles />}
         </div>
         <Stats className="grid lg:hidden -mt-2" />
@@ -90,7 +90,73 @@ function Stat({ value, label }: { value: string; label: string }) {
 
 type Mode = 'login' | 'reset';
 
-function LoginCard() {
+// Ingreso diario con correo + PIN; la tarjeta de Google/contraseña queda para
+// la primera vez (crear el PIN), si olvidó el PIN o si lo prefiere.
+function AccessCard() {
+  const [method, setMethod] = useState<'pin' | 'cuenta'>(() => (recentUsers().length ? 'pin' : 'cuenta'));
+  return method === 'pin'
+    ? <PinLoginCard onOtherMethod={() => setMethod('cuenta')} />
+    : <LoginCard onPin={() => setMethod('pin')} />;
+}
+
+function PinLoginCard({ onOtherMethod }: { onOtherMethod: () => void }) {
+  const { denied } = useCurrentUser();
+  const [recent, setRecent] = useState<RecentUser[]>(() => recentUsers());
+  const [email, setEmail] = useState(() => recentUsers()[0]?.email ?? '');
+  const [pin, setPin] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pinRef = useRef<HTMLInputElement>(null);
+  const valid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()) && /^\d{4}$/.test(pin);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!valid || pending) return;
+    setPending(true); setError(null);
+    try { await signInWithPin(email, pin); }
+    catch (err) { setError(authErrorMessage(err) || 'No se pudo ingresar.'); setPin(''); pinRef.current?.focus(); }
+    finally { setPending(false); }
+  }
+
+  const message = error ?? denied;
+  return (
+    <div className="card p-5 sm:p-6 text-charcoal-700 shadow-lift">
+      <p className="eyebrow">Acceso del equipo</p>
+      <h2 className="text-lg font-semibold text-charcoal-900 tracking-display uppercase mt-1 mb-4">Ingresar con PIN</h2>
+      {recent.length > 0 && (
+        <div className="mb-3">
+          <p className="text-xs text-charcoal-500 mb-1.5">En este dispositivo</p>
+          <div className="flex flex-wrap gap-1.5">
+            {recent.map((u) => (
+              <span key={u.email} className={'inline-flex items-center rounded-md border text-sm ' + (u.email === email ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-700')}>
+                <button type="button" className="px-3 py-1.5" onClick={() => { setEmail(u.email); setPin(''); setError(null); setTimeout(() => pinRef.current?.focus(), 30); }}>{u.name}</button>
+                <button type="button" aria-label={`Quitar a ${u.name} de este dispositivo`} className="pr-2 opacity-60 hover:opacity-100" onClick={() => { forgetRecentUser(u.email); setRecent(recentUsers()); if (email === u.email) setEmail(''); }}>×</button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      <form onSubmit={submit} className="space-y-3">
+        <label className="block">
+          <span className="text-xs text-charcoal-500">Correo</span>
+          <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} className="field mt-1" />
+        </label>
+        <label className="block">
+          <span className="text-xs text-charcoal-500">PIN</span>
+          <input ref={pinRef} type="password" inputMode="numeric" autoComplete="current-password" maxLength={4} value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} className="field mt-1 text-center text-2xl tracking-[0.6em] h-12" aria-label="PIN de 4 dígitos" />
+        </label>
+        <Button type="submit" className="w-full" disabled={!valid || pending}>{pending ? 'Ingresando…' : 'Ingresar'}</Button>
+      </form>
+      {message && <div role="alert" className="mt-3 rounded-md border border-red-200 bg-red-50 text-red-800 text-sm px-3 py-2">{message}</div>}
+      <div className="text-center mt-4">
+        <button type="button" onClick={onOtherMethod} className="text-xs text-charcoal-500 underline hover:text-charcoal-900">Primera vez, olvidó su PIN o prefiere Google / contraseña</button>
+      </div>
+    </div>
+  );
+}
+
+function LoginCard({ onPin }: { onPin: () => void }) {
   const { denied } = useCurrentUser();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
@@ -161,7 +227,10 @@ function LoginCard() {
         {message && <div role="alert" className="rounded-md border border-red-200 bg-red-50 text-red-800 text-sm px-3 py-2">{message}</div>}
         {info && <div className="rounded-md border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm px-3 py-2">{info}</div>}
 
-        <p className="text-[11px] text-charcoal-300 text-center">El acceso es por invitación. Si no puede entrar, pídale a administración que lo agregue con su correo.</p>
+        <p className="text-[11px] text-charcoal-300 text-center">El acceso es por invitación. Si no puede entrar, pídale a administración que lo agregue con su correo. La primera vez la app le pide crear su PIN.</p>
+        <div className="text-center">
+          <button type="button" onClick={onPin} className="text-xs text-charcoal-500 underline hover:text-charcoal-900">Ya tengo PIN: entrar con correo y PIN</button>
+        </div>
       </div>
     </div>
   );

@@ -111,9 +111,6 @@ service cloud.firestore {
     match /userPins/{uid} {
       allow read, write: if false;
     }
-    match /invitePins/{email} {
-      allow read, write: if false;
-    }
     match /pinLog/{id} {
       allow read:  if isSuperAdmin() || role() == 'consultor';
       allow write: if false;

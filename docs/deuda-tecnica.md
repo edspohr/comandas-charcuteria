@@ -13,7 +13,7 @@ Actualizado al 24-10-2026, versión 1.0. Prioridad: **Alta** = riesgo de datos o
 | DT-07 | Alta | Datos | Calidad del dato en Bsale (precios $0, stock absurdo, variantes sin cruce, 119 clientes sin vínculo) |
 | DT-08 | Media | Calidad | Sin tests unitarios ni e2e; solo 15 tests de reglas |
 | DT-09 | Media | Mantención | Componentes muy grandes |
-| DT-10 | Media | Operación | Alertas de errores no configuradas y sin acceso a Cloud Scheduler |
+| DT-10 | Baja | Operación | Sin acceso a Cloud Scheduler (alertas configuradas el 24-10) |
 | DT-11 | Alta | Seguridad | `service-account.json` local sin rotar |
 | DT-12 | Baja | Correctitud | Fechas con hora local del navegador en algunos cálculos |
 | DT-13 | Media | IA | Lectura de foto sin verificar; Gemini no habilitado en staging |
@@ -71,11 +71,11 @@ Solo hay 15 tests de reglas. No hay tests unitarios del dominio (`parse/local`, 
 `NuevoPedido.tsx` (~920 líneas), `orders.ts` (~800), `PanelGestion.tsx` (~670), `Produccion.tsx` (~575), `Tablero.tsx` (~540), `sync.ts` (~500), `OrderDialogs.tsx` (~490).
 **Propuesta:** separar los pasos del wizard, dividir `orders.ts` en creación, armado, despacho y facturación, y dividir `OrderDialogs` en un archivo por diálogo. Hacerlo al tocar cada archivo, no como proyecto aparte.
 
-### DT-10 · Alertas y Scheduler · Media
-- `scripts/setup-alerts.sh` (correo ante errores de las funciones de Bsale) no se ha corrido.
+### DT-10 · Alertas y Scheduler · Baja
+- Alertas: `scripts/setup-alerts.sh` ya se corrió (24-10). Llega un correo a edmundo@spohr.cl ante errores de las funciones `bsale*`.
 - La cuenta de servicio no tiene permisos sobre Cloud Scheduler: no se puede forzar la sincronización programada desde la terminal. Hay que esperar el cron o usar «Sincronizar» en la app.
 
-**Propuesta:** correr `bash scripts/setup-alerts.sh <correo>` con una cuenta Owner y dar `roles/cloudscheduler.admin` a quien opere.
+**Propuesta:** dar `roles/cloudscheduler.admin` a quien opere.
 
 ### DT-11 · Credenciales locales · Alta
 `service-account.json` (Admin SDK de producción) está en la raíz del repo local. Está ignorado por git, pero se ha usado para auditorías y conviene rotarlo.

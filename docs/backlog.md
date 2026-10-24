@@ -17,7 +17,7 @@ La deuda técnica está en [deuda-tecnica.md](deuda-tecnica.md).
 | 4 | Decidir si la producción (y luego los traslados) se escriben en Bsale desde la semana 1. Hoy: escrituras apagadas, la oficina carga a mano | Edmundo / Ciro | Por decidir |
 | 5 | Corregir en Bsale los precios en $0 y el stock absurdo (DT-07) | Miguel | Pendiente |
 | 6 | Revisar el cruce de variantes pendiente y asociar los 119 clientes «por revisar» | Miguel / Edmundo | Pendiente |
-| 7 | Correr `scripts/setup-alerts.sh` y rotar `service-account.json` (DT-10, DT-11) | Edmundo | Pendiente |
+| 7 | Correr `scripts/setup-alerts.sh` (hecho 24-10) y rotar `service-account.json` (DT-11) | Edmundo | Alertas listas; rotación pendiente |
 | 8 | Grupo de soporte (WhatsApp) para reportar fallas con captura | Edmundo | Pendiente |
 | 9 | Habilitar AI Logic en staging y verificar la foto de la planilla (DT-13) | Edmundo | Pendiente |
 | 10 | Probar el PIN al enviar un pedido de punta a punta con un vendedor real | Equipo | Pendiente |

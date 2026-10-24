@@ -111,7 +111,7 @@ Todos se corren desde la raíz. Los que tocan producción piden `--confirm coman
 | `catalog-golive.ts` | 13 cruces y 22 productos `sellable:false` | aplicado 23-10 |
 | `migrate-claims.ts` | copia `users.role` al claim | aplicado |
 | `appcheck-setup.mjs` | App Check para Gemini | aplicado (producción) |
-| `setup-alerts.sh` | alerta por correo ante errores de las funciones de Bsale | **pendiente** |
+| `setup-alerts.sh` | alerta por correo ante errores de las funciones de Bsale | aplicado 24-10 (edmundo@spohr.cl; correrlo de nuevo duplica la alerta) |
 | `verify-*.ts` | verificaciones manuales de datos, parser y Gemini | vigente |
 
 Las auditorías ad hoc van en `private/` (gitignored), nunca en `scripts/`.

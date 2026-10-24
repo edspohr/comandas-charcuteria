@@ -6,6 +6,7 @@ import type { Role } from '@/domain/types';
 import { ROUTE_ACCESS, can, canAny, type RouteKey } from '@/domain/permissions';
 import IntegrationHealth from '@/components/IntegrationHealth';
 import PinPrompt from '@/components/PinPrompt';
+import InstallButton from '@/components/InstallButton';
 import AppLock from '@/components/AppLock';
 
 // Navegación en dos formas:
@@ -106,6 +107,7 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
             </div>
           ))}
         </nav>
+        <div className="px-4 pt-3"><InstallButton className="w-full justify-center" /></div>
         <div className="border-t border-cream-100/10 px-4 py-3 flex items-center justify-between gap-2">
           <div className="min-w-0 leading-tight">
             <p className="text-sm font-medium truncate">{current.appUser.displayName}</p>
@@ -125,7 +127,8 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
               <Logo size={30} />
               <span className="font-semibold tracking-display uppercase text-sm">Comandas</span>
             </Link>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <InstallButton />
               <div className="text-right leading-tight hidden sm:block">
                 <div className="text-sm font-medium">{current.appUser.displayName}</div>
                 <div className="text-[10px] text-cream-100/70 uppercase tracking-display">{ROLE_LABEL[role]}</div>

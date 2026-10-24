@@ -1,3 +1,4 @@
+import InstallButton from '@/components/InstallButton';
 import { useRef, useState, type ReactNode } from 'react';
 import { DEMO_PASSWORD, demoUsers, type DemoUser } from '@/data/demo-users';
 import { authErrorMessage, forgetRecentUser, recentUsers, requestPasswordReset, signInWithGoogle, signInWithPassword, signInWithPin, useCurrentUser, type RecentUser } from '@/data/auth';
@@ -35,7 +36,10 @@ function TopBar() {
           <span aria-hidden className="h-4 w-[3px] rounded-full bg-brass-500" />
           Comandas
         </span>
-        <a href="#ingresar" className="lg:hidden text-[11px] uppercase tracking-display border border-cream-100/30 rounded-md px-3 py-1.5 hover:border-cream-100/60">Ingresar</a>
+        <div className="flex items-center gap-2">
+          <InstallButton />
+          <a href="#ingresar" className="lg:hidden text-[11px] uppercase tracking-display border border-cream-100/30 rounded-md px-3 py-1.5 hover:border-cream-100/60">Ingresar</a>
+        </div>
       </div>
     </div>
   );

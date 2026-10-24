@@ -53,7 +53,10 @@ const weekOrders: Order[] = rawWeekOrders.map(shiftOrder);
 //   - Set USE_REAL_FIREBASE=1 + GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json
 //     to run against the real project. The service account must have
 //     Firebase Admin permissions on the target project.
-const useEmulators = process.env.USE_REAL_FIREBASE !== '1';
+//   - SEED_TARGET=staging seeds comandas-staging (demo users and data for
+//     end-to-end tests), with Application Default Credentials.
+const toStaging = process.env.SEED_TARGET === 'staging';
+const useEmulators = process.env.USE_REAL_FIREBASE !== '1' && !toStaging;
 
 if (useEmulators) {
   process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:8080';
@@ -63,7 +66,7 @@ if (useEmulators) {
   delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
 }
 
-const PROJECT_ID = useEmulators ? 'comandas-charcuteria-demo' : 'comandas-charcuteria';
+const PROJECT_ID = toStaging ? 'comandas-staging' : useEmulators ? 'comandas-charcuteria-demo' : 'comandas-charcuteria';
 
 function assertTarget() {
   if (useEmulators) {
@@ -72,6 +75,7 @@ function assertTarget() {
     }
     return;
   }
+  if (toStaging && PROJECT_ID === 'comandas-staging') return;
   // Since the real rollout (Oct 2026) the real project holds real people and
   // real orders: demo data goes to emulators only. Use scripts/reset-real.ts
   // to clean the real project and scripts/bootstrap-admin.ts for first users.

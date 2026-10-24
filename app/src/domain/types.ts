@@ -51,7 +51,12 @@ export interface Product {
   discontinued: boolean;
   formats: ProductFormat[];
   aliases?: string[];
+  // false = existe en Bsale pero no se ofrece al tomar pedidos (materia
+  // prima, insumos, ítems de la tienda web). Sigue sincronizando stock.
+  sellable?: boolean;
 }
+
+export const isSellable = (p: Pick<Product, 'active' | 'discontinued' | 'sellable'>) => p.active && !p.discontinued && p.sellable !== false;
 
 // Stock is a *mirror* of Bsale, not a source of truth. `onHand` is the last
 // quantity Bsale reported for the variant (see syncStockFromBsale); the app
@@ -221,6 +226,8 @@ export interface AppUser {
   // WhatsApp) pero aún no tiene cuenta. Al invitarla, adminInviteUser y
   // claimInvite reasignan sus pedidos y cartera al uid real (mergedInto).
   placeholder?: boolean;
+  // Tiene PIN personal asignado (functions/src/pin.ts).
+  hasPin?: boolean;
   mergedInto?: string;
 }
 

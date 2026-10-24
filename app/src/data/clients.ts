@@ -171,7 +171,7 @@ export async function createClientQuick(input: QuickClientInput, by: string): Pr
     await setDoc(doc(db, 'clients', id), client);
   } catch (e) {
     console.error('[clients] mirror create failed after Bsale create', e);
-    throw new Error('El cliente se creó en Bsale pero la copia local falló. Sincronizá con Bsale y volvé a buscarlo.');
+    throw new Error('El cliente se creó en Bsale pero la copia local falló. Sincronice con Bsale y vuelva a buscarlo.');
   }
   return client;
 }
@@ -270,6 +270,6 @@ export async function updateClientAdmin(client: Client, patch: ClientAdminPatch,
     await updateDoc(doc(db, 'clients', client.id), mirror);
   } catch (e) {
     console.error('[clients] mirror update failed after Bsale update', e);
-    throw new Error('Bsale quedó actualizado pero la copia local falló. Tocá "Sincronizar Bsale" en el tablero para alinearla.');
+    throw new Error('Bsale quedó actualizado pero la copia local falló. Toque "Sincronizar Bsale" en el tablero para alinearla.');
   }
 }

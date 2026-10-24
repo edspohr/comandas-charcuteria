@@ -84,6 +84,10 @@ export type ActionKind = 'take' | 'arm' | 'link' | 'transfer' | 'samples' | 'dis
 
 export interface NextAction { kind: ActionKind; label: string; }
 
+// A sale that left without its document (despachar sin factura).
+export const needsLateInvoice = (o: Pick<Order, 'invoiceRef' | 'kind' | 'status'>) =>
+  !o.invoiceRef && (o.kind ?? 'venta') === 'venta' && ['despachado', 'entregado'].includes(o.status);
+
 export function nextAction(order: Order, role: Role, uid: string, opts: { isShop?: boolean; strictStock?: boolean } = {}): NextAction {
   const shop = opts.isShop || order.kind === 'reposicion';
   // Supervisores (administración) pueden mover cualquier tarjeta; el resto
@@ -115,6 +119,10 @@ export function nextAction(order: Order, role: Role, uid: string, opts: { isShop
     case 'despachado':
       if (shop && can(role, 'transfer.receive')) return { kind: 'deliver', label: 'Recibir en tienda' };
       return can(role, 'order.deliver') ? { kind: 'deliver', label: 'Entregar' } : { kind: 'none', label: '' };
+    case 'entregado':
+      // Dispatched without a document: invoice after delivery (superAdmin).
+      if (needsLateInvoice(order) && can(role, 'order.invoiceLate')) return { kind: 'link', label: 'Facturar' };
+      return { kind: 'none', label: '' };
     default:
       return { kind: 'none', label: '' };
   }

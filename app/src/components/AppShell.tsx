@@ -5,6 +5,7 @@ import Logo from '@/components/ui/Logo';
 import type { Role } from '@/domain/types';
 import { ROUTE_ACCESS, can, canAny, type RouteKey } from '@/domain/permissions';
 import IntegrationHealth from '@/components/IntegrationHealth';
+import PinPrompt from '@/components/PinPrompt';
 
 // Navegación en dos formas:
 //   - Escritorio (lg+): sidebar fijo con grupos. El superadmin tiene 11
@@ -177,6 +178,7 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
           {canAny(role, ['stock.sync', 'order.link', 'bsale.configure']) && <IntegrationHealth canFix={can(role, 'bsale.configure')} />}
           {children}
         </main>
+        <PinPrompt />
         <footer className="text-center py-6 text-[10px] uppercase tracking-display text-charcoal-300">
           La Charcutería Artesanal · Barrio Franklin
         </footer>

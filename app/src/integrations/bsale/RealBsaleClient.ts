@@ -1,3 +1,4 @@
+import { withPin } from '@/data/pin';
 import { httpsCallable } from 'firebase/functions';
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
 import { db, functions } from '@/data/firebase';
@@ -17,8 +18,8 @@ import { bsale as mock } from './MockBsaleClient';
 
 export const REAL_DOCS_PATH = ['bsale', 'sales', 'documents'] as const;
 
-const createFn = httpsCallable<BsaleCustomerInput, { dryRun: boolean; customer: BsaleCustomer | null }>(functions, 'bsaleCreateClient');
-const updateFn = httpsCallable<{ bsaleClientId: string; patch: Partial<BsaleCustomerInput> }, { dryRun: boolean; customer: BsaleCustomer | null }>(functions, 'bsaleUpdateClient');
+const createFn = httpsCallable<BsaleCustomerInput & { pin?: string }, { dryRun: boolean; customer: BsaleCustomer | null }>(functions, 'bsaleCreateClient');
+const updateFn = httpsCallable<{ bsaleClientId: string; patch: Partial<BsaleCustomerInput>; pin?: string }, { dryRun: boolean; customer: BsaleCustomer | null }>(functions, 'bsaleUpdateClient');
 
 export class RealBsaleClient implements BsaleClient {
   async getStocks(): Promise<BsaleVariantStock[]> {
@@ -45,11 +46,11 @@ export class RealBsaleClient implements BsaleClient {
 
   // null = Bsale está en simulacro: el alta quedó en la bitácora sin enviarse.
   async createClient(input: BsaleCustomerInput): Promise<BsaleCustomer | null> {
-    return (await createFn(input)).data.customer;
+    return withPin('Crear el cliente en Bsale', async (pin) => (await createFn({ ...input, pin })).data.customer);
   }
 
   async updateClient(id: string, patch: Partial<BsaleCustomerInput>): Promise<BsaleCustomer | null> {
-    return (await updateFn({ bsaleClientId: id, patch })).data.customer;
+    return withPin('Actualizar el cliente en Bsale', async (pin) => (await updateFn({ bsaleClientId: id, patch, pin })).data.customer);
   }
 
   buildPayload(order: Order, invoiceRef?: string): unknown {

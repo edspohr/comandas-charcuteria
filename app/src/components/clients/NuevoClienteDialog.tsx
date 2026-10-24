@@ -66,7 +66,7 @@ export default function NuevoClienteDialog({ initial, uid, onClose, onCreated }:
         <Field label="Notas"><input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Contacto, referencias…" className="field h-10 text-sm" /></Field>
 
         <div className={'rounded-md p-2.5 text-xs border ' + (complete ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-brass-50 border-brass-300 text-brass-700')}>
-          {complete ? 'Datos de facturación completos.' : 'Se creará con facturación incompleta: podés tomar el pedido igual; administración completa RUT, razón social, giro y dirección después.'}
+          {complete ? 'Datos de facturación completos.' : 'Se creará con facturación incompleta: puede tomar el pedido igual; administración completa RUT, razón social, giro y dirección después.'}
         </div>
         {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-2 text-sm">{error}</div>}
         <div className="flex gap-2">

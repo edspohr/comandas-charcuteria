@@ -3,6 +3,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { randomBytes } from 'node:crypto';
 import { REGION, ROLES, isRole, type Role } from './common';
+import { pinRecord, storePin, validatePin } from './pin';
 
 // Gestión de usuarios. El rol vive en dos lados y estas funciones son las
 // únicas que lo escriben, siempre juntos:
@@ -89,6 +90,8 @@ export const claimInvite = onCall({ region: REGION }, async (req) => {
   };
   await writeUser(user);
   await mergePlaceholder(inv.legacyUid, user.uid);
+  const pinSnap = await getFirestore().doc(`invitePins/${email}`).get();
+  if (pinSnap.exists) { await storePin(user.uid, pinSnap.data() as ReturnType<typeof pinRecord>); await pinSnap.ref.delete(); }
   await inviteRef.delete();
   return { user };
 });
@@ -103,6 +106,8 @@ export const adminInviteUser = onCall({ region: REGION }, async (req) => {
   const displayName = typeof req.data?.displayName === 'string' ? req.data.displayName.trim() : '';
   const role = req.data?.role;
   const withPassword = req.data?.withPassword === true;
+  const pin = typeof req.data?.pin === 'string' && req.data.pin ? req.data.pin : undefined;
+  if (pin) validatePin(pin);
   const legacyUid = typeof req.data?.legacyUid === 'string' && req.data.legacyUid.startsWith('wa-') ? req.data.legacyUid : undefined;
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpsError('invalid-argument', 'Correo no válido.');
   if (displayName.length < 2) throw new HttpsError('invalid-argument', 'Indique el nombre.');
@@ -116,7 +121,12 @@ export const adminInviteUser = onCall({ region: REGION }, async (req) => {
     throw new HttpsError('already-exists', 'Ese correo ya tiene usuario. Cambie su perfil desde la lista.');
   }
 
-  await db.doc(`invites/${email}`).set({ email, displayName, role, createdAt: Date.now(), createdBy: by, ...(legacyUid ? { legacyUid } : {}) });
+  // The PIN waits hashed in invitePins (server-only: a short PIN hash is
+  // brute-forceable, so it never sits where the app can read it) and lands
+  // in userPins on first login.
+  const pinRec = pin ? pinRecord(pin, by) : undefined;
+  await db.doc(`invites/${email}`).set({ email, displayName, role, createdAt: Date.now(), createdBy: by, ...(legacyUid ? { legacyUid } : {}), ...(pinRec ? { hasPin: true } : {}) });
+  if (pinRec) await db.doc(`invitePins/${email}`).set(pinRec);
 
   if (withPassword) {
     const uid = existingUid ?? (await auth.createUser({
@@ -127,7 +137,9 @@ export const adminInviteUser = onCall({ region: REGION }, async (req) => {
     })).uid;
     await writeUser({ uid, displayName, email, role, active: true, createdAt: Date.now(), createdBy: by });
     await mergePlaceholder(legacyUid, uid);
+    if (pinRec) await storePin(uid, pinRec);
     await db.doc(`invites/${email}`).delete();
+    await db.doc(`invitePins/${email}`).delete();
     return { status: 'created', uid };
   }
   return { status: 'invited' };
@@ -171,5 +183,6 @@ export const adminDeleteInvite = onCall({ region: REGION }, async (req) => {
   const email = normEmail(req.data?.email);
   if (!email) throw new HttpsError('invalid-argument', 'Falta el correo.');
   await getFirestore().doc(`invites/${email}`).delete();
+  await getFirestore().doc(`invitePins/${email}`).delete();
   return { ok: true };
 });

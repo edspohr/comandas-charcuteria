@@ -107,6 +107,18 @@ service cloud.firestore {
       allow read:  if canRead() || (isAuth() && request.auth.uid == uid);
       allow write: if false;
     }
+    // PIN: el hash solo lo ve el servidor; la bitácora de usos, auditoría.
+    match /userPins/{uid} {
+      allow read, write: if false;
+    }
+    match /invitePins/{email} {
+      allow read, write: if false;
+    }
+    match /pinLog/{id} {
+      allow read:  if isSuperAdmin() || role() == 'consultor';
+      allow write: if false;
+    }
+
     match /invites/{email} {
       allow read:  if isSuperAdmin() || role() == 'consultor';
       allow write: if false;

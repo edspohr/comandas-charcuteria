@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '@/components/ui/Button';
 import { useCurrentUser } from '@/data/auth';
@@ -6,6 +6,7 @@ import { useProducts } from '@/data/products';
 import { parseLocal, type ParsedLine, type MatchStatus } from '@/domain/parse/local';
 import { geminiEnabled, parseWithGeminiFull } from '@/domain/parse/gemini';
 import { applySamples } from '@/domain/parse/samples';
+import { isSellable } from '@/domain/types';
 import { SAMPLE_DEFAULT_GRAMS, sampleLine } from '@/domain/samples';
 import { extractClientHints, hintsHaveSomething, isClientInfoLine, matchExistingClient, type ClientHints } from '@/domain/parse/client';
 import { useClients } from '@/data/clients';
@@ -55,7 +56,9 @@ export default function PegarPedido() {
   const { current } = useCurrentUser();
   const uid = current!.appUser.uid;
   const navigate = useNavigate();
-  const { products, loading } = useProducts();
+  const { products: allProducts, loading } = useProducts();
+  // Pedido IA matches only against what is offered to clients.
+  const products = useMemo(() => allProducts.filter(isSellable), [allProducts]);
   const { clients } = useClients();
   const { settings } = useSettings();
   const [text, setText] = useState('');
@@ -224,7 +227,7 @@ export default function PegarPedido() {
 
       {aiFallback && (
         <div className="mb-4 rounded-md bg-brass-50 border border-brass-300 text-brass-700 px-3 py-2 text-xs">
-          Se usó el intérprete local (Gemini no disponible en este momento). El resultado puede ser menos preciso; revisá cada línea.
+          Se usó el intérprete local (Gemini no disponible en este momento). El resultado puede ser menos preciso; revise cada línea.
         </div>
       )}
 

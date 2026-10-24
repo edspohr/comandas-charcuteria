@@ -1,3 +1,7 @@
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/data/firebase';
+import { useCurrentUser } from '@/data/auth';
+import { can } from '@/domain/permissions';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import CruceBsale from '@/components/catalog/CruceBsale';
@@ -50,6 +54,11 @@ function CatalogoStock() {
   const error = productsError ?? stockError;
   const [q, setQ] = useState('');
   const [onlyIssues, setOnlyIssues] = useState(false);
+  const { current } = useCurrentUser();
+  const editable = can(current?.appUser.role, 'catalog.map');
+  // Products that exist in Bsale but aren't sold to clients (raw material,
+  // supplies, web-store items) stay synced but leave the order wizard.
+  const setSellable = (id: string, v: boolean) => updateDoc(doc(db, 'products', id), { sellable: v });
 
   const rows = useMemo<FormatRow[]>(() => {
     const needle = norm(q.trim());
@@ -78,7 +87,7 @@ function CatalogoStock() {
           <p className="eyebrow">Administración</p>
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Catálogo</h1>
           <p className="text-xs text-charcoal-300 mt-1">
-            {products.length} productos · {rows.length} formatos · stock según Bsale{sync?.at ? ` (sincronizado ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })})` : ''} · los ajustes se hacen en Bsale · tocá una fila para ver la bitácora
+            {products.length} productos · {rows.length} formatos · stock según Bsale{sync?.at ? ` (sincronizado ${new Date(sync.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })})` : ''} · los ajustes se hacen en Bsale · toque una fila para ver la bitácora
           </p>
         </div>
         <Link to="/clientes" className="text-[11px] uppercase tracking-display text-charcoal-500 hover:text-charcoal-900 border border-charcoal-200 rounded-md px-3 py-1.5">Clientes →</Link>
@@ -104,6 +113,11 @@ function CatalogoStock() {
             <div>
               <p className="font-semibold text-charcoal-900">{r.product.name}</p>
               <p className="text-[10px] uppercase tracking-display text-charcoal-300">{categoryLabel(r.product.category)}{r.product.discontinued ? ' · discontinuado' : ''}{!r.product.active ? ' · inactivo' : ''}</p>
+              {editable && (
+                <label className="mt-1 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-display text-charcoal-500" onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" checked={r.product.sellable !== false} onChange={(e) => void setSellable(r.product.id, e.target.checked)} /> Se ofrece en pedidos
+                </label>
+              )}
             </div>
           ) : <span className="text-charcoal-200">↳</span> },
           { key: 'format', label: 'Formato', mobile: true, render: (r) => <span className="text-charcoal-700">{r.format.label}</span> },

@@ -78,7 +78,7 @@ export default function Clientes() {
         <div>
           <p className="eyebrow">{ROLE_LABEL[role]}</p>
           <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Clientes</h1>
-          <p className="text-xs text-charcoal-300 mt-1">{filtered.length} de {rows.length} · datos desde Bsale · salud según pedidos de los últimos 90 días · tocá una fila para ver el detalle</p>
+          <p className="text-xs text-charcoal-300 mt-1">{filtered.length} de {rows.length} · datos desde Bsale · salud según pedidos de los últimos 90 días · toque una fila para ver el detalle</p>
         </div>
         {can(role, 'client.quickCreate') && <Button size="sm" onClick={() => setCreating(true)}>+ Nuevo cliente</Button>}
       </header>

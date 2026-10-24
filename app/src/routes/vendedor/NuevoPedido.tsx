@@ -19,7 +19,7 @@ import { categoryLabel, categoryOrder } from '@/domain/categories';
 import { computeLineSubtotal, formatCLP, unitPriceLabel } from '@/lib/pricing';
 import { formatWindow, parseWindow, windowValid } from '@/domain/delivery';
 import { SAMPLE_DEFAULT_GRAMS, SAMPLE_GRAM_OPTIONS, lineKey, sampleLabel, sampleLine, sampleSourceFor } from '@/domain/samples';
-import type { Client, Product, ProductFormat, StockDoc } from '@/domain/types';
+import { isSellable, type Client, type Product, type ProductFormat, type StockDoc } from '@/domain/types';
 
 interface Draft {
   clientId: string | null;
@@ -354,7 +354,7 @@ function StepProductos({
 }) {
   const [openProductId, setOpenProductId] = useState<string | null>(null);
   const [sampleOpen, setSampleOpen] = useState(false);
-  const active = products.filter((p) => p.active && !p.discontinued);
+  const active = products.filter(isSellable);
   const showRepeat = !!(lastOrder && onRepeat && lines.length === 0);
 
   function addOrUpdate(product: Product, format: ProductFormat, qty: number, notes?: string) {

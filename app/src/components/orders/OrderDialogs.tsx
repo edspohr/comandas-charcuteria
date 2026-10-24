@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Button from '@/components/ui/Button';
 import { anularOrder, consumeSamplesAfterInvoice, despacharOrder, entregarOrder, registrarSalidaMuestras, registrarTraslado, vincularDocumento } from '@/data/orders';
 import { lineKey, sampleLabel } from '@/domain/samples';
+import { confirmPin } from '@/data/pin';
 import { useBsaleDocuments } from '@/data/bsale';
 import { emitDocumentForOrder } from '@/integrations/bsale/mockAdmin';
 import { syncStockFromBsale } from '@/data/stock';
@@ -39,19 +40,24 @@ export function ModalShell({ title, eyebrow, onClose, children, wide }: { title:
 
 const COURIERS = ['Retiro cliente', 'Repartidor propio', 'Courier Chilexpress', 'Courier Starken'];
 
-export function DispatchDialog({ order, uid, onClose }: { order: Order; uid: string; onClose: () => void }) {
+export function DispatchDialog({ order, uid, onClose, defer = false }: { order: Order; uid: string; onClose: () => void; defer?: boolean }) {
   const [deliveredBy, setDeliveredBy] = useState<string>(order.deliveryMode === 'retiro' ? 'Retiro cliente' : 'Repartidor propio');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function submit() {
     setBusy(true); setError(null);
-    try { await despacharOrder(order.id, uid, deliveredBy, note || undefined); onClose(); }
+    try {
+      if (defer) await confirmPin('despachar_sin_factura', `Despachar ${order.id} sin factura`, order.id);
+      await despacharOrder(order.id, uid, deliveredBy, note || undefined, { deferInvoice: defer });
+      onClose();
+    }
     catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
   }
   return (
-    <ModalShell title="Despachar pedido" eyebrow={order.id} onClose={onClose}>
+    <ModalShell title={defer ? 'Despachar sin factura' : 'Despachar pedido'} eyebrow={order.id} onClose={onClose}>
       <div className="space-y-4">
+        {defer && <p className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 px-3 py-2 text-xs">Sale sin documento. Al entregarlo aparece «Facturar» en Cerrados; hasta entonces el stock sigue reservado.</p>}
         {order.lines.some((l) => l.sample && !l.shortReason) && (
           <p className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 px-3 py-2 text-xs">Lleva {order.lines.filter((l) => l.sample && !l.shortReason).length} muestra(s) sin cargo: {order.lines.filter((l) => l.sample && !l.shortReason).map((l) => `${l.productName} ${sampleLabel(l)}`).join(', ')}.</p>
         )}
@@ -114,6 +120,7 @@ export function TrasladoDialog({ order, uid, onClose }: { order: Order; uid: str
   async function submit() {
     setBusy(true); setError(null);
     try {
+      await confirmPin('traslado', `Registrar traslado de ${order.id}`, order.id);
       const r = await registrarTraslado(order, uid);
       setDone(r.skipped ? 'Traslado registrado en la app (Bsale simulado).' : r.dryRun ? 'Traslado registrado. Bsale está en simulacro: quedó en la bitácora sin enviarse.' : 'Traslado registrado en Bsale.');
     } catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
@@ -158,6 +165,7 @@ export function SalidaMuestrasDialog({ order, uid, onClose }: { order: Order; ui
   async function submit() {
     setBusy(true); setError(null);
     try {
+      await confirmPin('salida_muestras', `Registrar salida de muestras de ${order.id}`, order.id);
       const r = await registrarSalidaMuestras(order, uid);
       setDone(r.skipped ? `Salida registrada en la app (${r.reason ?? 'Bsale apagado'}).` : r.dryRun ? 'Salida registrada. Bsale está en simulacro: el consumo quedó en la bitácora sin enviarse.' : 'Salida registrada y descontada en Bsale como consumo interno.');
     } catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
@@ -200,7 +208,7 @@ export function AnularDialog({ order, uid, onClose, onDone }: { order: Order; ui
   async function submit() {
     if (reason.trim().length < 3) { setError('Indique un motivo (mínimo 3 caracteres)'); return; }
     setBusy(true); setError(null);
-    try { await anularOrder(order.id, uid, reason.trim()); onClose(); onDone?.(); }
+    try { await confirmPin('anular', `Anular ${order.id}`, order.id); await anularOrder(order.id, uid, reason.trim()); onClose(); onDone?.(); }
     catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
   }
   return (
@@ -225,7 +233,7 @@ export function AnularDialog({ order, uid, onClose, onDone }: { order: Order; ui
 // (best matches first: same reference, same RUT, closest total) and offers
 // the demo shortcut "Simular emisión en POS" that creates the document in
 // the mock Bsale as if the cashier had just done it.
-export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { order: Order; uid: string; onClose: () => void; onLinked?: (doc: BsaleDocument) => void }) {
+export function VincularDocumentoDialog({ order, uid, onClose, onLinked, onDeferDispatch }: { order: Order; uid: string; onClose: () => void; onLinked?: (doc: BsaleDocument) => void; onDeferDispatch?: () => void }) {
   const { documents, loading } = useBsaleDocuments({ limit: 60 });
   const { settings: bsaleSettings } = useBsaleSettings();
   const canEmit = isRealBsale && !!bsaleSettings.invoicesEnabled;
@@ -255,7 +263,7 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
 
   async function link(d: BsaleDocument) {
     setBusy(d.id); setError(null);
-    try { await vincularDocumento(order.id, { id: d.id, number: d.number }, uid); onLinked?.(d); onClose(); void afterLink(); }
+    try { await confirmPin('vincular', `Vincular ${d.number} a ${order.id}`, order.id); await vincularDocumento(order.id, { id: d.id, number: d.number }, uid); onLinked?.(d); onClose(); void afterLink(); }
     catch (e) { setError(describeFirestoreError(e)); setBusy(null); }
   }
 
@@ -278,7 +286,7 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
     const found = documents.find((d) => d.number === manualNumber);
     if (found) return link(found);
     setBusy('manual'); setError(null);
-    try { await vincularDocumento(order.id, { id: `manual-${manualNumber}`, number: manualNumber }, uid); onClose(); void afterLink(); }
+    try { await confirmPin('vincular', `Vincular ${manualNumber} a ${order.id}`, order.id); await vincularDocumento(order.id, { id: `manual-${manualNumber}`, number: manualNumber }, uid); onClose(); void afterLink(); }
     catch (e) { setError(describeFirestoreError(e)); setBusy(null); }
   }
 
@@ -287,12 +295,18 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
       <div className="space-y-4">
         {canEmit && <EmitirEnBsale order={order} onDone={(d) => { onLinked?.(d as BsaleDocument); }} onClose={onClose} />}
         {canEmit && <p className="eyebrow pt-2 border-t border-charcoal-100">¿Ya se emitió en el POS? Vincúlelo</p>}
+        {onDeferDispatch && order.status === 'armado' && (
+          <div className="rounded-md border border-charcoal-100 bg-cream-100/60 p-3 flex items-center justify-between gap-3">
+            <p className="text-xs text-charcoal-600">¿Se factura después de entregar? Despáchelo sin documento.</p>
+            <Button size="sm" variant="secondary" onClick={onDeferDispatch}>Despachar sin factura</Button>
+          </div>
+        )}
         {isRealBsale && !canEmit && <p className="text-sm text-charcoal-700">Emita la factura o boleta en el POS de Bsale (con los pesos del armado) y vincúlela aquí. Los documentos aparecen solos en unos minutos; también puede escribir el número.</p>}
         <p className="text-sm text-charcoal-700">
-          La venta se emite en el POS de Bsale. Elegí el documento que corresponde a{' '}
+          La venta se emite en el POS de Bsale. Elija el documento que corresponde a{' '}
           <span className="font-semibold">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</span>
           {order.totalCLP ? <> · total esperado <span className="font-semibold">{formatCLP(order.totalCLP)}</span></> : null}.
-          Al vincularlo se libera la reserva y el pedido pasa a <em>facturado</em>.
+          {order.status === 'armado' ? <>Al vincularlo se libera la reserva y el pedido pasa a <em>facturado</em>.</> : <>Al vincularlo se libera la reserva; el pedido sigue <em>{order.status}</em>, ahora con su documento.</>}
         </p>
         {!order.invoicingComplete && (
           <div className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 p-2.5 text-xs">
@@ -328,7 +342,7 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
 
         <div className="flex gap-2 items-end">
           <div className="flex-1">
-            <label className="eyebrow block mb-1.5">O ingresá el número a mano</label>
+            <label className="eyebrow block mb-1.5">O ingrese el número a mano</label>
             <input value={manual} onChange={(e) => setManual(e.target.value)} placeholder="FA-000824" className={'field h-10 text-sm font-mono ' + (manual.trim() && !manualValid ? 'border-red-400' : '')} />
             {manual.trim() && !manualValid && <p className="text-[11px] text-red-700 mt-1">Formato FA-000000 / BO-000000 / GD-000000</p>}
             {manualLinkedElsewhere && <p className="text-[11px] text-red-700 mt-1">Ya vinculado a {manualLinkedElsewhere.linkedOrderId}</p>}

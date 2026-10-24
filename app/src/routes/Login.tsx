@@ -252,7 +252,7 @@ function BsaleSection() {
         ))}
       </div>
       <p className="mt-5 text-xs text-charcoal-500 text-center max-w-2xl mx-auto">
-        Se sincroniza cada 10 minutos y con avisos de Bsale. Comandas solo escribe en Bsale lo que nace en la operación (facturas, producción, traslados, muestras y clientes nuevos), primero en simulacro y siempre con registro.
+        Se sincroniza cada 10 minutos y con avisos de Bsale. Comandas solo escribe en Bsale lo que nace en la operación (facturas, producción, traslados, muestras y clientes nuevos), primero en simulacro y siempre con registro. Cada escritura en Bsale y cada acción importante se confirma con el PIN personal de quien la hace.
       </p>
     </section>
   );

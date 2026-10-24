@@ -151,7 +151,7 @@ export default function Tablero() {
   }, [visible, stock, thresholds, now, today]);
 
   // Dialogs
-  const [dialog, setDialog] = useState<{ kind: ActionKind; order: Order } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: ActionKind; order: Order; defer?: boolean } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   async function run(kind: ActionKind, order: Order) {
@@ -398,8 +398,8 @@ export default function Tablero() {
 
       {dialog?.kind === 'transfer' && <TrasladoDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'samples' && <SalidaMuestrasDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'link' && <VincularDocumentoDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'dispatch' && <DispatchDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'link' && <VincularDocumentoDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} onDeferDispatch={can(role, 'order.invoiceLate') ? () => setDialog({ kind: 'dispatch', order: dialog.order, defer: true }) : undefined} />}
+      {dialog?.kind === 'dispatch' && <DispatchDialog order={dialog.order} uid={uid} defer={dialog.defer} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'deliver' && <DeliverDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'anular' && <AnularDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
     </div>

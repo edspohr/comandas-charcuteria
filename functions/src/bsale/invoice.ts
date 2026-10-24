@@ -53,7 +53,8 @@ export async function buildInvoice(s: BsaleSettings, orderId: string, wanted?: '
   const samples = order.lines.filter((l) => l.sample);
   if (order.kind === 'muestras' || (samples.length && samples.length === order.lines.length)) blocking.push('Es un pedido solo de muestras: no se factura, se registra la salida de muestras.');
   else if (samples.length) warnings.push(`Incluye ${samples.length} muestra${samples.length === 1 ? '' : 's'} sin cargo: no van en el documento, se descuentan de Bsale como consumo interno.`);
-  if (order.status !== 'armado') blocking.push(`El pedido está en "${order.status}": se factura cuando está armado.`);
+  // Armado, or dispatched without a document (invoice after delivery).
+  if (!['armado', 'despachado', 'entregado'].includes(order.status)) blocking.push(`El pedido está en "${order.status}": se factura cuando está armado.`);
   if (order.invoiceRef) blocking.push(`Ya tiene el documento ${order.invoiceRef}.`);
 
   const canInvoice = !!(client.rut && client.giro && client.address && (client.name || order.clientSnapshot.name));
@@ -170,9 +171,10 @@ export async function emitInvoice(api: BsaleApi, s: BsaleSettings, by: string, o
       tx.set(mv, { id: mv.id, productId: l.productId, formatId: l.formatId, qty: l.packedQty ?? l.reservedQty, type: 'venta_bsale', orderId, by, at: now, reason: l.sample ? `${number} · muestra` : number });
     }
     tx.set(db.doc(`bsale/sales/documents/${mirror.id}`), { ...stripUndefined(mirror), linkedOrderId: orderId }, { merge: true });
+    const late = order.status === 'despachado' || order.status === 'entregado';
     tx.update(ref, {
-      status: 'facturado', invoiceRef: number, bsaleDocumentId: String(raw.id), invoiceUrl: raw.urlPdf ?? FieldValue.delete(), updatedAt: now,
-      statusHistory: [...order.statusHistory, { status: 'facturado', by, at: now, note: `${number} · emitido desde Comandas` }],
+      status: late ? order.status : 'facturado', invoiceRef: number, bsaleDocumentId: String(raw.id), invoiceUrl: raw.urlPdf ?? FieldValue.delete(), updatedAt: now,
+      statusHistory: [...order.statusHistory, { status: late ? order.status : 'facturado', by, at: now, note: `${number} · emitido desde Comandas${late ? ' tras el despacho' : ''}` }],
     });
   });
   // Samples leave the factory with the invoice: internal consumption in Bsale.

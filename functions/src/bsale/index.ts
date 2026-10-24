@@ -12,6 +12,7 @@ import { createClient, receiveProduction, transferToStore, updateClient, type Cu
 import { buildInvoice, emitInvoice } from './invoice';
 import { backfillMonth, refreshCosts } from './facts';
 import { consumeSamples } from './samples';
+import { checkPin } from '../pin';
 
 const secrets = [BSALE_TOKEN];
 const SYNC_ROLES = ['despacho', 'produccion', 'admin', 'superAdmin'] as const;
@@ -116,6 +117,7 @@ export const bsaleReceiveProduction = onCall({ region: REGION, secrets, timeoutS
   const { uid } = requireRole(req, ['produccion', 'admin', 'superAdmin'], 'registrar producción');
   const s = await loadSettings();
   requireEnabled(s);
+  if (s.writesEnabled) await checkPin(req, 'bsale_produccion');
   const api = apiFromSecret();
   const result = await receiveProduction(api, s, uid, parseLines(req.data?.lines), typeof req.data?.note === 'string' ? req.data.note.slice(0, 200) : undefined);
   const summary = result.dryRun ? null : await syncStock(api, s, { by: uid });
@@ -128,6 +130,7 @@ export const bsaleTransferToStore = onCall({ region: REGION, secrets, timeoutSec
   requireEnabled(s);
   const orderId = String(req.data?.orderId ?? '');
   if (!orderId) throw new HttpsError('invalid-argument', 'Falta el pedido.');
+  if (s.writesEnabled) await checkPin(req, 'bsale_traslado', orderId);
   return transferToStore(apiFromSecret(), s, uid, orderId, parseLines(req.data?.lines));
 });
 
@@ -145,6 +148,7 @@ export const bsaleCreateClient = onCall({ region: REGION, secrets }, async (req)
   // Selling must not stop because Bsale is off: the client stays in the app,
   // pending review, and administración creates it in Bsale later.
   if (!s.enabled || !s.writesEnabled) return { dryRun: true, customer: null, pending: true };
+  await checkPin(req, 'bsale_cliente_alta');
   return createClient(apiFromSecret(), s, uid, parseCustomer(req.data, false) as CustomerInput);
 });
 
@@ -154,6 +158,7 @@ export const bsaleUpdateClient = onCall({ region: REGION, secrets }, async (req)
   requireEnabled(s);
   const id = String(req.data?.bsaleClientId ?? '');
   if (!id) throw new HttpsError('invalid-argument', 'Falta el id de Bsale.');
+  if (s.writesEnabled) await checkPin(req, 'bsale_cliente_edicion', id);
   return updateClient(apiFromSecret(), s, uid, id, parseCustomer(req.data?.patch, true));
 });
 
@@ -177,6 +182,7 @@ export const bsaleEmitInvoice = onCall({ region: REGION, secrets, timeoutSeconds
   if (!s.invoicesEnabled) throw new HttpsError('failed-precondition', 'La facturación desde Comandas está apagada: emita en el POS de Bsale y vincule el documento.');
   const orderId = String(req.data?.orderId ?? '');
   if (!orderId) throw new HttpsError('invalid-argument', 'Falta el pedido.');
+  await checkPin(req, 'bsale_factura', orderId);
   return emitInvoice(apiFromSecret(), s, uid, orderId, kindArg(req.data?.kind));
 });
 
@@ -220,5 +226,6 @@ export const bsaleConsumeSamples = onCall({ region: REGION, secrets, timeoutSeco
   const orderId = String(req.data?.orderId ?? '');
   if (!orderId) throw new HttpsError('invalid-argument', 'Falta el pedido.');
   const s = await loadSettings();
+  if (s.enabled && s.writesEnabled) await checkPin(req, 'bsale_muestras', orderId);
   return consumeSamples(s.enabled && s.writesEnabled ? apiFromSecret() : null, s, uid, orderId);
 });

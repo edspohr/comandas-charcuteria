@@ -369,7 +369,7 @@ export async function markArmado(
       if (st && st.onHand < st.reserved && !compromised.includes(label)) compromised.push(label);
     }
     if (compromised.length > 0 && opts.strictStock) {
-      throw new Error(`Bsale reporta menos stock del reservado en ${compromised.join(', ')}. Sincronizá con Bsale o resolvé el pedido desde administración antes de armar.`);
+      throw new Error(`Bsale reporta menos stock del reservado en ${compromised.join(', ')}. Sincronice con Bsale o resuelva el pedido desde administración antes de armar.`);
     }
 
     const now = Date.now();
@@ -440,7 +440,8 @@ export async function vincularDocumento(
     if (!orderSnap.exists()) throw new Error('Pedido no encontrado');
     const order = orderSnap.data() as Order;
     if (order.invoiceRef) throw new Error(`El pedido ya tiene el documento ${order.invoiceRef}`);
-    if (order.status !== 'armado') throw new Error(`No se puede vincular un documento a un pedido en estado ${order.status}`);
+    const late = order.status === 'despachado' || order.status === 'entregado';
+    if (order.status !== 'armado' && !late) throw new Error(`No se puede vincular un documento a un pedido en estado ${order.status}`);
     const docSnap = await tx.get(docRef);
     if (docSnap.exists() && (docSnap.data() as { linkedOrderId?: string }).linkedOrderId) {
       throw new Error('Ese documento ya está vinculado a otro pedido');
@@ -468,12 +469,13 @@ export async function vincularDocumento(
     }
 
     if (docSnap.exists()) tx.update(docRef, { linkedOrderId: orderId });
+    // Invoiced after delivery: the order keeps its status, the history says when.
     tx.update(orderRef, {
-      status: 'facturado',
+      status: late ? order.status : 'facturado',
       invoiceRef: number,
       bsaleDocumentId: document.id,
       updatedAt: now,
-      statusHistory: [...order.statusHistory, { status: 'facturado', by, at: now, note: number }],
+      statusHistory: [...order.statusHistory, { status: late ? order.status : 'facturado', by, at: now, note: late ? `Facturado tras despacho · ${number}` : number }],
     });
   });
 }
@@ -572,20 +574,24 @@ export async function despacharOrder(
   by: string,
   deliveredBy: string,
   note?: string,
+  opts: { deferInvoice?: boolean } = {},
 ): Promise<void> {
   const orderRef = doc(db, 'orders', orderId);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(orderRef);
     if (!snap.exists()) throw new Error('Pedido no encontrado');
     const order = snap.data() as Order;
-    if (order.status !== 'facturado') throw new Error(`No se puede despachar un pedido en estado ${order.status}`);
+    // Despachar sin factura (superAdmin): leaves armado with its reservation
+    // held until the document is linked or emitted after delivery.
+    const deferred = opts.deferInvoice && order.status === 'armado';
+    if (order.status !== 'facturado' && !deferred) throw new Error(`No se puede despachar un pedido en estado ${order.status}`);
     const now = Date.now();
     tx.update(orderRef, {
       status: 'despachado',
       deliveredBy,
       deliveryProof: note ? { note } : undefined,
       updatedAt: now,
-      statusHistory: [...order.statusHistory, { status: 'despachado', by, at: now, note: deliveredBy }],
+      statusHistory: [...order.statusHistory, { status: 'despachado', by, at: now, note: deferred ? `${deliveredBy} · sin factura (se factura al entregar)` : deliveredBy }],
     });
   });
 }

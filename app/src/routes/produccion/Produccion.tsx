@@ -73,7 +73,7 @@ export default function Produccion() {
             <button onClick={() => setOnlyPending((v) => !v)} className={'rounded-md px-2.5 py-1.5 text-[11px] uppercase tracking-display font-medium border transition ' + (onlyPending ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-500 hover:border-charcoal-300')}>
               Solo con demanda pendiente{urgentCount > 0 && <span className="ml-1 rounded-full bg-brass-100 text-brass-700 px-1.5">{urgentCount}</span>}
             </button>
-            <span className="text-xs text-charcoal-300">{visible.length} formatos · tocá una fila para ver los pedidos que dependen</span>
+            <span className="text-xs text-charcoal-300">{visible.length} formatos · toque una fila para ver los pedidos que dependen</span>
           </div>
           <DataTable<DemandRow>
             rows={visible}
@@ -193,7 +193,7 @@ function ProduccionIA({ uid, onDone }: { uid: string; onDone: (msg: string) => v
 
       {aiFallback && (
         <div className="mb-3 rounded-md bg-brass-50 border border-brass-300 text-brass-700 px-3 py-2 text-xs">
-          Se usó el intérprete local (Gemini no disponible en este momento). Revisá cada línea antes de cargar en Bsale.
+          Se usó el intérprete local (Gemini no disponible en este momento). Revise cada línea antes de cargar en Bsale.
         </div>
       )}
 
@@ -203,7 +203,7 @@ function ProduccionIA({ uid, onDone }: { uid: string; onDone: (msg: string) => v
             <p className="eyebrow">Líneas propuestas · {lines.length}{engine === 'ai' && <span className="ml-2 normal-case tracking-normal text-brass-700">· Gemini</span>}{engine === 'local' && <span className="ml-2 normal-case tracking-normal text-charcoal-300">· parser local</span>}</p>
             <span className="text-[10px] uppercase tracking-display text-charcoal-300">{lines.filter((l) => l.ok).length} verificadas · {lines.filter((l) => !l.ok).length} a revisar</span>
           </div>
-          {lines.length === 0 && <p className="text-sm text-charcoal-500">No se identificaron productos. Ajustá el texto e intentá de nuevo.</p>}
+          {lines.length === 0 && <p className="text-sm text-charcoal-500">No se identificaron productos. Ajuste el texto e intente de nuevo.</p>}
           <ul className="divide-y divide-charcoal-100">
             {lines.map((l, i) => {
               const p = products.find((x) => x.id === l.productId);

@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Button from '@/components/ui/Button';
 import { usePinPrompt } from '@/data/pin';
+import { useScrollLock } from '@/lib/scrollLock';
 
 // Diálogo global del PIN personal. Lo abre withPin() cuando el servidor lo pide.
 export default function PinPrompt() {
   const p = usePinPrompt();
   const [pin, setPin] = useState('');
   const input = useRef<HTMLInputElement>(null);
+  useScrollLock(p.open);
   useEffect(() => { if (p.open) { setPin(''); setTimeout(() => input.current?.focus(), 50); } }, [p.open, p.error]);
   if (!p.open) return null;
   const submit = (e: React.FormEvent) => { e.preventDefault(); if (/^\d{4}$/.test(pin)) p.resolve?.(pin); };

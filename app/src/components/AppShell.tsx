@@ -8,6 +8,7 @@ import PinPrompt from '@/components/PinPrompt';
 import InstallButton from '@/components/InstallButton';
 import AppLock from '@/components/AppLock';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { useScrollLock } from '@/lib/scrollLock';
 
 // Navegación con grupos y orden fijos (cada perfil ve solo lo suyo):
 //   Pedidos · Clientes · Producción · Gestión · Administración · Mi cuenta
@@ -43,6 +44,7 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
   const { pathname } = useLocation();
   const role = current.appUser.role;
   const [more, setMore] = useState(false);
+  useScrollLock(more);
   const [account, setAccount] = useState(false);
   useEffect(() => { setMore(false); setAccount(false); }, [pathname]);
 
@@ -152,8 +154,8 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
         </nav>
 
         {more && (
-          <div className="lg:hidden fixed inset-0 z-30 bg-charcoal-900/50" onClick={() => setMore(false)}>
-            <div className="absolute bottom-0 inset-x-0 bg-cream-50 rounded-t-2xl shadow-lift p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="lg:hidden fixed inset-0 z-30 bg-charcoal-900/50 overscroll-contain" onClick={() => setMore(false)}>
+            <div className="absolute bottom-0 inset-x-0 bg-cream-50 rounded-t-2xl shadow-lift p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-h-[80dvh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
               <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-charcoal-200" />
               {GROUP_ORDER.map((g) => {
                 const items = inMore.filter((n) => n.group === g);

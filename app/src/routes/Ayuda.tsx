@@ -14,7 +14,7 @@ const ACCESS: [string, string[]] = ['Entrar y su PIN', [
   'Desde ahí entra con su correo y su PIN. En un teléfono compartido toque su nombre en «En este dispositivo».',
   'La app se bloquea al abrirla y tras 30 minutos sin uso: desbloquee con su PIN. «Bloquear ahora» y «Cerrar sesión» están bajo su nombre (arriba a la derecha en el teléfono).',
   'Si olvida el PIN o se bloquea, pídale a Ciro o a Edmundo que lo borre en Usuarios y cree uno nuevo al entrar con Google.',
-  'Instale la app en el teléfono con el botón «Instalar app» (menú de su nombre o «Más»). En iPhone: Safari → Compartir → «Agregar a inicio».',
+  'Instale la app en el teléfono con el botón «Instalar app» (menú de su nombre o «Más»). En iPhone: Safari → ••• (abajo a la derecha) → Compartir → «Agregar a inicio».',
 ]];
 
 const GUIDES: Record<Role, Guide> = {

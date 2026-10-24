@@ -1,5 +1,7 @@
 # QA del guión de demo — 22-09-2026
 
+> **Histórico.** QA de la demo del 22-09-2026, previo a Bsale real y a la versión 1.0. Los hallazgos se resolvieron o pasaron a [deuda-tecnica.md](deuda-tecnica.md) y [backlog.md](backlog.md). No refleja el estado actual.
+
 Testeo manual de los 10 pasos del **Guión de demo** del README contra el proyecto Firebase real (`comandas-charcuteria`), en viewport móvil (375×812).
 
 **Cómo se hizo.** La URL en vivo no pasa del login (ver #1), así que el resto se probó con `vite --mode production` local (mismo `.env.production`, misma BD real) más dos parches locales marcados `QA-PATCH` en `app/src/data/auth.ts` y `app/src/data/firebase.ts` (están en el working tree, sin commitear; son propuestas de fix, no la versión final). Al terminar se corrió `npm run seed` contra el proyecto real, así que la BD volvió al estado sembrado (el pedido `PED-2026-0041` y las facturas de prueba ya no existen).

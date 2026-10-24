@@ -1,212 +1,227 @@
 # Comandas — La Charcutería Artesanal
 
 Toma y seguimiento de pedidos para **Cecinas Marcosi SpA** (La Charcutería Artesanal, Barrio Franklin, Santiago).
-Reemplaza el grupo de WhatsApp sin formato por una app móvil que muestra el stock real de Bsale, deja un responsable en cada etapa del pedido y le da a los dueños las cifras del negocio.
+Reemplaza el grupo de WhatsApp sin formato por una app móvil (PWA) que muestra el stock real de Bsale, deja un responsable en cada etapa del pedido y le da a los dueños las cifras del negocio.
+
+**Estado (24-10-2026):** versión **1.0** en marcha blanca, con todos los perfiles desde el lunes 26-10. Bsale conectado en lectura; las escrituras hacia Bsale están **apagadas** (simulacro) y la facturación se hace en el POS de Bsale y se vincula en Comandas.
 
 ---
 
-## Live
+## Enlaces
 
-- **App:** <https://comandas-charcuteria.web.app>
-- **Consola Firebase:** <https://console.firebase.google.com/project/comandas-charcuteria>
-- **Repo:** <https://github.com/edspohr/comandas-charcuteria>
+| | |
+|---|---|
+| App (producción) | <https://comandas-charcuteria.web.app> |
+| App (staging, Bsale simulado) | <https://comandas-staging.web.app> |
+| Consola Firebase | [comandas-charcuteria](https://console.firebase.google.com/project/comandas-charcuteria) · [comandas-staging](https://console.firebase.google.com/project/comandas-staging) |
+| Repo | <https://github.com/edspohr/comandas-charcuteria> |
+
+## Documentación
+
+| Documento | Para qué |
+|---|---|
+| [docs/operacion.md](docs/operacion.md) | Runbook: deploy, staging, usuarios y PIN, interruptores de Bsale, scripts, alertas |
+| [docs/adr/](docs/adr/README.md) | Decisiones de arquitectura (ADR) y por qué se tomaron |
+| [docs/deuda-tecnica.md](docs/deuda-tecnica.md) | Deuda técnica conocida, priorizada |
+| [docs/backlog.md](docs/backlog.md) | Pendientes de la puesta en marcha, plan a noviembre y backlog fuera de alcance |
+| [docs/QA-guion-demo.md](docs/QA-guion-demo.md) | QA de la demo del 22-09 (histórico) |
+| En la app: Mi cuenta → **Guía de uso** | Guía de una página por perfil ([`app/src/routes/Ayuda.tsx`](app/src/routes/Ayuda.tsx)) |
 
 ---
 
-## Fuente de la verdad
+## Fuente de la verdad ([ADR-0001](docs/adr/0001-bsale-fuente-de-verdad.md))
 
 | Dato | Dueño | Comandas… |
 |---|---|---|
 | Catálogo, precios, clientes (datos tributarios), stock por sucursal, documentos | **Bsale** | lo lee y guarda espejos |
-| Pedidos, reservas, estados, responsables, pesos empacados, cartera por vendedor | **Comandas** | es el dueño |
-| Producción: insumos, procesos, rendimientos y mermas (próxima etapa) | **Comandas** | es el dueño |
+| Pedidos, reservas, estados, responsables, pesos empacados, cartera, horario de entrega, aprobaciones, muestras | **Comandas** | es el dueño |
+| Producción cargada (bitácora), insumos y rendimientos (próxima etapa) | **Comandas** | es el dueño |
 
-Comandas **solo escribe en Bsale** hechos que nacen en la app: recepción de producción terminada, traslado fábrica → tienda y alta/corrección de clientes. Nunca ajustes de stock "a mano". Cada escritura queda en una bitácora y se puede correr en **simulacro** (registra lo que se enviaría sin enviarlo).
+Comandas **solo escribe en Bsale** hechos que nacen en la app, desde Cloud Functions, con bitácora, simulacro y PIN ([ADR-0004](docs/adr/0004-escrituras-bsale-servidor.md)). Nunca ajusta stock "a mano".
 
 ---
 
-## Perfiles
+## Perfiles ([ADR-0003](docs/adr/0003-un-perfil-por-usuario.md))
 
-Cada persona tiene **un perfil**. La matriz vive en [`app/src/domain/permissions.ts`](app/src/domain/permissions.ts) y se replica en [`firestore.rules`](firestore.rules). El perfil viaja como *custom claim* `role` en el token y solo lo escriben las Cloud Functions de usuarios.
+Cada persona tiene **un perfil**, que viaja como *custom claim* `role`. La matriz vive en [`app/src/domain/permissions.ts`](app/src/domain/permissions.ts) y se replica a mano en [`firestore.rules`](firestore.rules) y [`functions/src/common.ts`](functions/src/common.ts): **cambiar las tres juntas**.
 
 | Perfil | Qué hace |
 |---|---|
-| Vendedor | Toma pedidos de sus clientes (wizard o Pedido IA), ve stock y el estado de sus pedidos, da de alta clientes. |
-| Tienda | Pide reposición para la tienda y confirma lo que llega. |
-| Despacho | Arma con pesos reales, registra traslados a tienda, despacha. |
+| Vendedor | Toma pedidos de su cartera (paso a paso o pegando el mensaje, con IA), muestras, alta de clientes, sigue sus pedidos. |
+| Tienda | Pide reposición, recibe traslados; también vende. |
+| Despacho | Arma con pesos reales, registra traslados y salidas de muestras, despacha. |
 | Reparto | Marca salida y entrega. |
-| Producción | Ve la demanda pendiente y registra la producción terminada en Bsale (Producción IA). |
-| Administración | Todo el flujo: vincula documentos Bsale, clientes, cruce de catálogo, Panel. |
-| Super Administrador | Lo anterior + usuarios y configuración de Bsale. |
-| Consultor | Auditor: ve todo (app y Bsale, *Ventana a Bsale*) sin modificar nada. |
+| Producción | Ve qué producir por fecha de entrega y carga lo producido (foto de la planilla o a mano). |
+| Administración | Todo el flujo operativo: vincula documentos de Bsale, clientes, catálogo, Panel. |
+| Super Administrador | Lo anterior + usuarios, aprobación de excepciones, configuración de Bsale, despachar sin factura y facturar después de entregar. |
+| Consultor | Auditor: ve todo (app y Bsale) sin modificar nada. |
 
-**Acceso:** por invitación. Un superAdmin agrega a la persona en **Usuarios** (con Google o con contraseña; en el segundo caso le llega un correo para crearla). Los primeros accesos se crean con `scripts/bootstrap-admin.ts`.
+## Acceso y PIN ([ADR-0007](docs/adr/0007-pin-personal.md))
+
+- **Por invitación.** Un superAdmin agrega a la persona en **Usuarios**, con «Agregar persona» o con «Invitar con su historial», que trae sus pedidos y cartera de WhatsApp.
+- **Primer ingreso** con Google o contraseña. La app pide crear un **PIN de 4 dígitos** y aceptar la declaración de responsabilidad (versión `v1-2026-10-24`).
+- **Uso diario:** correo + PIN. La app se **bloquea** al abrirla y tras 30 minutos sin uso.
+- **Acciones clave con PIN**, verificado en el servidor y registrado en `pinLog`:
+  - enviar pedido, cargar producción, anular, vincular documento;
+  - traslado, salida de muestras, despachar sin factura, aprobar o rechazar excepciones;
+  - toda escritura a Bsale.
+- **Intentos fallidos:** 5 bloquean el PIN 15 minutos y 10 lo desactivan. El superAdmin solo puede **borrar** un PIN; nunca lo ve ni lo asigna.
 
 ---
 
 ## Flujo de un pedido
 
-`Pendiente → En armado → Por facturar → Por despachar → Cerrado` (tablero kanban para todos los perfiles; cada uno ve la acción que le toca).
+`Pendiente → En armado → Por facturar → Por despachar → Cerrado`: un tablero para todos los perfiles, donde cada uno ve la acción que le toca.
 
-- **Venta:** el vendedor crea el pedido (reserva stock en una transacción; lo que falta queda *a producción* y se reasigna FIFO cuando entra stock). Despacho arma con pesos reales. Administración **vincula el documento** emitido en el POS de Bsale (libera la reserva). Reparto entrega.
-- **Reposición de tienda:** la tienda pide; despacho arma y **registra el traslado** (consumo en fábrica + recepción en tienda, o guía, según configuración); la tienda **recibe**.
+- **Venta.**
+  1. El vendedor crea el pedido con un **horario de entrega obligatorio** desde–hasta ([ADR-0009](docs/adr/0009-horario-entrega-obligatorio.md)). La reserva de stock se hace en la misma transacción ([ADR-0002](docs/adr/0002-stock-reservas-transaccionales.md)).
+  2. Lo que falta queda *a producción* y se reasigna por orden de llegada (FIFO) cuando entra stock.
+  3. Despacho arma con los pesos reales.
+  4. Administración emite en el POS de Bsale y **vincula el documento** ([ADR-0005](docs/adr/0005-facturacion-pos-y-vincular.md)), lo que libera la reserva.
+  5. Reparto entrega.
+- **Stock informativo** (por defecto): un faltante avisa pero no impide armar. `settings/app.stockMode = 'estricto'` lo vuelve bloqueante ([ADR-0006](docs/adr/0006-stock-informativo.md)).
+- **Excepciones:** precio, corte, pago o entrega fuera de lo normal, o líneas sobre 25 kg / 60 u. El pedido queda **por aprobar** hasta que un superAdmin lo aprueba con su PIN, y las reglas impiden armarlo antes ([ADR-0008](docs/adr/0008-excepciones-con-aprobacion.md)).
+- **Reposición de tienda:** la tienda pide, despacho arma y registra el traslado, y la tienda recibe.
+- **Muestras** ([ADR-0010](docs/adr/0010-muestras-consumo-interno.md)):
+  - el vendedor agrega «+ Muestra», 80 g por defecto, a $0;
+  - despacho las rotula;
+  - al facturar o con «Registrar salida» (`MU-…`) se registran como consumo interno en Bsale;
+  - a los 7 días el vendedor responde «¿Qué le pareció…?»;
+  - se cuenta conversión si el cliente compra el producto dentro de 60 días;
+  - Panel → Muestras muestra los kg por cliente nuevo ganado.
+
+## Producción ([ADR-0014](docs/adr/0014-bitacora-produccion.md))
+
+La pantalla diaria de Producción tiene cuatro partes:
+- **Qué producir:** lo que esperan los pedidos, agrupado en para hoy, para mañana y próximos días, con el primer pedido de cada producto y su horario.
+- **Carga de lo producido:** con **foto de la planilla** (Gemini lee las cantidades) o **a mano**, siempre con PIN.
+- **Cargado hoy:** la bitácora del día (`productionLog`).
+- **Todo el stock:** stock de Bsale, reservado y disponible.
+
+Si las escrituras a Bsale están apagadas, la carga queda «Por cargar en Bsale»: la oficina la pasa a Bsale y la marca.
+
+## Bsale
+
+**Lectura** (activa desde el 19-10-2026):
+- sincronización cada 10 minutos de 06:00 a 23:00, más webhooks;
+- catálogo y cruce de variantes (`catalogMap`), stock por sucursal (1 = fábrica «MARCOSI (SALA DE PROCESO)», 2 = tienda), lista de precios 8, clientes compradores y documentos;
+- historia de ventas comprimida por mes para el Panel ([ADR-0012](docs/adr/0012-hechos-venta-por-mes.md)) y costos promedio diarios a las 05:30.
+
+**Escrituras** (código listo; apagadas en producción, ver [docs/operacion.md](docs/operacion.md#interruptores-de-bsale)):
+
+| En Comandas | En Bsale | Interruptor |
+|---|---|---|
+| Cargar producción | recepción en fábrica, a costo promedio vigente | `writesEnabled` + `dryRun` |
+| Traslado a tienda | consumo en fábrica + recepción en tienda (o guía) | `writesEnabled` + `dryRun` |
+| Salida de muestras | consumo interno `MU-…` | `writesEnabled` + `dryRun` |
+| Alta / edición de cliente | cliente | `writesEnabled` + `dryRun` |
+| Facturar desde Comandas | factura o boleta con pesos del armado | `invoicesEnabled` (+ los anteriores) |
+
+Cada intento queda en `bsale/writes/log`. Funciones en [`functions/src/bsale/`](functions/src/bsale); los supuestos sobre la API están anotados en `api.ts`.
+
+**Cloud Functions:**
+- usuarios: `claimInvite`, `adminInviteUser`, `adminUpdateUser`, `adminDeleteInvite`;
+- PIN: `setOwnPin`, `pinLogin`, `verifyPin`, `adminResetPin`;
+- IA: `parseOrder`;
+- Bsale:
+  - lectura y sincronización: `bsaleDiagnose`, `bsaleSyncNow`, `bsaleScheduledSync`, `bsaleWebhook`, `bsaleWebhookInfo`;
+  - escrituras: `bsaleReceiveProduction`, `bsaleTransferToStore`, `bsaleCreateClient`, `bsaleUpdateClient`, `bsaleConsumeSamples`;
+  - facturación: `bsaleInvoicePreview`, `bsaleEmitInvoice`;
+  - historia y costos: `bsaleFactsBackfill`, `bsaleRefreshCosts`, `bsaleDailyCosts`;
+  - proxy de solo lectura: `bsaleProxy` (solo GET).
+
+## Panel de gestión
+
+Corre sobre las ventas de Bsale (facturas + boletas − notas de crédito, neto), no sobre los pedidos. Pestañas:
+- Resumen y Ventas;
+- Productos: ABC y margen con costo promedio;
+- Clientes: ritmo de compra, en riesgo, perdidos;
+- Vendedores: la tienda cuenta como vendedora;
+- Stock;
+- Muestras;
+- Explorador: tabla dinámica + CSV;
+- Pedidos.
+
+Reglas de salud de cliente: ver [ADR-0015](docs/adr/0015-salud-de-cliente.md) (hay dos definiciones; ver deuda técnica).
+
+## IA (Gemini)
+
+Firebase AI Logic (`@firebase/ai`, gemini-2.5-flash, *thinking* apagado) con **App Check reCAPTCHA Enterprise**, que solo se exige en AI Logic ([ADR-0011](docs/adr/0011-gemini-con-fallback.md)). Se usa para:
+- **Pegar mensaje (IA)** en Nuevo pedido;
+- la **foto de la planilla** en Producción.
+
+Si Gemini falla, el texto cae a un intérprete determinista (`domain/parse/local.ts`); la foto, en cambio, requiere la IA. Para reproducir la configuración: `npm run appcheck:setup` (ver [docs/operacion.md](docs/operacion.md#gemini-y-app-check)).
 
 ---
 
-## Bsale: puesta en marcha cuando llegue el token
-
-Todo está construido y probado contra un Bsale falso ([`scripts/fake-bsale.ts`](scripts/fake-bsale.ts)). Pasos en orden; los marcados **(usted)** requieren permisos que Claude no tiene:
-
-1. **(usted) Secret Manager.** Las funciones de Bsale declaran el secreto, así que tiene que existir antes del primer deploy, aunque el token aún no llegue:
-   ```bash
-   gcloud services enable secretmanager.googleapis.com --project=comandas-charcuteria
-   printf "pendiente" | gcloud secrets create BSALE_ACCESS_TOKEN --data-file=- --project=comandas-charcuteria
-   ```
-   Cuando llegue el token, agregar una versión nueva y volver a desplegar las funciones para que la tomen:
-   ```bash
-   printf "TOKEN_DE_BSALE" | gcloud secrets versions add BSALE_ACCESS_TOKEN --data-file=- --project=comandas-charcuteria
-   firebase deploy --only functions --project comandas-charcuteria
-   ```
-   Con el valor "pendiente" no pasa nada malo: mientras la sincronización esté apagada, ninguna función llama a Bsale.
-2. **(usted) Desplegar funciones y reglas:**
-   ```bash
-   firebase deploy --only functions,firestore:rules,firestore:indexes --project comandas-charcuteria
-   ```
-3. **(usted) Login con Google:** Consola Firebase → Authentication → Sign-in method → habilitar **Google**. Verificar que `comandas-charcuteria.web.app` esté en *Authorized domains*.
-4. **Arranque limpio** (borra pedidos y usuarios de demo; ver sección más abajo) y **primeros accesos** con `bootstrap-admin.ts`.
-5. **Modo real en el build:** agregar `VITE_BSALE_MODE=real` a `app/.env.production` y `npm run deploy`.
-6. En la app, **Conexión Bsale → Correr diagnóstico**. Trae sucursales, catálogo, precios, stock, clientes, vendedores y 90 días de documentos, y propone fábrica, tienda y lista de precios.
-7. **Configuración:** confirmar sucursal de fábrica, tienda y lista de precios.
-8. **Catálogo → Cruce con Bsale:** confirmar las sugerencias (en la prueba acertó 96 de 97) y resolver las que queden. Opcional: *Traer precios de Bsale*.
-9. Encender **Sincronización** (cron cada 10 min de 06:00 a 23:00 + webhooks). Botón **Webhook** → pedirle a soporte de Bsale que registre esa URL.
-10. Encender **Escrituras** con **Simulacro**; revisar la **Bitácora**; cuando todo calce, apagar Simulacro.
-11. **Conexión Bsale → Historia de ventas → Cargar 2 años** y **Actualizar costos**: llena el Panel de gestión (unos minutos, un mes por llamada). Después se mantiene solo con cada sincronización, y los costos se refrescan todos los días a las 05:30.
-
-### Sin retipeo
-
-Lo que nace en Comandas se escribe en Bsale desde la app, siempre pasando por la bitácora y el simulacro:
-
-| En Comandas | En Bsale |
-|---|---|
-| Pedido armado → **Facturar** (factura o boleta, con los pesos reales del armado y el precio de la lista) | documento tributario, reservas liberadas, pedido facturado con su PDF |
-| Producción → **Registrar producción** | recepción de stock en fábrica, a costo promedio vigente |
-| Tablero → **Traslado a tienda** | consumo en fábrica + recepción en tienda (o guía de traslado) |
-| Alta rápida de cliente | cliente nuevo |
-| Muestras sin cargo (en un pedido o solas) | consumo interno en fábrica, nota «Muestra · cliente · pedido», al facturar o al registrar la salida |
-
-### Muestras
-
-El vendedor agrega **+ Muestra** en el pedido (80 g por defecto, sale del granel del producto; sin granel, una unidad del formato más chico) y Pedido IA reconoce «incluir muestra de…». Van a $0, no generan demanda de producción y no entran en la factura. Despacho las arma con su peso y rotula; un pedido solo de muestras se cierra con **Registrar salida** (`MU-…`). Siete días después de la entrega el vendedor ve en su Tablero «¿Qué le pareció…?» y responde (`sampleFeedback`); si el cliente compra ese producto dentro de 60 días cuenta como conversión. Panel → Muestras: kilos y costo regalados, seguimiento por vendedor, conversión y venta generada.
-
-### Panel de gestión
-
-Corre sobre las ventas de Bsale (facturas + boletas − notas de crédito, neto), no sobre los pedidos. Los hechos se guardan comprimidos, un documento por mes (`bsale/facts/months/{AAAA-MM}`): dos años de historia cuestan ~25 lecturas. Pestañas: Resumen, Ventas, Productos (ABC, margen), Clientes (ritmo de compra, en riesgo, perdidos), Vendedores (la tienda cuenta como vendedora), Stock (cobertura, reposición a tienda), Explorador (tabla dinámica + CSV) y Pedidos (el panel operativo de Comandas). El margen usa el costo promedio de Bsale; si las recepciones se cargan sin costo, aparece como "costo no informado".
-
-Funciones: `bsaleDiagnose`, `bsaleSyncNow`, `bsaleScheduledSync`, `bsaleWebhook`, `bsaleWebhookInfo`, `bsaleReceiveProduction`, `bsaleTransferToStore`, `bsaleCreateClient`, `bsaleUpdateClient`, `bsaleInvoicePreview`, `bsaleEmitInvoice`, `bsaleFactsBackfill`, `bsaleRefreshCosts`, `bsaleDailyCosts`, `bsaleConsumeSamples`, `bsaleProxy` (solo GET). Código en [`functions/src/bsale/`](functions/src/bsale). Los supuestos sobre la API (rutas, paginación, nombres de campos) están anotados en `api.ts`; el diagnóstico guarda las respuestas para verificarlos.
-
-### Colecciones
+## Colecciones
 
 | Colección | Qué es | Quién escribe |
 |---|---|---|
-| `stock/{productId__formatId}` | `onHand` = fábrica según Bsale, `storeOnHand` = tienda, `reserved` = reservas de la app | servidor (sync) + transacciones de pedido |
-| `clients/*` | espejo de Bsale + cartera, modalidad, horario, notas | servidor + alta rápida |
-| `catalogMap/{variantId}` | cruce variante Bsale ↔ producto/formato | administración |
-| `bsale/catalog/variants`, `bsale/stock/byVariant`, `bsale/sales/documents`, `bsale/master/*`, `bsale/meta` | espejos y diagnóstico | servidor |
-| `bsale/facts` (índice de meses + costos), `bsale/facts/months/{AAAA-MM}` | hechos de venta del Panel, comprimidos | servidor |
-| `bsale/writes/log`, `bsale/webhooks/log` | bitácoras | servidor |
-| `settings/bsale` | configuración de la integración | superAdmin |
+| `orders/*` | pedidos (líneas, reservas, estados, ventana, aprobación, muestras) | app (transacciones) |
+| `stock/{productId__formatId}` | `onHand` = fábrica según Bsale, `storeOnHand`, `reserved` = reservas de la app | servidor (sync) + transacciones de pedido |
+| `stockMovements/*` | bitácora de stock, append-only | app |
+| `productionLog/*` | producción cargada desde Comandas y su estado en Bsale | Producción (crea), supervisión (marca «cargado») |
+| `clients/*` | espejo de Bsale + cartera, horario habitual, notas | servidor + alta rápida |
+| `products/*`, `catalogMap/{variantId}` | catálogo de la app (`sellable`) y cruce con Bsale | administración |
+| `users/*`, `invites/*` | perfiles e invitaciones | solo Cloud Functions |
+| `userPins/*` | hash scrypt del PIN | solo servidor (deny-all a clientes) |
+| `pinLog/*` | auditoría de cada uso del PIN | solo servidor |
+| `sampleFeedback/*` | seguimiento de muestras | vendedor |
+| `settings/app`, `settings/bsale`, `settings/bsaleSync` | configuración y estado de sincronización | superAdmin / servidor |
+| `bsale/**` | espejos, hechos de venta, bitácoras de escrituras y webhooks | servidor |
 
 ---
 
 ## Desarrollo local
 
-Requiere Node 20+ y Java para los emuladores (`brew install openjdk@21`, sin sudo; es *keg-only*, así que se antepone a `PATH`).
+Requiere Node 22 y Java 21 para los emuladores (`brew install openjdk@21`; es *keg-only*, así que se antepone a `PATH`).
 
 ```bash
 npm install
-npm run emulators            # Auth, Firestore, Functions (necesita Java en PATH)
-npm run seed                 # datos de demo: catálogo, clientes, 16 usuarios (demo1234), ~40 pedidos
-```
-
-App contra emuladores (con tarjetas de usuarios de desarrollo en el login):
-
-```bash
+npm run emulators            # Auth, Firestore, Functions
+npm run seed                 # demo: catálogo, clientes, usuarios (demo1234), ~40 pedidos
 cd app && VITE_USE_EMULATORS=true VITE_DEMO_LOGIN=true VITE_FIREBASE_PROJECT_ID=comandas-charcuteria-demo npx vite
 ```
 
-**Probar Bsale real sin token:** `npx tsx scripts/fake-bsale.ts` levanta un Bsale falso en `:4010` con la misma forma de la API. Con `functions/.env.local` = `BSALE_BASE_URL=http://127.0.0.1:4010` y `functions/.secret.local` = `BSALE_ACCESS_TOKEN=fake`, las funciones del emulador le hablan a él. Agregar `VITE_BSALE_MODE=real` al comando de la app. Las configuraciones de `.claude/launch.json` (`emulators`, `fake-bsale`, `app-emulators`, `app-emulators-real`) hacen todo esto.
-
-**Tests de reglas** (13 casos: pedidos, reposición, muestras, consultor, usuarios, espejos de Bsale):
-
-```bash
-npm run test:rules:emu
-```
-
----
-
-## Arranque limpio del proyecto real
-
-```bash
-GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npx tsx scripts/reset-real.ts                                  # muestra qué borraría
-GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npx tsx scripts/reset-real.ts --confirm comandas-charcuteria   # borra
-GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npx tsx scripts/bootstrap-admin.ts ciro@lacharcuteriartesanal.cl "Ciro" superAdmin luisorsini7@gmail.com "Luis" superAdmin
-```
-
-Borra pedidos, bitácora, contadores, espejos de stock y clientes, el Bsale simulado y los usuarios `@charcuteria.demo`. Conserva el catálogo (destino del cruce; `--products` lo borra), la configuración y los usuarios reales. La seed de demo ya no corre contra el proyecto real.
-
----
+- **Bsale falso:** `npx tsx scripts/fake-bsale.ts` (`:4010`), con `functions/.env.local` → `BSALE_BASE_URL=http://127.0.0.1:4010`, `functions/.secret.local` → `BSALE_ACCESS_TOKEN=fake` y `VITE_BSALE_MODE=real` en la app. `.claude/launch.json` trae estas configuraciones.
+- **Tests de reglas** (15 casos), solo con emuladores propios:
+  ```bash
+  npm run test:rules:emu
+  ```
+- **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): typecheck de funciones, build de la app y tests de reglas en cada push.
+- `app/tsconfig` tiene `noEmit`: no generar `.js` junto a los `.tsx`.
 
 ## Deploy
 
 ```bash
-npm run deploy                                                   # build + hosting
-firebase deploy --only firestore:rules,firestore:indexes         # reglas + índices
-firebase deploy --only functions --project comandas-charcuteria  # funciones (plan Blaze habilitado)
+npm run deploy                                                          # build + hosting (producción)
+npm run deploy:rules                                                    # reglas + índices
+firebase deploy --only functions --project comandas-charcuteria         # funciones
+cd app && npx vite build --mode staging && cd .. && firebase deploy --only hosting --project staging   # staging
 ```
 
-Tras cada deploy de hosting, los dispositivos ven el aviso **"Nueva versión disponible — Recargar"**.
-
----
-
-## Habilitar Gemini (una sola vez)
-
-Firebase AI Logic (`@firebase/ai`) llama a Gemini a través de `firebasevertexai.googleapis.com` con la API key web del proyecto **y un token de App Check**. Si falta cualquiera de las dos cosas, la app cae al parser determinista y muestra el aviso amarillo "Se usó el intérprete local". Sin App Check el proyecto responde `403 Firebase AI Logic has been deactivated… you must enforce Firebase App Check`: habilitar la API no alcanza.
-
-Ya está hecho en `comandas-charcuteria` (23-09-2026). Para reproducirlo en otro proyecto:
-
-1. **APIs**: `firebasevertexai.googleapis.com`, `aiplatform.googleapis.com`, `firebaseml.googleapis.com`.
-   ```bash
-   gcloud services enable firebasevertexai.googleapis.com aiplatform.googleapis.com --project comandas-charcuteria
-   ```
-2. **App Check con reCAPTCHA Enterprise**, todo por CLI (requiere `gcloud auth login` con una cuenta Owner/Editor):
-   ```bash
-   npm run appcheck:setup
-   ```
-   El script ([`scripts/appcheck-setup.mjs`](scripts/appcheck-setup.mjs)) es idempotente: habilita `recaptchaenterprise` + `firebaseappcheck`, crea (o reutiliza) la key *score* `comandas-appcheck-web` con dominios `comandas-charcuteria.web.app`, `comandas-charcuteria.firebaseapp.com` y `localhost`, la registra como proveedor de App Check de la web app, pone **Enforce solo en Firebase AI Logic** (`firebaseml.googleapis.com`; Firestore y Auth quedan sin enforcement para no romper clientes sin token) y escribe `VITE_RECAPTCHA_SITE_KEY` en `app/.env.production`. Se eligió Enterprise en vez de reCAPTCHA v3 clásico porque no requiere pegar una *secret key* en la consola y se administra por API.
-   - La key recién creada tarda ~1 minuto en propagarse; hasta entonces el SDK loguea `AppCheck: 400 error` y reintenta solo.
-   - `localhost` es dominio permitido, así que `npm run dev` funciona sin debug tokens. `VITE_APPCHECK_DEBUG=true` + `VITE_APPCHECK_DEBUG_TOKEN` quedan para CI/emuladores (registrar el token en *App Check → Apps → ⋮ → Manage debug tokens*).
-3. `npm run deploy`. Verificar en Pedido IA que el chip diga **· Gemini** y no aparezca el aviso amarillo. La consola del navegador loguea `[parse] Gemini failed…` con la causa exacta cuando falla.
-
-Costo aproximado al volumen del cliente (≈ 5 M tokens/mes, gemini-2.5-flash): USD 1–2/mes; entra en la cuota gratuita de Vertex AI. reCAPTCHA Enterprise: gratis hasta 10.000 evaluaciones/mes (un token de App Check dura 1 h, así que el equipo queda muy por debajo).
-
----
+Hosting sirve `index.html`, `sw.js` y el manifest sin caché y `/assets/**` como inmutables. Tras cada deploy, los dispositivos ven «Nueva versión disponible — Recargar». Detalle y checklist en [docs/operacion.md](docs/operacion.md).
 
 ## Estructura
 
 ```
 app/src/
-  domain/        tipos, permisos (permissions.ts), kanban, cutoff, analytics, parse/
-  data/          hooks Firestore, transacciones de pedido, auth, usuarios, bsaleOps, bsaleAdmin, catalogMap
-  integrations/bsale/  BsaleClient (interfaz), MockBsaleClient + mockAdmin (simulado), RealBsaleClient (vía funciones)
-  routes/        Login (landing), Tablero, vendedor/, despacho/, produccion/, clientes/, admin/, bsale/Explorador
+  domain/        tipos, permisos, kanban, delivery, exceptions, samples, analytics, bsaleAnalytics, parse/
+  data/          hooks Firestore, transacciones de pedido, auth, pin, productionLog, bsaleOps, bsaleAdmin
+  integrations/bsale/  BsaleClient (interfaz), Mock (staging/local) y Real (vía funciones)
+  components/    AppShell (menú agrupado + barra inferior), AppLock, PinPrompt, InstallButton, orders/, panel/, ui/
+  routes/        Login (landing), Tablero, Ayuda, vendedor/, despacho/, produccion/, clientes/, admin/, bsale/
+  lib/           format, image, install, scrollLock, draft, csv, rut
 functions/src/
-  users.ts       claimInvite, adminInviteUser, adminUpdateUser, adminDeleteInvite
-  bsale/         api, config, sync, diagnose, writes, index
-  bsaleProxy.ts  GET de solo lectura
-scripts/         seed (emuladores), bootstrap-admin, reset-real, fake-bsale, verify-*
+  users.ts, pin.ts, common.ts, bsaleProxy.ts, index.ts (parseOrder)
+  bsale/         api, config, sync, diagnose, facts, writes, invoice, samples, index
+scripts/         seed, bootstrap-admin, reset-real, bsale-load, bsale-probe, fake-bsale, import-whatsapp,
+                 golive-clean, catalog-golive, migrate-claims, appcheck-setup, setup-alerts, verify-*
 tests/rules/     reglas por perfil
+private/         datos extraídos y auditorías (gitignored, nunca al repo)
 ```
 
-## Fuera de alcance (por ahora)
+## Fuera de alcance
 
-Pago de despachos, comisiones, metas y venta predictiva, cobranza vía Chipax, cuentas por pagar/cobrar, fotos como prueba de entrega, notificaciones push. La línea de producción (insumos, procesos, rendimientos) es la siguiente etapa del contrato.
+Ver [docs/backlog.md](docs/backlog.md#fuera-de-alcance-no-cotizado). La línea de producción (insumos, procesos, rendimientos y mermas) es la siguiente etapa del contrato.

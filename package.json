@@ -2,7 +2,7 @@
   "name": "comandas-charcuteria",
   "private": true,
   "version": "0.1.0",
-  "description": "Mockup funcional de captura y fulfillment de pedidos para La Charcutería Artesanal (Cecinas Marcosi SpA)",
+  "description": "Comandas: toma y seguimiento de pedidos integrada con Bsale para La Charcutería Artesanal (Cecinas Marcosi SpA)",
   "workspaces": [
     "app",
     "functions"

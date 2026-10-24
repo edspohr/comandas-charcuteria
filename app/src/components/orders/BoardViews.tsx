@@ -60,7 +60,7 @@ export function CompactRow({ order, tone, action, onAction, onOpen }: { order: O
       <span className={'w-2 h-2 rounded-full shrink-0 ' + TONE_DOT[tone.tone]} />
       <button onClick={onOpen} className="min-w-0 flex-1 text-left">
         <span className="font-semibold text-charcoal-900 truncate block">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</span>
-        <span className="text-[10px] text-charcoal-300">{order.id.replace(/^PED-\d{4}-/, '#')} · <span className="first-letter:uppercase">{formatDateShort(order.requestedDate)}</span>{order.totalCLP ? ` · ${formatCLP(order.totalCLP)}` : ''}</span>
+        <span className="text-[10px] text-charcoal-300">{order.id.replace(/^PED-\d{4}-/, '#')} · <span className="first-letter:uppercase">{formatDateShort(order.requestedDate)}{order.deliveryWindow ? ` ${order.deliveryWindow.from}–${order.deliveryWindow.to}` : ''}</span>{order.totalCLP ? ` · ${formatCLP(order.totalCLP)}` : ''}</span>
       </button>
       {action.kind !== 'none' && action.kind !== 'anular' && (
         <button onClick={() => onAction(action.kind)} className="shrink-0 rounded bg-charcoal-700 text-cream-50 px-2 py-1 text-[10px] uppercase tracking-display hover:bg-charcoal-900">{action.label}</button>

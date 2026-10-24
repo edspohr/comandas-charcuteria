@@ -1,3 +1,5 @@
+import { windowKey } from '@/domain/delivery';
+import { isStrictStock } from '@/domain/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -52,6 +54,7 @@ export default function Tablero() {
   const { clients } = useClients();
   const internalShopIds = useMemo(() => new Set(clients.filter((c) => c.isInternalShop).map((c) => c.id)), [clients]);
   const { settings } = useSettings();
+  const strictStock = isStrictStock(settings);
   const thresholds = settings.kanban ?? DEFAULT_KANBAN_THRESHOLDS;
   const sync = useSyncState();
 
@@ -103,6 +106,8 @@ export default function Tablero() {
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return orders.filter((o) => {
+      // WhatsApp history archived at go-live: lives in fichas and the panel.
+      if (o.archived) return false;
       if (o.status === 'anulado') return showAnulados && (!mine || o.createdBy === uid);
       if (o.status === 'entregado' && o.updatedAt < closedSince) return false;
       if (mine) {
@@ -136,6 +141,9 @@ export default function Tablero() {
         const rank = (t: Tone) => (t === 'red' ? 0 : t === 'amber' ? 1 : t === 'neutral' ? 2 : 3);
         if (rank(ta) !== rank(tb)) return rank(ta) - rank(tb);
         if (a.requestedDate !== b.requestedDate) return a.requestedDate.localeCompare(b.requestedDate);
+        // Same day: whoever receives earliest goes first (armado and reparto).
+        const wa = windowKey(a.deliveryWindow); const wb = windowKey(b.deliveryWindow);
+        if (wa !== wb) return wa.localeCompare(wb);
         return a.createdAt - b.createdAt;
       });
     }
@@ -198,7 +206,7 @@ export default function Tablero() {
   const wide = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
   const openOrder = (o: Order) => { if (wide) setDrawerId(o.id); else navigate(detailPath(o, role, uid)); };
   const toneOf = (o: Order) => cardTone(o, stock, thresholds, now, today);
-  const actionOf = (o: Order) => nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId) });
+  const actionOf = (o: Order) => nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId), strictStock });
   const [activeCol, setActiveCol] = useState<ColumnId>(can(role, 'order.link') ? 'por_facturar' : role === 'reparto' ? 'por_despachar' : 'pendiente');
   function scrollToCol(id: ColumnId) {
     setActiveCol(id);
@@ -316,7 +324,7 @@ export default function Tablero() {
         {COLUMNS.map((c) => {
           const list = byColumn.columns.get(c.id) ?? [];
           const isCerrado = c.id === 'cerrado';
-          const dropOk = dragOrder ? actionForDrop(dragOrder, c.id, role, uid, { isShop: internalShopIds.has(dragOrder.clientId) }) : null;
+          const dropOk = dragOrder ? actionForDrop(dragOrder, c.id, role, uid, { isShop: internalShopIds.has(dragOrder.clientId), strictStock }) : null;
           const sumCLP = list.reduce((s, o) => s + (o.totalCLP ?? 0), 0);
           return (
             <section
@@ -329,7 +337,7 @@ export default function Tablero() {
                 e.preventDefault();
                 const o = dragOrder; setDragId(null); setOverCol(null);
                 if (!o) return;
-                const kind = actionForDrop(o, c.id, role, uid, { isShop: internalShopIds.has(o.clientId) });
+                const kind = actionForDrop(o, c.id, role, uid, { isShop: internalShopIds.has(o.clientId), strictStock });
                 if (kind) void run(kind, o);
               }}
             >
@@ -352,10 +360,10 @@ export default function Tablero() {
                     key={o.id}
                     order={o}
                     tone={cardTone(o, stock, thresholds, now, today)}
-                    action={nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId) })}
+                    action={nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId), strictStock })}
                     onAction={(kind) => run(kind, o)}
                     detailTo={detailPath(o, role, uid)}
-                    draggable={dragEnabled && !isCerrado && nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId) }).kind !== 'none' && nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId) }).kind !== 'anular'}
+                    draggable={dragEnabled && !isCerrado && nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId), strictStock }).kind !== 'none' && nextAction(o, role, uid, { isShop: internalShopIds.has(o.clientId), strictStock }).kind !== 'anular'}
                     onDragStart={() => setDragId(o.id)}
                     onDragEnd={() => { setDragId(null); setOverCol(null); }}
                     compact={isCerrado}
@@ -449,7 +457,7 @@ function KanbanCard({ order, tone, action, onAction, onOpen, detailTo, draggable
       </div>
       <Link to={detailTo} onClick={(e) => { if (onOpen) { e.preventDefault(); onOpen(); } }} className="block font-semibold text-charcoal-900 text-sm leading-tight mt-0.5 truncate">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</Link>
       <div className="flex items-center justify-between gap-2 mt-1 text-[11px] text-charcoal-500">
-        <span className={'first-letter:uppercase ' + (late ? 'text-red-700 font-semibold' : '')}>{formatDateShort(order.requestedDate)} · {order.deliveryMode === 'retiro' ? 'retiro' : 'despacho'}</span>
+        <span className={'first-letter:uppercase ' + (late ? 'text-red-700 font-semibold' : '')}>{formatDateShort(order.requestedDate)}{order.deliveryWindow ? ` ${order.deliveryWindow.from}–${order.deliveryWindow.to}` : ''} · {order.deliveryMode === 'retiro' ? 'retiro' : 'despacho'}</span>
         <span className="font-semibold text-charcoal-700">{order.totalCLP ? formatCLP(order.totalCLP) : `${order.lines.length} lín.`}</span>
       </div>
       {!compact && (

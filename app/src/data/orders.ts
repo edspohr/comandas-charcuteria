@@ -6,6 +6,7 @@ import {
   orderBy,
   query,
   runTransaction,
+  updateDoc,
   where,
   limit,
 } from 'firebase/firestore';
@@ -16,6 +17,7 @@ import { describeFirestoreError } from '@/lib/errors';
 import { computeLineSubtotal } from '@/lib/pricing';
 import { DOCUMENTS_PATH, isRealBsale } from '@/integrations/bsale/client';
 import { hasSamples, isSampleOnly, lineKey } from '@/domain/samples';
+import { formatWindow, type DeliveryWindow } from '@/domain/delivery';
 import type { DocumentReference, Transaction } from 'firebase/firestore';
 
 // One read per stock doc, even when several lines share it (a Coppa line and
@@ -67,6 +69,9 @@ export interface DraftOrderInput {
   deliveryMode: 'retiro' | 'despacho';
   deliveryAddress?: string;
   receivingHours?: string;
+  deliveryWindow?: DeliveryWindow;
+  // Nombre de fantasía con que despacho reconoce al cliente (opcional).
+  fantasyName?: string;
   source: 'app' | 'pasted';
   rawText?: string;
 }
@@ -87,7 +92,7 @@ export async function createOrder(
   const year = new Date().getFullYear();
   const counterRef = doc(db, 'counters', `orders-${year}`);
 
-  return await runTransaction(db, async (tx) => {
+  const result = await runTransaction(db, async (tx) => {
     // ---- Reads
     const counterSnap = await tx.get(counterRef);
     const nextN = (counterSnap.data()?.last ?? 0) + 1;
@@ -156,7 +161,7 @@ export async function createOrder(
       clientId: input.client.id,
       clientSnapshot: {
         name: input.client.name,
-        fantasyName: input.client.fantasyName,
+        fantasyName: input.fantasyName?.trim() || input.client.fantasyName,
         rut: input.client.rut,
         address: input.client.address,
       },
@@ -164,7 +169,8 @@ export async function createOrder(
       requestedDate: input.requestedDate,
       deliveryMode: input.deliveryMode,
       deliveryAddress: input.deliveryAddress ?? input.client.address,
-      receivingHours: input.receivingHours ?? input.client.receivingHours,
+      receivingHours: input.deliveryWindow ? formatWindow(input.deliveryWindow) : input.receivingHours ?? input.client.receivingHours,
+      ...(input.deliveryWindow ? { deliveryWindow: stripEmpty(input.deliveryWindow) } : {}),
       status,
       statusHistory: [
         { status: 'recibido',     by: createdByUid, at: now },
@@ -208,6 +214,25 @@ export async function createOrder(
 
     return { orderId, status, parcialLines };
   });
+  await rememberClientHabits(input);
+  return result;
+}
+
+const stripEmpty = (w: DeliveryWindow): DeliveryWindow => (w.note?.trim() ? { from: w.from, to: w.to, note: w.note.trim() } : { from: w.from, to: w.to });
+
+// The client's usual window (and fantasy name, when it had none) prefill the
+// next order. Best effort: the order is already saved.
+async function rememberClientHabits(input: DraftOrderInput) {
+  const patch: Record<string, unknown> = {};
+  const w = input.deliveryWindow;
+  if (w && (input.client.deliveryWindow?.from !== w.from || input.client.deliveryWindow?.to !== w.to)) {
+    patch.deliveryWindow = { from: w.from, to: w.to };
+    patch.receivingHours = `${w.from}–${w.to}`;
+  }
+  const fantasy = input.fantasyName?.trim();
+  if (fantasy && !input.client.fantasyName) patch.fantasyName = fantasy;
+  if (!Object.keys(patch).length) return;
+  try { await updateDoc(doc(db, 'clients', input.client.id), patch); } catch (e) { console.warn('[pedido] hábitos del cliente', e); }
 }
 
 // ---------- Despacho queue ----------
@@ -313,6 +338,7 @@ export async function markArmado(
   orderId: string,
   packed: PackedLineInput[],
   packerUid: string,
+  opts: { strictStock?: boolean } = {},
 ): Promise<void> {
   const orderRef = doc(db, 'orders', orderId);
   await runTransaction(db, async (tx) => {
@@ -324,8 +350,10 @@ export async function markArmado(
     }
     // Hard-block armado while any line still has production pending — the
     // stock has to show up in Bsale first (sync promotes the order).
+    // Informative stock (marcha blanca): packed with what's in the cold room;
+    // the pending production of the order stops counting once it's armado.
     const stillPending = order.lines.some((l) => l.pendingProductionQty > 0);
-    if (stillPending) {
+    if (stillPending && opts.strictStock) {
       throw new Error('El pedido tiene líneas esperando stock de producción. Se arma cuando Bsale reporte el stock.');
     }
 
@@ -340,7 +368,7 @@ export async function markArmado(
       const label = `${line.productName} · ${line.formatLabel}`;
       if (st && st.onHand < st.reserved && !compromised.includes(label)) compromised.push(label);
     }
-    if (compromised.length > 0) {
+    if (compromised.length > 0 && opts.strictStock) {
       throw new Error(`Bsale reporta menos stock del reservado en ${compromised.join(', ')}. Sincronizá con Bsale o resolvé el pedido desde administración antes de armar.`);
     }
 
@@ -365,8 +393,8 @@ export async function markArmado(
       const shortReason = p?.shortReason?.trim() || undefined;
       // Si la línea faltó, forzamos packedQty=0 y subtotal=0: la ficha y el
       // Panel lo tratan como no-vendido, no como merma.
-      if (shortReason) return { ...line, packedQty: 0, packedWeightKg: undefined, subtotalCLP: 0, shortReason };
-      const out: OrderLine = { ...line, packedQty, packedWeightKg: p?.packedWeightKg, subtotalCLP };
+      if (shortReason) { const { packedWeightKg: _w, ...rest } = line; return { ...rest, packedQty: 0, subtotalCLP: 0, shortReason, pendingProductionQty: 0 }; }
+      const out: OrderLine = { ...line, packedQty, packedWeightKg: p?.packedWeightKg, subtotalCLP, pendingProductionQty: 0 };
       if (out.packedWeightKg === undefined) delete out.packedWeightKg;
       if (out.subtotalCLP === undefined) delete out.subtotalCLP;
       return out;

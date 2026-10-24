@@ -12,6 +12,8 @@ import { describeFirestoreError } from '@/lib/errors';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import { formatCLP } from '@/lib/pricing';
 import { useUsers } from '@/data/users';
+import { useSettings } from '@/data/settings';
+import { isStrictStock } from '@/domain/types';
 import { ORDER_STATUS_LABEL } from '@/domain/types';
 
 
@@ -35,7 +37,8 @@ export default function DetalleArmado() {
     setState(Object.fromEntries(order.lines.map((l) => [
       lineKey(l),
       {
-        packedQty: l.packedQty ?? l.reservedQty,
+        // Informative stock: default to what was ordered; Bsale may lag behind the cold room.
+        packedQty: l.packedQty ?? (strictStock ? l.reservedQty : l.qty),
         packedWeightKg: l.packedWeightKg != null ? String(l.packedWeightKg) : '',
         short: !!l.shortReason,
         shortReason: l.shortReason ?? '',
@@ -44,7 +47,11 @@ export default function DetalleArmado() {
   }, [order]);
 
   const mine = order?.assignedPackerId === uid;
-  const anyPendingProduction = order?.lines.some((l) => l.pendingProductionQty > 0) ?? false;
+  const { settings } = useSettings();
+  const strictStock = isStrictStock(settings);
+  const shortOfStock = order?.lines.some((l) => l.pendingProductionQty > 0) ?? false;
+  // Informative stock: a shortfall in Bsale doesn't stop packing.
+  const anyPendingProduction = strictStock && shortOfStock;
   const canTake = order && (!order.assignedPackerId || mine) && (order.status === 'confirmado' || order.status === 'confirmado_parcial') && !anyPendingProduction;
   const canPack = order && mine && order.status === 'en_armado' && !anyPendingProduction;
   const isDone = order && (order.status === 'armado' || order.status === 'facturado' || order.status === 'despachado' || order.status === 'entregado');
@@ -93,6 +100,7 @@ export default function DetalleArmado() {
           };
         }),
         uid,
+        { strictStock },
       );
       navigate('/tablero', { state: { armadoOk: order.id } });
     } catch (e) {
@@ -123,6 +131,9 @@ export default function DetalleArmado() {
         <p className="text-xs text-charcoal-300 mt-1 first-letter:uppercase">
           Solicitado para {formatDateLong(order.requestedDate)} · {order.deliveryMode === 'retiro' ? 'Retiro' : (order.deliveryAddress ?? 'Despacho')}
         </p>
+        <p className="text-sm text-charcoal-900 font-semibold mt-1">
+          {order.receivingHours ? `Recibe ${order.receivingHours}` : 'Sin horario de entrega'}
+        </p>
       </header>
 
       {canTake && (
@@ -133,6 +144,12 @@ export default function DetalleArmado() {
           <Button onClick={take} className="w-full">
             {order.assignedPackerId ? 'Comenzar armado' : 'Tomar este pedido'}
           </Button>
+        </div>
+      )}
+
+      {!strictStock && shortOfStock && !isDone && (
+        <div className="rounded-md bg-brass-50 border border-brass-300 text-brass-700 p-3 text-sm mb-4">
+          Bsale no muestra stock suficiente para algunas líneas (marcadas abajo). Arme con lo que haya en cámara y registre lo empacado; si falta, márquelo como faltante.
         </div>
       )}
 
@@ -175,6 +192,9 @@ export default function DetalleArmado() {
                 <div className="text-right shrink-0">
                   <p className="eyebrow">{line.sample ? 'Muestra' : 'Vendido'}</p>
                   <p className="font-semibold text-charcoal-700 mt-0.5">{line.sample ? sampleLabel(line) : formatQty(line.qty, line.unit)}</p>
+                  {!strictStock && line.pendingProductionQty > 0 && (
+                    <p className="text-[10px] uppercase tracking-display text-brass-700 mt-0.5">Sin stock en Bsale</p>
+                  )}
                   {line.reservedQty !== line.qty && (
                     <p className="text-[10px] uppercase tracking-display text-brass-700 mt-0.5">
                       Reserv. {formatQty(line.reservedQty, line.unit)}

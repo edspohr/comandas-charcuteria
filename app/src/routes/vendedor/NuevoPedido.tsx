@@ -17,6 +17,7 @@ import { formatDateLong, formatDateShort, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 import { categoryLabel, categoryOrder } from '@/domain/categories';
 import { computeLineSubtotal, formatCLP, unitPriceLabel } from '@/lib/pricing';
+import { formatWindow, parseWindow, windowValid } from '@/domain/delivery';
 import { SAMPLE_DEFAULT_GRAMS, SAMPLE_GRAM_OPTIONS, lineKey, sampleLabel, sampleLine, sampleSourceFor } from '@/domain/samples';
 import type { Client, Product, ProductFormat, StockDoc } from '@/domain/types';
 
@@ -27,6 +28,12 @@ interface Draft {
   deliveryMode: 'retiro' | 'despacho';
   deliveryAddress: string;
   receivingHours: string;
+  // Horario de entrega (obligatorio) y nombre de fantasía (opcional). Pueden
+  // faltar en borradores guardados antes de la 1.0.
+  deliveryFrom?: string;
+  deliveryTo?: string;
+  deliveryNote?: string;
+  fantasyName?: string;
   step: number;
 }
 
@@ -87,6 +94,8 @@ export default function NuevoPedido() {
 
   async function submit() {
     if (!client) return;
+    const window = { from: draft.deliveryFrom ?? '', to: draft.deliveryTo ?? '', note: draft.deliveryNote };
+    if (!windowValid(window)) { setError('Indique el horario de entrega: desde y hasta (el primero antes que el segundo).'); goto(3); return; }
     setSubmitting(true);
     setError(null);
     try {
@@ -97,6 +106,8 @@ export default function NuevoPedido() {
         deliveryMode: draft.deliveryMode,
         deliveryAddress: draft.deliveryAddress || client.address,
         receivingHours: draft.receivingHours || client.receivingHours,
+        deliveryWindow: window,
+        fantasyName: draft.fantasyName?.trim() || undefined,
         source: 'app',
       });
       clearDraft(uid);
@@ -131,7 +142,11 @@ export default function NuevoPedido() {
           clients={clients}
           uid={uid}
           selectedId={draft.clientId}
-          onSelect={(c) => { update('clientId', c.id); update('deliveryMode', c.deliveryMode); goto(2); }}
+          onSelect={(c) => {
+            // A different client brings its own usual window and fantasy name.
+            if (c.id !== draft.clientId) setDraft((d) => ({ ...d, deliveryFrom: undefined, deliveryTo: undefined, deliveryNote: undefined, fantasyName: undefined }));
+            update('clientId', c.id); update('deliveryMode', c.deliveryMode); goto(2);
+          }}
           onRepeat={() => {
             if (!lastOrder) return;
             update('lines', lastOrder.lines.filter((l) => !l.sample).map((l) => ({
@@ -650,6 +665,8 @@ function SelectedLines({ lines, onRemove }: { lines: DraftLine[]; onRemove: (l: 
 
 // ---------- Step 3: Entrega ----------
 
+const QUICK_WINDOWS: Array<[string, string, string]> = [['09:00', '13:00', 'Mañana 9–13'], ['10:00', '12:00', '10–12'], ['14:00', '18:00', 'Tarde 14–18'], ['09:00', '18:00', 'Todo el día']];
+
 function StepEntrega({
   client, draft, onUpdate, onNext, onBack,
 }: {
@@ -659,6 +676,18 @@ function StepEntrega({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const [touched, setTouched] = useState(false);
+  const valid = windowValid({ from: draft.deliveryFrom ?? '', to: draft.deliveryTo ?? '' });
+  // Prefill: the client's usual window (or what the message/ficha says) and
+  // its fantasy name. Only once, when the draft has nothing yet.
+  useEffect(() => {
+    if (!draft.deliveryFrom && !draft.deliveryTo) {
+      const w = client.deliveryWindow ?? parseWindow(draft.receivingHours) ?? parseWindow(client.receivingHours);
+      if (w) { onUpdate('deliveryFrom', w.from); onUpdate('deliveryTo', w.to); }
+    }
+    if (draft.fantasyName === undefined) onUpdate('fantasyName', client.fantasyName ?? '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.id]);
   return (
     <section className="space-y-5">
       <div>
@@ -706,18 +735,31 @@ function StepEntrega({
       )}
 
       <div>
-        <label className="eyebrow block mb-1.5">Horario de recepción</label>
-        <input
-          value={draft.receivingHours || client.receivingHours || ''}
-          onChange={(e) => onUpdate('receivingHours', e.target.value)}
-          placeholder="Ej: L-V 09:00-14:00"
-          className="field"
-        />
+        <label className="eyebrow block mb-1.5">Horario de entrega *</label>
+        <div className="flex items-center gap-2">
+          <input type="time" aria-label="Desde" value={draft.deliveryFrom ?? ''} onChange={(e) => onUpdate('deliveryFrom', e.target.value)} className={'field ' + (touched && !draft.deliveryFrom ? 'border-red-400' : '')} />
+          <span className="text-sm text-charcoal-500">a</span>
+          <input type="time" aria-label="Hasta" value={draft.deliveryTo ?? ''} onChange={(e) => onUpdate('deliveryTo', e.target.value)} className={'field ' + (touched && !draft.deliveryTo ? 'border-red-400' : '')} />
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {QUICK_WINDOWS.map(([f, t, label]) => (
+            <button key={label} type="button" onClick={() => { onUpdate('deliveryFrom', f); onUpdate('deliveryTo', t); }}
+              className={'rounded-md border px-2.5 py-1 text-xs ' + (draft.deliveryFrom === f && draft.deliveryTo === t ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-600')}>{label}</button>
+          ))}
+        </div>
+        <input value={draft.deliveryNote ?? ''} onChange={(e) => onUpdate('deliveryNote', e.target.value)} placeholder="Nota opcional — no antes de las 10, tocar timbre, preguntar por el chef…" className="field mt-2 h-10 text-sm" />
+        {touched && !valid && <p className="text-xs text-red-700 mt-1">Indique desde y hasta qué hora puede recibir el cliente.</p>}
+        <p className="text-[11px] text-charcoal-300 mt-1">Horario preferido por el cliente para recibir. Queda como habitual en su ficha.</p>
+      </div>
+
+      <div>
+        <label className="eyebrow block mb-1.5">Nombre de fantasía <span className="normal-case tracking-normal text-charcoal-300">(opcional)</span></label>
+        <input value={draft.fantasyName ?? ''} onChange={(e) => onUpdate('fantasyName', e.target.value)} placeholder={`Cómo lo conoce despacho — ${client.name}`} className="field" />
       </div>
 
       <div className="flex gap-2 pt-2">
         <Button variant="secondary" onClick={onBack} className="flex-1">Volver</Button>
-        <Button onClick={onNext} className="flex-1">Siguiente</Button>
+        <Button onClick={() => { setTouched(true); if (valid) onNext(); }} className="flex-1">Siguiente</Button>
       </div>
     </section>
   );
@@ -751,8 +793,8 @@ function StepConfirmar({
       <div className="card p-4 space-y-2">
         <div>
           <p className="eyebrow">Cliente</p>
-          <p className="font-semibold text-charcoal-900 mt-1">{client.fantasyName ?? client.name}</p>
-          {client.fantasyName && client.name !== client.fantasyName && (
+          <p className="font-semibold text-charcoal-900 mt-1">{draft.fantasyName?.trim() || client.fantasyName || client.name}</p>
+          {(draft.fantasyName?.trim() || client.fantasyName) && client.name !== (draft.fantasyName?.trim() || client.fantasyName) && (
             <p className="text-xs text-charcoal-300 mt-0.5">Razón social: {client.name}</p>
           )}
           <p className="text-xs text-charcoal-300 mt-0.5">{client.rut ?? 'Sin RUT'}</p>
@@ -768,10 +810,12 @@ function StepConfirmar({
               ? 'Retiro en tienda'
               : `Despacho · ${draft.deliveryAddress || client.address || 'sin dirección'}`}
           </p>
-          {(draft.receivingHours || client.receivingHours) && (
-            <p className="text-xs text-charcoal-500 mt-0.5">
-              Horario · {draft.receivingHours || client.receivingHours}
+          {windowValid({ from: draft.deliveryFrom ?? '', to: draft.deliveryTo ?? '' }) ? (
+            <p className="text-xs text-charcoal-700 mt-0.5 font-medium">
+              Horario · {formatWindow({ from: draft.deliveryFrom, to: draft.deliveryTo, note: draft.deliveryNote })}
             </p>
+          ) : (
+            <p className="text-xs text-red-700 mt-0.5">Falta el horario de entrega (paso Entrega).</p>
           )}
         </div>
 

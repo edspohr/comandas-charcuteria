@@ -40,7 +40,12 @@ service cloud.firestore {
       allow create: if isSupervisor()
         || (canQuickClient() && request.resource.data.createdBy == request.auth.uid);
       // El sync espeja Bsale en clients/*: cualquier perfil que sincroniza.
-      allow update: if isSupervisor() || canSync();
+      allow update: if isSupervisor() || canSync()
+        // Quien toma pedidos deja el horario habitual del cliente y, si no
+        // tenía, su nombre de fantasía. Nada más de la ficha.
+        || (canCreateOrder()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryWindow', 'receivingHours', 'fantasyName'])
+          && (resource.data.get('fantasyName', '') == '' || unchanged('fantasyName')));
       allow delete: if isSupervisor();
     }
 

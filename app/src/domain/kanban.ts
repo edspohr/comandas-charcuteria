@@ -84,13 +84,14 @@ export type ActionKind = 'take' | 'arm' | 'link' | 'transfer' | 'samples' | 'dis
 
 export interface NextAction { kind: ActionKind; label: string; }
 
-export function nextAction(order: Order, role: Role, uid: string, opts: { isShop?: boolean } = {}): NextAction {
+export function nextAction(order: Order, role: Role, uid: string, opts: { isShop?: boolean; strictStock?: boolean } = {}): NextAction {
   const shop = opts.isShop || order.kind === 'reposicion';
   // Supervisores (administración) pueden mover cualquier tarjeta; el resto
   // solo las propias o las que les tocan por función.
   const supervisor = can(role, 'order.cancelAny');
   const canCancel = (supervisor || (can(role, 'order.cancelOwn') && order.createdBy === uid));
-  const anyPending = order.lines.some((l) => l.pendingProductionQty > 0);
+  // Only strict stock blocks packing while production is pending.
+  const anyPending = !!opts.strictStock && order.lines.some((l) => l.pendingProductionQty > 0);
   switch (order.status) {
     case 'recibido':
     case 'confirmado':
@@ -120,7 +121,7 @@ export function nextAction(order: Order, role: Role, uid: string, opts: { isShop
 }
 
 // Which action a drop on `target` means, if any. Only adjacent forward moves.
-export function actionForDrop(order: Order, target: ColumnId, role: Role, uid: string, opts: { isShop?: boolean } = {}): ActionKind | null {
+export function actionForDrop(order: Order, target: ColumnId, role: Role, uid: string, opts: { isShop?: boolean; strictStock?: boolean } = {}): ActionKind | null {
   const from = columnFor(order.status);
   if (!from || from === target) return null;
   const idx = COLUMNS.findIndex((c) => c.id === from);

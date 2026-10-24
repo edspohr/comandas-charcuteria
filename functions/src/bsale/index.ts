@@ -174,6 +174,7 @@ export const bsaleEmitInvoice = onCall({ region: REGION, secrets, timeoutSeconds
   const { uid } = requireRole(req, [...INVOICE_ROLES], 'facturar');
   const s = await loadSettings();
   requireEnabled(s);
+  if (!s.invoicesEnabled) throw new HttpsError('failed-precondition', 'La facturación desde Comandas está apagada: emita en el POS de Bsale y vincule el documento.');
   const orderId = String(req.data?.orderId ?? '');
   if (!orderId) throw new HttpsError('invalid-argument', 'Falta el pedido.');
   return emitInvoice(apiFromSecret(), s, uid, orderId, kindArg(req.data?.kind));

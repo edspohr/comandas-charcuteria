@@ -109,6 +109,16 @@ describe('reposición de tienda', () => {
     await assertSucceeds(updateDoc(doc(edu, 'orders', 'PED-M'), { status: 'facturado', invoiceRef: 'MU-PED-M' }));
   });
 
+  it('a seller saves the client usual window and a missing fantasy name, nothing else', async () => {
+    await seed('clients/c-1', { id: 'c-1', name: 'Inversiones Uno SpA', deliveryMode: 'despacho', invoicingComplete: true });
+    await seed('clients/c-2', { id: 'c-2', name: 'Dos Ltda', fantasyName: 'Café Dos', deliveryMode: 'despacho', invoicingComplete: true });
+    const alice = as('u-alice', 'vendedor');
+    await assertSucceeds(updateDoc(doc(alice, 'clients', 'c-1'), { deliveryWindow: { from: '09:00', to: '13:00' }, receivingHours: '09:00–13:00', fantasyName: 'Café Uno' }));
+    await assertFails(updateDoc(doc(alice, 'clients', 'c-2'), { fantasyName: 'Otro nombre' }));
+    await assertFails(updateDoc(doc(alice, 'clients', 'c-1'), { rut: '11.111.111-1' }));
+    await assertFails(updateDoc(doc(as('u-rep', 'reparto'), 'clients', 'c-1'), { fantasyName: 'X' }));
+  });
+
   it('a seller answers a sample follow-up only as themself', async () => {
     const alice = as('u-alice', 'vendedor');
     const fb = { id: 'PED-1__coppa__granel', orderId: 'PED-1', productId: 'coppa', formatId: 'granel', result: 'gusto', at: Date.now() };

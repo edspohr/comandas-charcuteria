@@ -8,6 +8,7 @@ import { syncStockFromBsale } from '@/data/stock';
 import { bsale, isRealBsale } from '@/integrations/bsale/client';
 import { emitInvoice, previewInvoice, type InvoicePreview } from '@/data/bsaleOps';
 import { callableMessage } from '@/data/userAdmin';
+import { useBsaleSettings } from '@/data/bsaleAdmin';
 import { describeFirestoreError } from '@/lib/errors';
 import { formatCLP } from '@/lib/pricing';
 import type { Order } from '@/domain/types';
@@ -226,6 +227,8 @@ export function AnularDialog({ order, uid, onClose, onDone }: { order: Order; ui
 // the mock Bsale as if the cashier had just done it.
 export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { order: Order; uid: string; onClose: () => void; onLinked?: (doc: BsaleDocument) => void }) {
   const { documents, loading } = useBsaleDocuments({ limit: 60 });
+  const { settings: bsaleSettings } = useBsaleSettings();
+  const canEmit = isRealBsale && !!bsaleSettings.invoicesEnabled;
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState('');
@@ -280,10 +283,11 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked }: { ord
   }
 
   return (
-    <ModalShell title={isRealBsale ? 'Facturar en Bsale' : 'Vincular documento Bsale'} eyebrow={order.id} onClose={onClose} wide>
+    <ModalShell title={canEmit ? 'Facturar en Bsale' : 'Vincular documento Bsale'} eyebrow={order.id} onClose={onClose} wide>
       <div className="space-y-4">
-        {isRealBsale && <EmitirEnBsale order={order} onDone={(d) => { onLinked?.(d as BsaleDocument); }} onClose={onClose} />}
-        {isRealBsale && <p className="eyebrow pt-2 border-t border-charcoal-100">¿Ya se emitió en el POS? Vincúlelo</p>}
+        {canEmit && <EmitirEnBsale order={order} onDone={(d) => { onLinked?.(d as BsaleDocument); }} onClose={onClose} />}
+        {canEmit && <p className="eyebrow pt-2 border-t border-charcoal-100">¿Ya se emitió en el POS? Vincúlelo</p>}
+        {isRealBsale && !canEmit && <p className="text-sm text-charcoal-700">Emita la factura o boleta en el POS de Bsale (con los pesos del armado) y vincúlela aquí. Los documentos aparecen solos en unos minutos; también puede escribir el número.</p>}
         <p className="text-sm text-charcoal-700">
           La venta se emite en el POS de Bsale. Elegí el documento que corresponde a{' '}
           <span className="font-semibold">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</span>

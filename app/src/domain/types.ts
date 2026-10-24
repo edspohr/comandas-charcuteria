@@ -1,3 +1,4 @@
+import type { DeliveryWindow } from './delivery';
 // Un perfil por usuario. Ver domain/permissions.ts para lo que puede cada uno.
 export type Role =
   | 'vendedor' | 'tienda' | 'despacho' | 'reparto' | 'produccion' | 'admin' | 'superAdmin' | 'consultor';
@@ -90,6 +91,8 @@ export interface Client {
   email?: string;
   deliveryMode: DeliveryMode;
   receivingHours?: string;
+  // Horario habitual de recepción (prellena el pedido).
+  deliveryWindow?: DeliveryWindow;
   notes?: string;
   isInternalShop?: boolean;
   invoicingComplete: boolean;
@@ -165,6 +168,8 @@ export interface Order {
   deliveryMode: DeliveryMode;
   deliveryAddress?: string;
   receivingHours?: string;
+  // Rango preferido por el cliente (obligatorio desde la 1.0).
+  deliveryWindow?: DeliveryWindow;
   status: OrderStatus;
   assignedPackerId?: string;
   statusHistory: StatusEvent[];
@@ -179,6 +184,8 @@ export interface Order {
   // Importado: valores estimados con la lista de precios, estados inferidos.
   historical?: boolean;
   rawText?: string;
+  // Historial importado archivado en la puesta en marcha (fuera del Tablero).
+  archived?: boolean;
   // Consumo interno de las muestras en Bsale (una vez por pedido).
   samplesConsumption?: { at: number; by: string; ref: string; dryRun?: boolean; skipped?: boolean; logId?: string };
   invoicingComplete: boolean;
@@ -252,7 +259,13 @@ export interface Settings {
   clientHealth?: { activoDias: number; riesgoDias: number };
   // Bsale office whose stock backs the pedidos (fábrica Franklin).
   bsaleOfficeId?: number;
+  // informativo (por defecto, marcha blanca): el faltante se avisa pero no
+  // bloquea tomar ni armar. estricto: sin stock en Bsale el pedido espera
+  // producción. Pasar a estricto cuando el cruce de catálogo esté completo.
+  stockMode?: 'informativo' | 'estricto';
 }
+
+export const isStrictStock = (s?: Pick<Settings, 'stockMode'> | null) => s?.stockMode === 'estricto';
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   recibido: 'Recibido',

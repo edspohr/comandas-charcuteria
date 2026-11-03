@@ -1,30 +1,30 @@
 # Backlog
 
-Actualizado al 24-10-2026. Tres partes:
-1. lo que falta para que la 1.0 funcione con todos el lunes 26-10;
+Actualizado al 03-11-2026. Tres partes:
+1. lo que falta para que la 1.0 funcione con todos (no arrancó el 26-10; arranca el miércoles 04-11, ver [arranque-04-11.md](arranque-04-11.md));
 2. el plan del contrato hasta el 30-11;
 3. el backlog fuera de alcance, que no está cotizado.
 
 La deuda técnica está en [deuda-tecnica.md](deuda-tecnica.md).
 
-## 1. Puesta en marcha 1.0 (semana del 26-10)
+## 1. Puesta en marcha 1.0 (desde el 04-11)
 
 | # | Pendiente | Quién | Estado |
 |---|---|---|---|
-| 1 | Correos y perfiles del equipo: Rafael, Gabriela, Ramiro, Juan, Tania, Lucy, Edu, Morena, Miguel y reparto. Invitarlos con «Invitar con su historial» | Edmundo / Ciro | Pendiente |
+| 1 | Correos y perfiles del equipo: Rafael, Gabriela, Ramiro, Juan, Tania, Lucy, Edu, Morena, Miguel y reparto. Ciro los crea en Usuarios (tabla en arranque-04-11.md §3) | Ciro | 04-11 |
 | 2 | Ciro y Luis ingresan y crean su PIN (la invitación de Luis sigue sin usar) | Ciro, Luis | Pendiente |
 | 3 | Yury prueba Producción con datos reales (foto de la planilla + carga a mano) | Yury | En curso (24-10) |
-| 4 | Decidir si la producción (y luego los traslados) se escriben en Bsale desde la semana 1. Hoy: escrituras apagadas, la oficina carga a mano | Edmundo / Ciro | Por decidir |
+| 4 | Escrituras a Bsale desde el día 1, sin simulacro: producción, traslados, muestras y clientes. La facturación sigue en el POS + vincular con sugerencia | Edmundo | Decidido 03-11; se encienden el 04-11 |
 | 5 | Corregir en Bsale los precios en $0 y el stock absurdo (DT-07) | Miguel | Pendiente |
 | 6 | Revisar el cruce de variantes pendiente y asociar los 119 clientes «por revisar» | Miguel / Edmundo | Pendiente |
 | 7 | Correr `scripts/setup-alerts.sh` (hecho 24-10) y rotar `service-account.json` (DT-11) | Edmundo | Alertas listas; rotación pendiente |
-| 8 | Grupo de soporte (WhatsApp) para reportar fallas con captura | Edmundo | Pendiente |
+| 8 | Grupo de soporte (WhatsApp) para reportar fallas con captura | Edmundo | 03-11 |
 | 9 | Habilitar AI Logic en staging y verificar la foto de la planilla (DT-13) | Edmundo | Pendiente |
 | 10 | Probar el PIN al enviar un pedido de punta a punta con un vendedor real | Equipo | Pendiente |
 | 11 | Elizabeth: reactivar su cuenta cuando corresponda (fue desactivada el 24-10) | Ciro | Por decidir |
 
-### Encendido gradual de escrituras a Bsale
-Una a la vez, primero con simulacro y revisando la bitácora unos días:
+### Encendido de escrituras a Bsale
+El plan original era encenderlas una a la vez y con simulacro. El 03-11 Edmundo decidió encender los pasos 1 a 3 juntos y en real desde el 04-11, revisando en Bsale la primera vez de cada una (checklist en arranque-04-11.md). Siguen pendientes los pasos 4 y 5:
 
 1. **Recepción de producción.** Es la de mayor ahorro y la de menor riesgo.
 2. **Consumo de muestras y traslados a tienda.**
@@ -33,7 +33,6 @@ Una a la vez, primero con simulacro y revisando la bitácora unos días:
 5. **Stock estricto** (`settings/app.stockMode = 'estricto'`), cuando el stock de Bsale sea confiable.
 
 ### Mejoras cortas propuestas (no comprometidas)
-- Pantalla «Pendiente en Bsale» para la oficina (DT-05).
 - Unificar las reglas de salud de cliente (DT-06), a decidir con Ciro.
 - Notificar al vendedor cuando su pedido se aprueba o rechaza, y a Ciro cuando hay pedidos por aprobar. Hoy solo se ve en el Tablero.
 - Producción: plan del día imprimible y meta de producción por producto.

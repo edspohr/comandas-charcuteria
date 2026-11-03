@@ -195,7 +195,7 @@ export interface Order {
   // Pedido con excepción: espera la aprobación de super administración.
   approval?: Approval;
   // Consumo interno de las muestras en Bsale (una vez por pedido).
-  samplesConsumption?: { at: number; by: string; ref: string; dryRun?: boolean; skipped?: boolean; logId?: string };
+  samplesConsumption?: { at: number; by: string; ref: string; dryRun?: boolean; skipped?: boolean; reason?: 'sin_muestras' | 'escrituras_apagadas'; manual?: boolean; logId?: string };
   invoicingComplete: boolean;
   createdAt: number;
   updatedAt: number;

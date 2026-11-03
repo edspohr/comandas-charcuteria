@@ -3,7 +3,7 @@
 Toma y seguimiento de pedidos para **Cecinas Marcosi SpA** (La Charcutería Artesanal, Barrio Franklin, Santiago).
 Reemplaza el grupo de WhatsApp sin formato por una app móvil (PWA) que muestra el stock real de Bsale, deja un responsable en cada etapa del pedido y le da a los dueños las cifras del negocio.
 
-**Estado (24-10-2026):** versión **1.0** en marcha blanca, con todos los perfiles desde el lunes 26-10. Bsale conectado en lectura; las escrituras hacia Bsale están **apagadas** (simulacro) y la facturación se hace en el POS de Bsale y se vincula en Comandas.
+**Estado (03-11-2026):** versión **1.0**. Arranca con todo el equipo el miércoles 04-11 (no partió el 26-10); checklist y guía en [docs/arranque-04-11.md](docs/arranque-04-11.md). Desde el 04-11 se encienden las escrituras hacia Bsale (producción, traslados, muestras y clientes, sin simulacro). La facturación sigue en el POS de Bsale: Comandas sugiere el documento y la oficina lo confirma en **Pendiente en Bsale**.
 
 ---
 
@@ -23,6 +23,7 @@ Reemplaza el grupo de WhatsApp sin formato por una app móvil (PWA) que muestra 
 | [docs/operacion.md](docs/operacion.md) | Runbook: deploy, staging, usuarios y PIN, interruptores de Bsale, scripts, alertas |
 | [docs/adr/](docs/adr/README.md) | Decisiones de arquitectura (ADR) y por qué se tomaron |
 | [docs/deuda-tecnica.md](docs/deuda-tecnica.md) | Deuda técnica conocida, priorizada |
+| [docs/arranque-04-11.md](docs/arranque-04-11.md) | Checklist del arranque con el equipo, guía de 15 minutos por perfil y cuentas por crear |
 | [docs/backlog.md](docs/backlog.md) | Pendientes de la puesta en marcha, plan a noviembre y backlog fuera de alcance |
 | [docs/QA-guion-demo.md](docs/QA-guion-demo.md) | QA de la demo del 22-09 (histórico) |
 | En la app: Mi cuenta → **Guía de uso** | Guía de una página por perfil ([`app/src/routes/Ayuda.tsx`](app/src/routes/Ayuda.tsx)) |
@@ -77,7 +78,7 @@ Cada persona tiene **un perfil**, que viaja como *custom claim* `role`. La matri
   1. El vendedor crea el pedido con un **horario de entrega obligatorio** desde–hasta ([ADR-0009](docs/adr/0009-horario-entrega-obligatorio.md)). La reserva de stock se hace en la misma transacción ([ADR-0002](docs/adr/0002-stock-reservas-transaccionales.md)).
   2. Lo que falta queda *a producción* y se reasigna por orden de llegada (FIFO) cuando entra stock.
   3. Despacho arma con los pesos reales.
-  4. Administración emite en el POS de Bsale y **vincula el documento** ([ADR-0005](docs/adr/0005-facturacion-pos-y-vincular.md)), lo que libera la reserva.
+  4. Administración emite en el POS de Bsale y **vincula el documento** ([ADR-0005](docs/adr/0005-facturacion-pos-y-vincular.md)), lo que libera la reserva. Comandas sugiere el documento: referencia = número del pedido, o mismo RUT y total a ±5 % ([`domain/linking.ts`](app/src/domain/linking.ts)). Se confirma en el diálogo o en **Pendiente en Bsale**.
   5. Reparto entrega.
 - **Stock informativo** (por defecto): un faltante avisa pero no impide armar. `settings/app.stockMode = 'estricto'` lo vuelve bloqueante ([ADR-0006](docs/adr/0006-stock-informativo.md)).
 - **Excepciones:** precio, corte, pago o entrega fuera de lo normal, o líneas sobre 25 kg / 60 u. El pedido queda **por aprobar** hasta que un superAdmin lo aprueba con su PIN, y las reglas impiden armarlo antes ([ADR-0008](docs/adr/0008-excepciones-con-aprobacion.md)).

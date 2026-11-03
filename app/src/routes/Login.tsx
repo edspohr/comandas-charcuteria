@@ -76,7 +76,7 @@ function Stats({ className }: { className: string }) {
   return (
     <ul className={`mt-8 grid-cols-2 gap-3 max-w-xl ${className}`}>
       <Stat value="4 pasos" label="para tomar un pedido desde el teléfono" />
-      <Stat value="Sin retipeo" label="factura, producción y traslados se escriben en Bsale" />
+      <Stat value="Sin retipeo" label="producción, traslados y muestras se escriben en Bsale" />
       <Stat value="2 años" label="de ventas de Bsale en el panel de gestión" />
       <Stat value="8 perfiles" label="cada persona ve solo lo suyo" />
     </ul>
@@ -246,7 +246,7 @@ const STEPS: Array<{ who: string; title: string; text: string }> = [
   { who: 'Vendedor', title: 'Toma el pedido', text: 'Elige cliente, productos, fecha y horario en que el cliente recibe, viendo el stock disponible. Si falta, la app avisa a producción.' },
   { who: 'Producción', title: 'Ve lo que falta', text: 'Lo que esperan los pedidos para hoy, mañana y los próximos días. Carga lo producido con una foto de la planilla o a mano, con su PIN, y queda registrado lo cargado en el día.' },
   { who: 'Despacho', title: 'Arma con peso real', text: 'Ve los pedidos ordenados por hora de entrega, registra lo que realmente se empacó y lo deja listo para facturar.' },
-  { who: 'Administración', title: 'Factura desde Comandas', text: 'Revisa la vista previa y emite la factura o boleta en Bsale con los pesos empacados. La reserva se libera sola.' },
+  { who: 'Administración', title: 'Factura en el POS de Bsale', text: 'Emite con los pesos empacados y Comandas sugiere el documento que corresponde a cada pedido: se confirma con un toque y el PIN. La reserva se libera sola.' },
   { who: 'Reparto', title: 'Entrega', text: 'Marca la salida y la entrega con una nota. El vendedor ve el estado sin preguntar.' },
 ];
 
@@ -277,7 +277,7 @@ const FEATURES: Array<{ icon: ReactNode; title: string; text: string }> = [
   { icon: <IconSpark />, title: 'Pedido IA', text: 'Pegue el mensaje de WhatsApp del cliente y la app lo convierte en un pedido con productos, cantidades, muestras ("incluir muestra de…") y datos del cliente.' },
   { icon: <IconBox />, title: 'Stock real de Bsale', text: 'Semáforo por producto con lo que reporta Bsale menos lo ya reservado. Nadie vende lo que no hay.' },
   { icon: <IconBoard />, title: 'Tablero con visión y detalle', text: 'Resumen por etapa con montos y kilos, vista en tarjetas, compacta o lista, y el detalle del pedido a un clic. Rojo si se atrasa.' },
-  { icon: <IconScale />, title: 'Facturar sin retipeo', text: 'La factura o boleta sale de Comandas a Bsale con el peso real empacado y el precio de la lista. Todo queda en la bitácora.' },
+  { icon: <IconScale />, title: 'Sin retipeo', text: 'La producción, los traslados, las muestras y los clientes nuevos se escriben solos en Bsale. «Pendiente en Bsale» reúne lo que la oficina aún debe cerrar: pedidos sin documento y envíos con error.' },
   { icon: <IconStore />, title: 'Reposición de tienda', text: 'La tienda pide por el mismo canal, el panel sugiere qué llevar según lo que vende y el traslado se registra en Bsale.' },
   { icon: <IconUsers />, title: 'Clientes y cartera', text: 'Ritmo de compra de cada cliente, quién está en riesgo y quién se perdió, y el seguimiento de cada muestra a los 7 días.' },
   { icon: <IconChart />, title: 'Panel de gestión', text: 'Dos años de ventas de Bsale: margen, productos ABC, clientes, vendedores, estacionalidad, stock, muestras que terminan en venta y un explorador con exportación a Excel.' },

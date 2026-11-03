@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { collection, doc, getDoc, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from './firebase';
-import { confirmPin } from './pin';
+import { confirmPin, PinCancelled } from './pin';
+import { callableMessage } from './userAdmin';
 import { registerProduction, type BsaleWriteOutcome } from './bsaleOps';
 import { isRealBsale } from '@/integrations/bsale/client';
 
@@ -20,6 +21,8 @@ export interface ProductionEntry {
   id: string; at: number; by: string; byName: string;
   lines: ProductionLine[]; note?: string; source: 'foto' | 'texto' | 'manual';
   bsaleStatus: ProductionBsaleStatus; bsaleMarkedBy?: string; bsaleMarkedAt?: number;
+  // Bsale rechazó la recepción (p. ej. producto sin cruce): queda por cargar.
+  bsaleError?: string;
 }
 
 export interface LoadResult { entry: ProductionEntry; outcome: BsaleWriteOutcome | null }
@@ -31,10 +34,19 @@ export async function loadProduction(lines: ProductionLine[], user: { uid: strin
   await confirmPin('registrar_produccion', `Cargar producción: ${valid.length} línea${valid.length === 1 ? '' : 's'}`);
   let outcome: BsaleWriteOutcome | null = null;
   let bsaleStatus: ProductionBsaleStatus;
+  let bsaleError: string | undefined;
   const writesOn = !isRealBsale || (await getDoc(doc(db, 'settings', 'bsale'))).data()?.writesEnabled === true;
   if (writesOn) {
-    outcome = await registerProduction(valid.map((l) => ({ productId: l.productId, formatId: l.formatId, qty: l.qty })), user.uid, note);
-    bsaleStatus = outcome.dryRun ? 'simulado' : 'ok';
+    // Lo producido no se pierde si Bsale lo rechaza: queda «por cargar» con
+    // el motivo y la oficina lo ve en Pendiente en Bsale.
+    try {
+      outcome = await registerProduction(valid.map((l) => ({ productId: l.productId, formatId: l.formatId, qty: l.qty })), user.uid, note);
+      bsaleStatus = outcome.dryRun ? 'simulado' : 'ok';
+    } catch (e) {
+      if (e instanceof PinCancelled) throw e;
+      bsaleStatus = 'por_cargar';
+      bsaleError = callableMessage(e);
+    }
   } else {
     bsaleStatus = 'por_cargar';
   }
@@ -42,6 +54,7 @@ export async function loadProduction(lines: ProductionLine[], user: { uid: strin
   const entry: ProductionEntry = {
     id: ref.id, at: Date.now(), by: user.uid, byName: user.name, lines: valid, source, bsaleStatus,
     ...(note ? { note } : {}),
+    ...(bsaleError ? { bsaleError } : {}),
   };
   await setDoc(ref, entry);
   return { entry, outcome };
@@ -64,6 +77,7 @@ export function useProductionLog(sinceMs: number): { entries: ProductionEntry[];
 export function loadResultText(r: LoadResult): string {
   const n = r.entry.lines.length;
   const what = `Producción cargada: ${n} línea${n === 1 ? '' : 's'}`;
+  if (r.entry.bsaleError) return `${what} en Comandas, pero Bsale no la recibió: ${r.entry.bsaleError} Avise a la oficina; queda en Pendiente en Bsale.`;
   if (r.entry.bsaleStatus === 'por_cargar') return `${what}. Quedó registrada en Comandas; la oficina la carga en Bsale y el stock se actualiza con la sincronización.`;
   if (r.entry.bsaleStatus === 'simulado') return `${what}. Bsale está en simulacro: quedó en la bitácora sin enviarse.`;
   const s = r.outcome?.summary;

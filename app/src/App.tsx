@@ -17,6 +17,7 @@ const Ayuda = lazy(() => import('./routes/Ayuda'));
 const Catalogo = lazy(() => import('./routes/admin/Catalogo'));
 const Usuarios = lazy(() => import('./routes/admin/Usuarios'));
 const Explorador = lazy(() => import('./routes/bsale/Explorador'));
+const PendienteBsale = lazy(() => import('./routes/admin/PendienteBsale'));
 import UpdateToast from './components/UpdateToast';
 import AppShell from './components/AppShell';
 import RouteGuard from './components/RouteGuard';
@@ -145,6 +146,16 @@ export default function App() {
             <RouteGuard current={current} route="bsaleConsola">
               <AppShell current={current!}>
                 <BsaleConsola />
+              </AppShell>
+            </RouteGuard>
+          }
+        />
+        <Route
+          path="/admin/pendiente-bsale"
+          element={
+            <RouteGuard current={current} route="pendienteBsale">
+              <AppShell current={current!}>
+                <PendienteBsale />
               </AppShell>
             </RouteGuard>
           }

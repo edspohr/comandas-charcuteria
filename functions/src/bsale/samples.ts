@@ -19,17 +19,20 @@ export async function consumeSamples(api: BsaleApi | null, s: BsaleSettings, by:
   const ref = db.doc(`orders/${orderId}`);
   const order = (await ref.get()).data() as Order | undefined;
   if (!order) throw new HttpsError('not-found', 'Pedido no encontrado.');
-  if (order.samplesConsumption) return { already: true, ...(order.samplesConsumption as object) };
+  // Una muestra que quedó sin registrar (escrituras apagadas) se puede
+  // reintentar desde Pendiente en Bsale; una registrada, nunca dos veces.
+  const prev = order.samplesConsumption as { skipped?: boolean } | undefined;
+  if (prev && !prev.skipped) return { already: true, ...prev };
   const lines = order.lines
     .filter((l) => l.sample && !l.shortReason)
     .map((l) => ({ productId: l.productId, formatId: l.formatId, qty: Math.round((l.packedQty ?? l.reservedQty) * 1000) / 1000 }))
     .filter((l) => l.qty > 0);
   const refText = `MU-${orderId}`;
   const record = (extra: Record<string, unknown>) => ref.update({ samplesConsumption: stripUndefined({ at: Date.now(), by, ref: refText, ...extra }) });
-  if (!lines.length) { await record({ skipped: true }); return { skipped: true, reason: 'sin muestras empacadas' }; }
+  if (!lines.length) { await record({ skipped: true, reason: 'sin_muestras' }); return { skipped: true, reason: 'sin muestras empacadas' }; }
   // Selling must not stop because Bsale writes are off: the sample stays in
   // the app's history and administración can register it later.
-  if (!api || !s.enabled || !s.writesEnabled) { await record({ skipped: true }); return { skipped: true, reason: 'escrituras a Bsale apagadas' }; }
+  if (!api || !s.enabled || !s.writesEnabled) { await record({ skipped: true, reason: 'escrituras_apagadas' }); return { skipped: true, reason: 'escrituras a Bsale apagadas' }; }
   const officeId = requireFactory(s);
   const items = await variantsFor(lines);
   const client = order.clientSnapshot?.fantasyName ?? order.clientSnapshot?.name ?? '';

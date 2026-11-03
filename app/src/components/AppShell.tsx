@@ -24,6 +24,7 @@ const GROUP_ORDER: Group[] = ['pedidos', 'clientes', 'produccion', 'gestion', 'a
 
 const NAV: NavItem[] = [
   { to: '/tablero', label: 'Tablero de pedidos', short: 'Pedidos', route: 'tablero', group: 'pedidos', icon: 'board' },
+  { to: '/admin/pendiente-bsale', label: 'Pendiente en Bsale', short: 'Pendiente', route: 'pendienteBsale', group: 'pedidos', icon: 'sync' },
   { to: '/clientes', label: 'Clientes', route: 'clientes', group: 'clientes', icon: 'users' },
   { to: '/produccion', label: 'Producción', route: 'produccion', group: 'produccion', icon: 'factory' },
   { to: '/admin/panel', label: 'Panel de gestión', short: 'Panel', route: 'panel', group: 'gestion', icon: 'chart' },

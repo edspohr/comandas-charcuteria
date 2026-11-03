@@ -1,6 +1,6 @@
 # Operación (runbook)
 
-Cómo desplegar, probar y operar Comandas. Actualizado al 24-10-2026.
+Cómo desplegar, probar y operar Comandas. Actualizado al 03-11-2026.
 
 ## Proyectos
 
@@ -46,7 +46,7 @@ Si la CLI responde con errores de autenticación: `firebase login --reauth`. Par
 
 ## Interruptores de Bsale
 
-Están en Conexión Bsale → Configuración (`settings/bsale`). Estado al 24-10:
+Están en Conexión Bsale → Configuración (`settings/bsale`). Estado al 24-10 (el 04-11 se encienden las escrituras, sin simulacro: ver [arranque-04-11.md](arranque-04-11.md)):
 
 | Campo | Valor | Efecto |
 |---|---|---|
@@ -69,7 +69,16 @@ En `settings/app`:
 
 El orden recomendado está en [backlog.md](backlog.md#encendido-gradual-de-escrituras-a-bsale).
 
-**Mientras estén apagadas, la oficina replica en Bsale:**
+**Pendiente en Bsale** (Pedidos → Pendiente en Bsale, admin y superAdmin) es la lista de trabajo de la oficina. Incluye:
+- pedidos sin documento, con el documento del POS sugerido para confirmar con PIN;
+- escrituras con error;
+- producción por cargar;
+- muestras sin consumo;
+- clientes por revisar.
+
+Una carga de producción que Bsale rechaza (por ejemplo, un producto sin cruce) no se pierde: queda «por cargar» con el motivo. Antes de cargarla a mano, revisar la Bitácora: si la línea dice «ok», ya está en Bsale.
+
+**Mientras las escrituras estén apagadas, la oficina replica en Bsale:**
 - producción «Por cargar en Bsale»: Producción → Cargado hoy → «Ya la cargué en Bsale»;
 - traslados a tienda;
 - consumos de muestras, con referencia `MU-pedido`;
@@ -123,6 +132,8 @@ Las auditorías ad hoc van en `private/` (gitignored), nunca en `scripts/`.
 | La app no muestra un cambio recién desplegado | service worker o pestaña con la versión anterior | tocar «Recargar» o cerrar y abrir; los headers ya evitan la caché larga |
 | «Correo o PIN incorrecto» aunque el PIN es correcto | PIN bloqueado 15 minutos o desactivado | esperar, o pedir a un superAdmin que borre el PIN |
 | «Las escrituras hacia Bsale están desactivadas» | `writesEnabled = false` | esperado; la producción queda «Por cargar en Bsale» |
+| «Sin cruce con Bsale: …» al cargar producción o trasladar | el formato no tiene cruce `confirmado` en `catalogMap` | Catálogo → Cruce con Bsale; la producción quedó en Pendiente en Bsale |
+| Algo se escribió mal en Bsale | escrituras encendidas | apagar `Escrituras` en Conexión Bsale → Configuración, corregir a mano en Bsale y avisar en soporte |
 | Pedido «por aprobar» que no se puede armar | excepción sin aprobar | superAdmin aprueba en el Tablero |
 | `AI/api-not-enabled` en consola | AI Logic sin habilitar en ese proyecto | ver «Gemini y App Check» |
 | `CONFIGURATION_NOT_FOUND` al ingresar | Authentication no habilitado en el proyecto | Consola → Authentication → Get started |

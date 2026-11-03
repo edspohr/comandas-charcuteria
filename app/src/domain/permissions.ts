@@ -105,7 +105,7 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
 // lectura; las pantallas esconden sus acciones con `can()`.
 export type RouteKey =
   | 'tablero' | 'nuevoPedido' | 'pedidoIA' | 'detallePedido' | 'armado' | 'clientes' | 'fichaCliente' | 'produccion'
-  | 'panel' | 'catalogo' | 'usuarios' | 'bsaleConsola' | 'bsaleExplorer' | 'ayuda';
+  | 'panel' | 'catalogo' | 'usuarios' | 'bsaleConsola' | 'bsaleExplorer' | 'pendienteBsale' | 'ayuda';
 
 const everyone = () => true;
 export const ROUTE_ACCESS: Record<RouteKey, (role: Role) => boolean> = {
@@ -123,6 +123,7 @@ export const ROUTE_ACCESS: Record<RouteKey, (role: Role) => boolean> = {
   usuarios: (r) => can(r, 'users.manage') || isReadOnly(r),
   bsaleConsola: (r) => can(r, 'bsale.configure'),
   bsaleExplorer: (r) => can(r, 'bsale.explore'),
+  pendienteBsale: (r) => can(r, 'order.link') || isReadOnly(r),
 };
 
 export const ROLE_HOME: Record<Role, string> = {

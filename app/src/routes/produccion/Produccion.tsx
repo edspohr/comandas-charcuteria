@@ -35,7 +35,7 @@ export default function Produccion() {
   const [prefill, setPrefill] = useState<ProductionLine[]>([]);
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  const [flash, setFlash] = useState<{ text: string; warn: boolean } | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const camera = useRef<HTMLInputElement>(null);
 
@@ -60,7 +60,7 @@ export default function Produccion() {
 
   const lineOf = (r: DemandRow, qty = r.toProduce): ProductionLine => ({ productId: r.productId, formatId: r.formatId, productName: r.productName, formatLabel: r.formatLabel, unit: r.unit, qty });
   function registerFor(lines: ProductionLine[]) { setPrefill(lines); setFlash(null); setView('mano'); window.scrollTo(0, 0); }
-  function done(msg: string) { setFlash(msg); setPrefill([]); setPhoto(null); setView('hoy'); window.scrollTo(0, 0); }
+  function done(text: string, warn = false) { setFlash({ text, warn }); setPrefill([]); setPhoto(null); setView('hoy'); window.scrollTo(0, 0); }
 
   async function takePhoto(file: File | undefined) {
     if (!file) return;
@@ -72,8 +72,8 @@ export default function Produccion() {
     setSyncing(true); setPageError(null); setFlash(null);
     try {
       const r = await syncStockFromBsale(me.uid);
-      setFlash(r.updated === 0 && r.promoted.length === 0 ? 'Bsale no reporta cambios de stock.'
-        : `Stock actualizado en ${r.updated} formato${r.updated === 1 ? '' : 's'}.` + (r.absorbed > 0 ? ` Se asignaron ${r.absorbed} u/kg a pedidos que esperaban.` : '') + (r.promoted.length > 0 ? ` Listos para armar: ${r.promoted.join(', ')}.` : ''));
+      setFlash({ warn: false, text: r.updated === 0 && r.promoted.length === 0 ? 'Bsale no reporta cambios de stock.'
+        : `Stock actualizado en ${r.updated} formato${r.updated === 1 ? '' : 's'}.` + (r.absorbed > 0 ? ` Se asignaron ${r.absorbed} u/kg a pedidos que esperaban.` : '') + (r.promoted.length > 0 ? ` Listos para armar: ${r.promoted.join(', ')}.` : '') });
     } catch (e) { setPageError(describeFirestoreError(e)); } finally { setSyncing(false); }
   }
 
@@ -128,7 +128,7 @@ export default function Produccion() {
         </div>
       )}
 
-      {flash && <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-4">{flash}</div>}
+      {flash && <div className={'rounded-md border p-3 text-sm mb-4 ' + (flash.warn ? 'bg-brass-50 border-brass-300 text-brass-700' : 'bg-emerald-50 border-emerald-200 text-emerald-800')}>{flash.text}</div>}
       {pageError && <div className="mb-4"><ErrorBanner message={pageError} /></div>}
       {error && <div className="mb-4"><ErrorBanner message={error} /></div>}
 
@@ -338,7 +338,7 @@ function StockTable({ rows }: { rows: DemandRow[] }) {
 
 interface StockLine { productId: string; productName: string; formatId: string; formatLabel: string; unit: 'g' | 'kg' | 'unidad'; qty: number; raw: string; ok: boolean; }
 
-function ProduccionIA({ user, photo, onRetake, onClearPhoto, onDone }: { user: { uid: string; name: string }; photo: Photo | null; onRetake: () => void; onClearPhoto: () => void; onDone: (msg: string) => void }) {
+function ProduccionIA({ user, photo, onRetake, onClearPhoto, onDone }: { user: { uid: string; name: string }; photo: Photo | null; onRetake: () => void; onClearPhoto: () => void; onDone: (text: string, warn?: boolean) => void }) {
   const { products } = useProducts();
   const [text, setText] = useState('');
   const [lines, setLines] = useState<StockLine[] | null>(null);
@@ -394,7 +394,7 @@ function ProduccionIA({ user, photo, onRetake, onClearPhoto, onDone }: { user: {
     setBusy(true); setError(null);
     try {
       const r = await loadProduction(usable.map((l) => ({ productId: l.productId, formatId: l.formatId, productName: l.productName, formatLabel: l.formatLabel, unit: l.unit, qty: l.qty })), user, photo ? 'foto' : 'texto', note.trim() || undefined);
-      onDone(loadResultText(r));
+      onDone(loadResultText(r), !!r.entry.bsaleError);
     } catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
   }
 
@@ -473,7 +473,7 @@ function ProduccionIA({ user, photo, onRetake, onClearPhoto, onDone }: { user: {
 
 interface Row { productId: string; formatId: string; qty: string }
 
-function RegistrarProduccion({ user, products, initial, suggestions, onDone }: { user: { uid: string; name: string }; products: Product[]; initial: ProductionLine[]; suggestions: ProductionLine[]; onDone: (msg: string) => void }) {
+function RegistrarProduccion({ user, products, initial, suggestions, onDone }: { user: { uid: string; name: string }; products: Product[]; initial: ProductionLine[]; suggestions: ProductionLine[]; onDone: (text: string, warn?: boolean) => void }) {
   const active = useMemo(() => products.filter((p) => p.active && !p.discontinued).sort((a, b) => a.name.localeCompare(b.name, 'es')), [products]);
   const [rows, setRows] = useState<Row[]>(() => initial.length ? initial.map((l) => ({ productId: l.productId, formatId: l.formatId, qty: String(l.qty) })) : [{ productId: '', formatId: '', qty: '' }]);
   const [note, setNote] = useState('');
@@ -493,7 +493,7 @@ function RegistrarProduccion({ user, products, initial, suggestions, onDone }: {
 
   async function submit() {
     setBusy(true); setError(null);
-    try { onDone(loadResultText(await loadProduction(lines, user, 'manual', note.trim() || undefined))); } catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
+    try { const r = await loadProduction(lines, user, 'manual', note.trim() || undefined); onDone(loadResultText(r), !!r.entry.bsaleError); } catch (e) { setError(describeFirestoreError(e)); setBusy(false); }
   }
 
   return (

@@ -68,12 +68,13 @@ const GUIDES: Record<Role, Guide> = {
     ['Cargar lo producido', [
       '«Fotografiar planilla»: tome la foto, toque «Leer la foto», revise las cantidades (lo dudoso aparece en dorado) y toque «Cargar».',
       '«Registrar a mano»: busque el producto, elija el formato y escriba la cantidad. Los productos que esperan los pedidos aparecen arriba para agregarlos con un toque. El botón «Registrar» de cada tarjeta deja la cantidad lista.',
-      'Toda carga se confirma con su PIN y queda en «Cargado hoy» a su nombre. Si dice «Por cargar en Bsale», la oficina la pasa a Bsale.',
+      'Toda carga se confirma con su PIN, entra a Bsale como recepción en la sala de proceso y queda en «Cargado hoy» a su nombre. Si Bsale la rechaza, la app se lo dice: avise a la oficina.',
     ]],
   ] },
   admin: { title: 'Administración', sections: [
     ACCESS,
-    ['Facturar', ['En «Pedidos», columna Por facturar: emita en el POS de Bsale con los pesos del armado y toque «Facturar» para vincular el documento (pide PIN). La reserva de stock se libera sola.']],
+    ['Facturar', ['En «Pedidos», columna Por facturar: emita en el POS de Bsale con los pesos del armado y toque «Facturar» para vincular el documento (pide PIN). La reserva de stock se libera sola.', 'Si el documento trae el número del pedido en la referencia, o es del mismo RUT con un total parecido, Comandas lo marca «Sugerido»: revíselo y confírmelo.']],
+    ['Pendiente en Bsale', ['Su lista de trabajo del día: pedidos armados o entregados sin documento (con «Confirmar» cuando hay sugerencia), envíos a Bsale con error, producción y muestras que no llegaron a Bsale y clientes por revisar. Déjela en cero antes de irse.']],
     ['Todo lo demás', ['Puede tomar pedidos, armar, despachar, ver el Panel y el Catálogo como los perfiles de operación.']],
   ] },
   superAdmin: { title: 'Super administración', sections: [

@@ -1,6 +1,6 @@
 import { Icon } from '@/components/ui/Icon';
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/data/firebase';
 import Button from '@/components/ui/Button';
@@ -32,7 +32,8 @@ export default function Clientes() {
   const { settings } = useSettings();
   const [orders, setOrders] = useState<Order[]>([]);
   const [q, setQ] = useState('');
-  const [filter, setFilter] = useState<Filter>(isSeller(role) ? 'cartera' : 'todos');
+  const [params] = useSearchParams();
+  const [filter, setFilter] = useState<Filter>(params.get('filtro') === 'revision' ? 'revision' : isSeller(role) ? 'cartera' : 'todos');
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const isAdmin = can(role, 'client.edit');

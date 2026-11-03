@@ -1,6 +1,6 @@
 # Deuda técnica
 
-Actualizado al 24-10-2026, versión 1.0. Prioridad: **Alta** = riesgo de datos o seguridad, o bloquea un paso del plan · **Media** = costo de mantención o confusión del usuario · **Baja** = higiene.
+Actualizado al 03-11-2026, versión 1.0. Prioridad: **Alta** = riesgo de datos o seguridad, o bloquea un paso del plan · **Media** = costo de mantención o confusión del usuario · **Baja** = higiene.
 
 | ID | Prioridad | Tema | Resumen |
 |---|---|---|---|
@@ -8,7 +8,7 @@ Actualizado al 24-10-2026, versión 1.0. Prioridad: **Alta** = riesgo de datos o
 | DT-02 | Media | Mantención | Matriz de permisos triplicada a mano |
 | DT-03 | Media | Consistencia | Reasignación FIFO implementada en cliente y servidor |
 | DT-04 | Media | Consistencia | Bitácora de producción no atómica con la recepción en Bsale |
-| DT-05 | Alta | Operación | Escrituras apagadas dejan tareas manuales sin cola visible (muestras, traslados, clientes) |
+| DT-05 | Baja | Operación | Traslados hechos con escrituras apagadas no aparecen en Pendiente en Bsale (resto resuelto 03-11) |
 | DT-06 | Media | Producto | Dos definiciones de salud de cliente |
 | DT-07 | Alta | Datos | Calidad del dato en Bsale (precios $0, stock absurdo, variantes sin cruce, 119 clientes sin vínculo) |
 | DT-08 | Media | Calidad | Sin tests unitarios ni e2e; solo 15 tests de reglas |
@@ -39,7 +39,10 @@ En anular, vincular, enviar pedido, cargar producción con Bsale apagado, despac
 `loadProduction` primero llama a `bsaleReceiveProduction` y después escribe `productionLog` desde el cliente. Si se corta la conexión entre ambos pasos, Bsale tiene la recepción y Comandas no la muestra. Al revés no pasa, porque la bitácora se escribe al final.
 **Propuesta:** que `bsaleReceiveProduction` escriba la bitácora en el servidor (con `bsale/writes/log` como referencia) y que el cliente solo la escriba cuando Bsale está apagado.
 
-### DT-05 · Tareas manuales sin cola visible con las escrituras apagadas · Alta
+### DT-05 · Tareas manuales sin cola visible con las escrituras apagadas · Baja (resuelto en parte el 03-11)
+**03-11:** existe Pedidos → **Pendiente en Bsale** (`routes/admin/PendienteBsale.tsx`). Reúne los pedidos sin documento (con sugerencia), las escrituras con error de 7 días, la producción por cargar (también la que Bsale rechazó), las muestras sin consumo (con reintento) y los clientes por revisar. Las escrituras quedan encendidas desde el 04-11. Falta: los traslados registrados «solo en la app» antes de esa fecha no tienen marca propia.
+
+Situación original:
 Con `writesEnabled = false`:
 - la producción queda «Por cargar en Bsale», que sí tiene pantalla;
 - los consumos de muestras quedan `samplesConsumption.skipped`, sin pantalla;

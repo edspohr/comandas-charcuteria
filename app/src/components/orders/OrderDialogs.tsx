@@ -6,6 +6,7 @@ import { approveOrder, rejectOrder, anularOrder, consumeSamplesAfterInvoice, des
 import { lineKey, sampleLabel } from '@/domain/samples';
 import { confirmPin } from '@/data/pin';
 import { useBsaleDocuments } from '@/data/bsale';
+import { DOC_REF_SCORE, rankDocuments, suggestDocument } from '@/domain/linking';
 import { emitDocumentForOrder } from '@/integrations/bsale/mockAdmin';
 import { syncStockFromBsale } from '@/data/stock';
 import { bsale, isRealBsale } from '@/integrations/bsale/client';
@@ -279,8 +280,22 @@ export function AnularDialog({ order, uid, onClose, onDone }: { order: Order; ui
   );
 }
 
+// After linking, Bsale is the only writer of onHand: refresh the mirror
+// right away so availability reflects the counter sale.
+async function afterDocumentLinked(order: Order, uid: string) {
+  await consumeSamplesAfterInvoice(order);
+  try { await syncStockFromBsale(uid); } catch (e) { console.warn('[vincular] sync', e); }
+}
+
+// PIN → vincular → muestras + sincronización. También lo usa Pendiente en Bsale.
+export async function linkDocumentWithPin(order: Order, d: Pick<BsaleDocument, 'id' | 'number'>, uid: string) {
+  await confirmPin('vincular', `Vincular ${d.number} a ${order.id}`, order.id);
+  await vincularDocumento(order.id, { id: d.id, number: d.number }, uid);
+  void afterDocumentLinked(order, uid);
+}
+
 // Link the document the cashier emitted in Bsale. Lists unlinked documents
-// (best matches first: same reference, same RUT, closest total) and offers
+// (best matches first, see domain/linking.ts; the suggestion is marked) and offers
 // the demo shortcut "Simular emisión en POS" that creates the document in
 // the mock Bsale as if the cashier had just done it.
 export function VincularDocumentoDialog({ order, uid, onClose, onLinked, onDeferDispatch }: { order: Order; uid: string; onClose: () => void; onLinked?: (doc: BsaleDocument) => void; onDeferDispatch?: () => void }) {
@@ -292,28 +307,14 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked, onDefer
   const [manual, setManual] = useState('');
   const [showPayload, setShowPayload] = useState(false);
 
-  const candidates = useMemo(() => {
-    const unlinked = documents.filter((d) => !d.linkedOrderId);
-    const score = (d: BsaleDocument) => {
-      let s = 0;
-      if (d.reference === order.id) s += 100;
-      if (d.clientRut && d.clientRut === order.clientSnapshot.rut) s += 20;
-      if (order.totalCLP && Math.abs(d.totalCLP - order.totalCLP) / order.totalCLP < 0.05) s += 10;
-      return s;
-    };
-    return unlinked.map((d) => ({ d, s: score(d) })).sort((a, b) => b.s - a.s || b.d.emittedAt - a.d.emittedAt).slice(0, 8);
-  }, [documents, order]);
+  const candidates = useMemo(() => rankDocuments(order, documents).slice(0, 8), [documents, order]);
+  const suggested = useMemo(() => suggestDocument(order, documents), [documents, order]);
 
-  // After linking, Bsale is the only writer of onHand: refresh the mirror
-  // right away so availability reflects the counter sale.
-  async function afterLink() {
-    await consumeSamplesAfterInvoice(order);
-    try { await syncStockFromBsale(uid); } catch (e) { console.warn('[vincular] sync', e); }
-  }
+  const afterLink = () => afterDocumentLinked(order, uid);
 
   async function link(d: BsaleDocument) {
     setBusy(d.id); setError(null);
-    try { await confirmPin('vincular', `Vincular ${d.number} a ${order.id}`, order.id); await vincularDocumento(order.id, { id: d.id, number: d.number }, uid); onLinked?.(d); onClose(); void afterLink(); }
+    try { await linkDocumentWithPin(order, d, uid); onLinked?.(d); onClose(); }
     catch (e) { setError(describeFirestoreError(e)); setBusy(null); }
   }
 
@@ -377,7 +378,8 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked, onDefer
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-sm text-charcoal-900">{d.number}</span>
                     <span className="text-[10px] uppercase tracking-display text-charcoal-300">{d.type}</span>
-                    {s >= 100 && <span className="text-[10px] uppercase tracking-display bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 rounded">Ref. {order.id}</span>}
+                    {s >= DOC_REF_SCORE && <span className="text-[10px] uppercase tracking-display bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 rounded">Ref. {order.id}</span>}
+                    {suggested?.id === d.id && <span className="text-[10px] uppercase tracking-display bg-brass-50 text-brass-700 border border-brass-300 px-1.5 rounded">Sugerido</span>}
                   </div>
                   <p className="text-xs text-charcoal-500 truncate">{d.clientName}{d.clientRut ? ` · ${d.clientRut}` : ''} · {new Date(d.emittedAt).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}</p>
                 </div>

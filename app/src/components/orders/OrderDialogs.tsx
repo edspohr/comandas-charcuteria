@@ -306,6 +306,7 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked, onDefer
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState('');
   const [showPayload, setShowPayload] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const candidates = useMemo(() => rankDocuments(order, documents).slice(0, 8), [documents, order]);
   const suggested = useMemo(() => suggestDocument(order, documents), [documents, order]);
@@ -353,6 +354,12 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked, onDefer
           </div>
         )}
         {isRealBsale && !canEmit && <p className="text-sm text-charcoal-700">Emita la factura o boleta en el POS de Bsale (con los pesos del armado) y vincúlela aquí. Los documentos aparecen solos en unos minutos; también puede escribir el número.</p>}
+        {isRealBsale && !canEmit && (
+          <div className="rounded-md border border-charcoal-100 p-3">
+            <button onClick={() => setShowPreview((v) => !v)} className="text-sm underline text-charcoal-700">{showPreview ? 'Ocultar' : 'Ver'} cómo lo facturaría Comandas</button>
+            {showPreview && <div className="mt-3"><EmitirEnBsale order={order} previewOnly compareTo={suggested} onDone={() => {}} onClose={onClose} /></div>}
+          </div>
+        )}
         <p className="text-sm text-charcoal-700">
           La venta se emite en el POS de Bsale. Elija el documento que corresponde a{' '}
           <span className="font-semibold">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</span>
@@ -425,7 +432,9 @@ export function VincularDocumentoDialog({ order, uid, onClose, onLinked, onDefer
 // Emit the invoice/boleta in Bsale from the packed order (real weights, Bsale
 // prices) and link it in the same step: no retyping at the POS. Preview first;
 // with Bsale in dry-run the payload goes to the write log only.
-function EmitirEnBsale({ order, onDone, onClose }: { order: Order; onDone: (d: unknown) => void; onClose: () => void }) {
+// previewOnly: la facturación desde Comandas está apagada; muestra el
+// documento que se emitiría, sin botón, para compararlo con el del POS.
+function EmitirEnBsale({ order, onDone, onClose, previewOnly, compareTo }: { order: Order; onDone: (d: unknown) => void; onClose: () => void; previewOnly?: boolean; compareTo?: BsaleDocument | null }) {
   const [kind, setKind] = useState<'factura' | 'boleta' | undefined>(undefined);
   const [state, setState] = useState<{ preview: InvoicePreview; writesEnabled: boolean; dryRun: boolean } | null>(null);
   const [busy, setBusy] = useState<'preview' | 'emit' | null>('preview');
@@ -453,7 +462,7 @@ function EmitirEnBsale({ order, onDone, onClose }: { order: Order; onDone: (d: u
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-charcoal-700">Se emite con lo empacado: kilos reales y precios de la lista de Bsale.</p>
+        <p className="text-sm text-charcoal-700">{previewOnly ? 'Vista previa, no emite nada: lo empacado con los precios de la lista de Bsale.' : 'Se emite con lo empacado: kilos reales y precios de la lista de Bsale.'}</p>
         <div className="flex gap-1">
           {(['factura', 'boleta'] as const).map((k) => (
             <button key={k} onClick={() => setKind(k)} className={'rounded-md px-2.5 py-1 text-[11px] uppercase tracking-display border ' + ((p?.kind ?? kind) === k ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-500')}>{k}</button>
@@ -477,9 +486,10 @@ function EmitirEnBsale({ order, onDone, onClose }: { order: Order; onDone: (d: u
             ))}
             <div className="px-3 py-2 flex justify-between font-semibold"><span>Total</span><span className="tabular-nums">{formatCLP(p.totalCLP)}{p.orderTotalCLP ? <span className="text-xs font-normal text-charcoal-300"> · pedido {formatCLP(p.orderTotalCLP)}</span> : null}</span></div>
           </div>
+          {compareTo && <p className={'text-xs ' + (Math.abs(compareTo.totalCLP - p.totalCLP) <= 10 ? 'text-emerald-800' : 'text-brass-700')}>{Math.abs(compareTo.totalCLP - p.totalCLP) <= 10 ? `Calza con ${compareTo.number} (${formatCLP(compareTo.totalCLP)}).` : `${compareTo.number} del POS: ${formatCLP(compareTo.totalCLP)} · diferencia ${formatCLP(compareTo.totalCLP - p.totalCLP)}. Revise precios y pesos línea a línea.`}</p>}
           {p.warnings.map((w) => <p key={w} className="text-xs text-brass-700">⚠︎ {w}</p>)}
           {p.blocking.map((w) => <p key={w} className="text-xs text-red-700">✕ {w}</p>)}
-          {done
+          {previewOnly ? null : done
             ? <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-2.5 text-sm flex justify-between gap-2"><span>{done}</span><button className="underline text-xs" onClick={onClose}>Cerrar</button></div>
             : <Button className="w-full" onClick={emit} disabled={busy != null || p.blocking.length > 0 || !state?.writesEnabled}>
                 {busy === 'emit' ? 'Emitiendo…' : !state?.writesEnabled ? 'Escrituras hacia Bsale apagadas' : state.dryRun ? `Probar en simulacro (${p.kind})` : `Emitir ${p.kind} en Bsale`}

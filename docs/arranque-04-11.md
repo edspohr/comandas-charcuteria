@@ -42,6 +42,7 @@ Abajo están el checklist del día y la guía de arranque por perfil.
 | ☐ | **Despacho registra un traslado** a la tienda | En Bsale, un **consumo** en la fábrica y una **recepción** en «LA CHARCUTERIA» con las cantidades empacadas | Edu + Miguel |
 | ☐ | **Sale una muestra** (al vincular el documento o con «Registrar salida») | En Bsale, un consumo interno con la nota «Muestra · cliente · pedido» | Miguel |
 | ☐ | **Un vendedor crea un cliente** nuevo | El cliente aparece en Bsale con el RUT, el giro y la dirección | Miguel |
+| ☐ | **Cada documento que se vincula** (mañana y pasado) | En el diálogo de vincular, «Ver cómo lo facturaría Comandas»: comparar las líneas, los precios, los kilos, el tipo de documento y el total con lo emitido en el POS. Anotar en soporte las diferencias | Miguel |
 | ☐ | **Un pedido completo:** vendedor (PIN) → despacho arma → POS de Bsale → Pendiente en Bsale «Confirmar» (PIN) → despachar → entregar | Que en cada paso aparezca el botón que corresponde y que el vendedor vea el estado | Equipo |
 
 **Si una escritura falla:** la app muestra el error y queda en **Pendiente en Bsale → Escrituras con error**.
@@ -60,6 +61,15 @@ Con las escrituras apagadas la producción vuelve a quedar «Por cargar en Bsale
 | ☐ | **Pendiente en Bsale en cero**, o con una explicación para cada pendiente | Miguel |
 | ☐ | Anotar las fallas y dudas del día en el grupo de soporte | Todos |
 | ☐ | Revisar la Bitácora de Bsale del día (todas las líneas en «ok») | Edmundo |
+
+---
+
+### Facturar desde Comandas (después)
+
+La facturación sigue en el POS. Para encender «Facturar desde Comandas»:
+1. Dos o tres días seguidos en que la vista previa calce con el POS.
+2. Encender `Facturar desde Comandas` y emitir una primera factura real a Fran GC; revisarla en Bsale.
+3. Si sale bien, la oficina factura desde Comandas y el POS queda de respaldo.
 
 ---
 

@@ -73,7 +73,7 @@ const GUIDES: Record<Role, Guide> = {
   ] },
   admin: { title: 'Administración', sections: [
     ACCESS,
-    ['Facturar', ['En «Pedidos», columna Por facturar: emita en el POS de Bsale con los pesos del armado y toque «Facturar» para vincular el documento (pide PIN). La reserva de stock se libera sola.', 'Si el documento trae el número del pedido en la referencia, o es del mismo RUT con un total parecido, Comandas lo marca «Sugerido»: revíselo y confírmelo.']],
+    ['Facturar', ['En «Pedidos», columna Por facturar: emita en el POS de Bsale con los pesos del armado y toque «Facturar» para vincular el documento (pide PIN). La reserva de stock se libera sola.', 'Si el documento trae el número del pedido en la referencia, o es del mismo RUT con un total parecido, Comandas lo marca «Sugerido»: revíselo y confírmelo.', '«Ver cómo lo facturaría Comandas» muestra la factura que emitiría la app (no emite nada). Compárela con la del POS: si calzan varios días seguidos, se enciende la facturación desde Comandas.']],
     ['Pendiente en Bsale', ['Su lista de trabajo del día: pedidos armados o entregados sin documento (con «Confirmar» cuando hay sugerencia), envíos a Bsale con error, producción y muestras que no llegaron a Bsale y clientes por revisar. Déjela en cero antes de irse.']],
     ['Todo lo demás', ['Puede tomar pedidos, armar, despachar, ver el Panel y el Catálogo como los perfiles de operación.']],
   ] },

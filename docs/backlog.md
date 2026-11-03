@@ -29,7 +29,7 @@ El plan original era encenderlas una a la vez y con simulacro. El 03-11 Edmundo 
 1. **Recepción de producción.** Es la de mayor ahorro y la de menor riesgo.
 2. **Consumo de muestras y traslados a tienda.**
 3. **Alta y edición de clientes**, después de asociar los 119 clientes.
-4. **Facturación desde Comandas** (`invoicesEnabled`), tras una semana estable con el POS.
+4. **Facturación desde Comandas** (`invoicesEnabled`): desde el 04-11 la oficina compara la vista previa («Ver cómo lo facturaría Comandas») con el POS; tras 2–3 días calzando, primera factura real a Fran GC y luego encender.
 5. **Stock estricto** (`settings/app.stockMode = 'estricto'`), cuando el stock de Bsale sea confiable.
 
 ### Mejoras cortas propuestas (no comprometidas)

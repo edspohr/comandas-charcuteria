@@ -114,8 +114,11 @@ export async function buildInvoice(s: BsaleSettings, orderId: string, wanted?: '
   if (order.totalCLP && Math.abs(totalCLP - order.totalCLP) / order.totalCLP > 0.1) warnings.push('El total difiere más de 10% del valorizado en el pedido (pesos reales o precios de Bsale).');
 
   const now = Math.floor(Date.now() / 1000);
-  const clientPart = client.bsaleClientId
-    ? { clientId: Number(client.bsaleClientId) }
+  // Un id que no es número (p. ej. datos de demo) rompería el documento.
+  const bsaleClientNum = client.bsaleClientId ? Number(client.bsaleClientId) : NaN;
+  if (client.bsaleClientId && !Number.isFinite(bsaleClientNum)) blocking.push(`El cliente tiene un id de Bsale inválido (${client.bsaleClientId}). Vincúlelo de nuevo en Clientes.`);
+  const clientPart = Number.isFinite(bsaleClientNum)
+    ? { clientId: bsaleClientNum }
     : kind === 'factura'
       ? { client: stripUndefined({ code: client.rut, company: client.name, activity: client.giro, address: client.address, municipality: 'Santiago', city: 'Santiago', companyOrPerson: 1 }) }
       : {};

@@ -48,5 +48,5 @@ export function useInvites(): Invite[] {
 export function callableMessage(e: unknown): string {
   const msg = (e as { message?: string }).message ?? '';
   // HttpsError messages are already user-facing Spanish.
-  return msg && !msg.startsWith('internal') ? msg : 'No se pudo completar la operación.';
+  return msg && !msg.toLowerCase().startsWith('internal') ? msg : 'No se pudo completar la operación.';
 }

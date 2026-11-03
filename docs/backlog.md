@@ -58,6 +58,6 @@ Backlog interno estimado en ~CLP 5,2 M; requiere cotización aparte:
 - pago de despachos;
 - fotos como prueba de entrega;
 - notificaciones push;
-- CRM / fuerza de ventas: HubSpot quedó pausado y la idea es que viva dentro de Comandas.
+- CRM / fuerza de ventas: HubSpot quedó pausado y la idea es que viva dentro de Comandas. **Adelantado el 03-11:** la gestión de oportunidades se entregó con el arranque ([ADR-0016](adr/0016-oportunidades-comerciales.md)); quedan las notificaciones y la asignación automática de los canales de adquisición.
 
 El PIN personal estaba en esta lista y se entregó en la 1.0 (24-10).

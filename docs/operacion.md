@@ -121,6 +121,7 @@ Todos se corren desde la raíz. Los que tocan producción piden `--confirm coman
 | `migrate-claims.ts` | copia `users.role` al claim | aplicado |
 | `appcheck-setup.mjs` | App Check para Gemini | aplicado (producción) |
 | `setup-alerts.sh` | alerta por correo ante errores de las funciones de Bsale | aplicado 24-10 (edmundo@spohr.cl; correrlo de nuevo duplica la alerta) |
+| `import-oportunidades.ts` | sube el resumen del informe de oportunidades a `opportunityCandidates` (idempotente; no toca las ya cargadas). Con `--confirm comandas-charcuteria` | vigente |
 | `verify-*.ts` | verificaciones manuales de datos, parser y Gemini | vigente |
 
 Las auditorías ad hoc van en `private/` (gitignored), nunca en `scripts/`.

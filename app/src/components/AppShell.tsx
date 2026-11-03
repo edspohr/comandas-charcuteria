@@ -25,6 +25,7 @@ const GROUP_ORDER: Group[] = ['pedidos', 'clientes', 'produccion', 'gestion', 'a
 const NAV: NavItem[] = [
   { to: '/tablero', label: 'Tablero de pedidos', short: 'Pedidos', route: 'tablero', group: 'pedidos', icon: 'board' },
   { to: '/admin/pendiente-bsale', label: 'Pendiente en Bsale', short: 'Pendiente', route: 'pendienteBsale', group: 'pedidos', icon: 'sync' },
+  { to: '/oportunidades', label: 'Oportunidades', route: 'oportunidades', group: 'clientes', icon: 'sparkle' },
   { to: '/clientes', label: 'Clientes', route: 'clientes', group: 'clientes', icon: 'users' },
   { to: '/produccion', label: 'Producción', route: 'produccion', group: 'produccion', icon: 'factory' },
   { to: '/admin/panel', label: 'Panel de gestión', short: 'Panel', route: 'panel', group: 'gestion', icon: 'chart' },
@@ -36,7 +37,7 @@ const NAV: NavItem[] = [
 const NEW_ORDER = '/vendedor/nuevo';
 
 // Phone bottom bar: the first of these the role can see.
-const BOTTOM_PRIORITY = ['/tablero', '/admin/panel', '/clientes', '/produccion', '/bsale', '/admin/catalogo'];
+const BOTTOM_PRIORITY = ['/tablero', '/oportunidades', '/admin/panel', '/clientes', '/produccion', '/bsale', '/admin/catalogo'];
 
 const isActive = (pathname: string, to: string) => pathname === to || pathname.startsWith(to + '/');
 const isNewOrder = (pathname: string) => pathname.startsWith('/vendedor/nuevo') || pathname.startsWith('/vendedor/pegar');

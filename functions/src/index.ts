@@ -16,3 +16,4 @@ export {
   bsaleReceiveProduction, bsaleTransferToStore, bsaleCreateClient, bsaleUpdateClient,
   bsaleInvoicePreview, bsaleEmitInvoice, bsaleFactsBackfill, bsaleRefreshCosts, bsaleDailyCosts, bsaleConsumeSamples,
 } from './bsale';
+export { opportunityWonOnInvoice } from './opportunities';

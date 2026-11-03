@@ -194,3 +194,52 @@ describe('bsale real (espejos del servidor)', () => {
   });
 });
 
+
+describe('oportunidades', () => {
+  const opp = (overrides: Record<string, unknown> = {}) => ({
+    id: 'op-1', clientId: 'c-1', clientSnapshot: { name: 'Cliente demo' }, title: 'Visita', origin: 'asignada',
+    ownerUid: 'u-rafael', createdBy: 'u-ciro', productsOfInterest: [], status: 'abierta', orderIds: [], activity: [],
+    createdAt: 1, updatedAt: 1, ...overrides,
+  });
+
+  it('the executive reads and manages only their own; cannot reassign or mark won', async () => {
+    await seed('opportunities/op-1', opp());
+    await seed('opportunities/op-2', opp({ id: 'op-2', ownerUid: 'u-gabriela' }));
+    const rafael = as('u-rafael', 'vendedor');
+    await assertSucceeds(getDoc(doc(rafael, 'opportunities', 'op-1')));
+    await assertFails(getDoc(doc(rafael, 'opportunities', 'op-2')));
+    await assertSucceeds(updateDoc(doc(rafael, 'opportunities', 'op-1'), { status: 'en_gestion', updatedAt: 2 }));
+    await assertFails(updateDoc(doc(rafael, 'opportunities', 'op-1'), { ownerUid: 'u-gabriela' }));
+    await assertFails(updateDoc(doc(rafael, 'opportunities', 'op-1'), { status: 'ganada' }));
+    await assertFails(updateDoc(doc(rafael, 'opportunities', 'op-2'), { status: 'en_gestion' }));
+  });
+
+  it('postpone needs a date and lost needs a reason', async () => {
+    await seed('opportunities/op-1', opp());
+    const rafael = as('u-rafael', 'vendedor');
+    await assertFails(updateDoc(doc(rafael, 'opportunities', 'op-1'), { status: 'postergada' }));
+    await assertSucceeds(updateDoc(doc(rafael, 'opportunities', 'op-1'), { status: 'postergada', postponedUntil: '2026-12-01' }));
+    await assertFails(updateDoc(doc(rafael, 'opportunities', 'op-1'), { status: 'perdida' }));
+    await assertSucceeds(updateDoc(doc(rafael, 'opportunities', 'op-1'), { status: 'perdida', lostReason: 'precio' }));
+  });
+
+  it('sellers create only their own; superAdmin assigns anyone; admin and consultor only read', async () => {
+    await assertSucceeds(setDoc(doc(as('u-rafael', 'vendedor'), 'opportunities', 'a'), opp({ id: 'a', ownerUid: 'u-rafael', createdBy: 'u-rafael', origin: 'propia' })));
+    await assertFails(setDoc(doc(as('u-rafael', 'vendedor'), 'opportunities', 'b'), opp({ id: 'b', ownerUid: 'u-gabriela', createdBy: 'u-rafael' })));
+    await assertSucceeds(setDoc(doc(as('u-ciro', 'superAdmin'), 'opportunities', 'c'), opp({ id: 'c', ownerUid: null })));
+    await assertSucceeds(updateDoc(doc(as('u-ciro', 'superAdmin'), 'opportunities', 'c'), { ownerUid: 'u-gabriela' }));
+    await assertFails(setDoc(doc(as('u-miguel', 'admin'), 'opportunities', 'd'), opp({ id: 'd', createdBy: 'u-miguel' })));
+    await assertFails(updateDoc(doc(as('u-miguel', 'admin'), 'opportunities', 'c'), { status: 'en_gestion' }));
+    await assertSucceeds(getDoc(doc(as('u-miguel', 'admin'), 'opportunities', 'c')));
+    await assertSucceeds(getDoc(doc(as('u-ed', 'consultor'), 'opportunities', 'c')));
+  });
+
+  it('report candidates: superAdmin marks them, nobody creates them from the app', async () => {
+    await seed('opportunityCandidates/inf-1', { id: 'inf-1', status: 'pendiente', rank: 1 });
+    const ciro = as('u-ciro', 'superAdmin');
+    await assertSucceeds(updateDoc(doc(ciro, 'opportunityCandidates', 'inf-1'), { status: 'cargada', opportunityId: 'op-1', loadedBy: 'u-ciro', loadedAt: 1 }));
+    await assertFails(updateDoc(doc(ciro, 'opportunityCandidates', 'inf-1'), { rank: 2 }));
+    await assertFails(setDoc(doc(ciro, 'opportunityCandidates', 'inf-2'), { id: 'inf-2' }));
+    await assertFails(getDoc(doc(as('u-rafael', 'vendedor'), 'opportunityCandidates', 'inf-1')));
+  });
+});

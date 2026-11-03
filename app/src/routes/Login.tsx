@@ -279,7 +279,7 @@ const FEATURES: Array<{ icon: ReactNode; title: string; text: string }> = [
   { icon: <IconBoard />, title: 'Tablero con visión y detalle', text: 'Resumen por etapa con montos y kilos, vista en tarjetas, compacta o lista, y el detalle del pedido a un clic. Rojo si se atrasa.' },
   { icon: <IconScale />, title: 'Sin retipeo', text: 'La producción, los traslados, las muestras y los clientes nuevos se escriben solos en Bsale. «Pendiente en Bsale» reúne lo que la oficina aún debe cerrar: pedidos sin documento y envíos con error.' },
   { icon: <IconStore />, title: 'Reposición de tienda', text: 'La tienda pide por el mismo canal, el panel sugiere qué llevar según lo que vende y el traslado se registra en Bsale.' },
-  { icon: <IconUsers />, title: 'Clientes y cartera', text: 'Ritmo de compra de cada cliente, quién está en riesgo y quién se perdió, y el seguimiento de cada muestra a los 7 días.' },
+  { icon: <IconUsers />, title: 'Oportunidades y cartera', text: 'Ciro asigna visitas y cada ejecutivo gestiona sus oportunidades: agenda del día, muestras y pedidos ligados, postergar con fecha o perder con motivo. Se gana sola al facturar. Más el ritmo de compra de cada cliente y quién está en riesgo.' },
   { icon: <IconChart />, title: 'Panel de gestión', text: 'Dos años de ventas de Bsale: margen, productos ABC, clientes, vendedores, estacionalidad, stock, muestras que terminan en venta y un explorador con exportación a Excel.' },
 ];
 

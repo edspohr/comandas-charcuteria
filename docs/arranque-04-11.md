@@ -23,6 +23,7 @@ Abajo están el checklist del día y la guía de arranque por perfil.
 | ☐ | **Catálogo → Cruce con Bsale:** confirmar el cruce de los productos que fabrica Yury. Una carga con un producto sin cruce no llega a Bsale: queda en Pendiente en Bsale con el motivo «Sin cruce con Bsale» | Miguel |
 | ☐ | Crear el grupo de WhatsApp «Soporte Comandas» (Edmundo, Ciro, Miguel). Ahí se reportan las fallas, con una captura de pantalla | Edmundo |
 | ☐ | Mandar a Ciro la tabla de cuentas (sección 3) con los correos que faltan | Edmundo |
+| ☐ | Subir el informe de oportunidades: `npx tsx scripts/import-oportunidades.ts tools/oportunidades/output/oportunidades_resumen.csv --confirm comandas-charcuteria` (hoy el piloto de 10 clientes) | Edmundo |
 
 ### Miércoles 04-11, antes de abrir
 
@@ -33,6 +34,7 @@ Abajo están el checklist del día y la guía de arranque por perfil.
 | ☐ | Ciro y Luis entran por primera vez y crean su PIN | Ciro, Luis |
 | ☐ | En **Conexión Bsale → Configuración**, dejar:<ul><li>`Escrituras` encendido;</li><li>`Simulacro` apagado;</li><li>`Facturar desde Comandas` apagado.</li></ul>Revisar que las oficinas sigan en 1 (fábrica) y 2 (tienda) | Ciro (superAdmin) |
 | ☐ | Tocar «Sincronizar» una vez y revisar que el stock se ve | Ciro |
+| ☐ | **Oportunidades → Del informe:** elegir qué clientes trabajar y a qué ejecutivo. Crear también las visitas que quiera asignar («+ Oportunidad») | Ciro |
 
 ### Durante el día: primeras veces (revisarlas en Bsale apenas ocurran)
 
@@ -89,13 +91,13 @@ La facturación sigue en el POS. Para encender «Facturar desde Comandas»:
 
 | Perfil | Primera tarea | Lo que tiene que entender |
 |---|---|---|
-| Vendedor | Un pedido real con «＋» → Paso a paso (o «Pegar mensaje» desde WhatsApp) | <ul><li>El horario de entrega es obligatorio.</li><li>Al enviar se pide el PIN.</li><li>Si hay una condición especial, el pedido espera la aprobación de Ciro.</li><li>Las muestras se agregan con «+ Muestra».</li></ul> |
+| Vendedor | **Oportunidades → Agenda:** abrir una oportunidad asignada, registrar la visita con su siguiente paso y crear las muestras o el pedido desde ahí. Después, un pedido con «＋» → Paso a paso (o «Pegar mensaje» desde WhatsApp) | <ul><li>El horario de entrega es obligatorio.</li><li>Al enviar se pide el PIN.</li><li>Si hay una condición especial, el pedido espera la aprobación de Ciro.</li><li>Las muestras se agregan con «+ Muestra».</li></ul> |
 | Tienda (Lucy) | Una reposición con «＋» y, cuando llegue, «Recibir en tienda» | <ul><li>El traslado ahora se registra solo en Bsale.</li><li>Lucy también puede tomar pedidos de clientes.</li></ul> |
 | Despacho | «Tomar» → «Armar» un pedido con el peso real | <ul><li>Se registra lo que realmente se empacó.</li><li>Un pedido «por aprobar» no se arma.</li><li>Las muestras se rotulan.</li><li>El traslado a la tienda pide el PIN y escribe en Bsale.</li></ul> |
 | Reparto | «Entregar» con quién recibió | Fijarse en el horario de recepción del cliente |
 | Producción (Yury) | Cargar lo producido hoy (foto de la planilla o a mano) | <ul><li>Cada carga pide el PIN y **entra a Bsale como recepción**.</li><li>Antes de cargar, revisar bien las cantidades leídas de la foto.</li></ul> |
 | Administración (Miguel) | Emitir en el POS → **Pendiente en Bsale** → «Confirmar» el documento sugerido | <ul><li>Si no hay sugerencia, usar «Vincular» y elegir el documento.</li><li>Escribir el número del pedido en la referencia del POS hace que la sugerencia sea segura.</li><li>Dejar la lista en cero al cierre.</li></ul> |
-| Super administración (Ciro, Luis) | Aprobar o rechazar un pedido «por aprobar» y crear una cuenta en Usuarios | <ul><li>Borrar un PIN olvidado.</li><li>Los interruptores de Bsale están en Conexión Bsale.</li></ul> |
+| Super administración (Ciro, Luis) | <ul><li>Aprobar o rechazar un pedido «por aprobar».</li><li>Crear una cuenta en Usuarios.</li><li>Asignar una oportunidad y revisar **Oportunidades → Equipo**.</li></ul> | <ul><li>Borrar un PIN olvidado.</li><li>Los interruptores de Bsale están en Conexión Bsale.</li><li>Una oportunidad se gana sola cuando su pedido se factura; postergar pide fecha y dar por perdida pide motivo.</li></ul> |
 
 **Consejo para la oficina:** en el POS, poner en la **referencia** del documento el número del pedido (por ejemplo `PED-2026-0042`). Con eso Comandas sugiere el documento sin dudar, aunque el cliente no tenga RUT o el total cambie.
 

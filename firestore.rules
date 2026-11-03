@@ -20,6 +20,8 @@ service cloud.firestore {
     function canSync()        { return roleIn(['despacho', 'produccion', 'admin', 'superAdmin']); }
     function canReceiveProd() { return roleIn(['produccion', 'admin', 'superAdmin']); }
     function canQuickClient() { return roleIn(['vendedor', 'tienda', 'admin', 'superAdmin']); }
+    function canSell()        { return roleIn(['vendedor', 'tienda']); }
+    function canViewAllOpps() { return roleIn(['admin', 'superAdmin', 'consultor']); }
     // Lectura: cualquier perfil (el consultor ve todo, sin escribir nada).
     function canRead()        { return hasRole(); }
 
@@ -171,6 +173,32 @@ service cloud.firestore {
     match /sampleFeedback/{id} {
       allow read:  if canRead();
       allow write: if (canCreateOrder() && request.resource.data.by == request.auth.uid) || isSupervisor();
+    }
+
+    // -------- Oportunidades comerciales (domain/opportunities.ts)
+    // El ejecutivo ve y gestiona las suyas; super administración todas
+    // (asigna, reasigna, gestiona); administración y consultor solo leen.
+    // «Ganada» la escribe la función al facturarse un pedido ligado.
+    match /opportunities/{id} {
+      allow read: if canViewAllOpps() || (canSell() && resource.data.ownerUid == request.auth.uid);
+      allow create: if request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status == 'abierta'
+        && (isSuperAdmin() || (canSell() && request.resource.data.ownerUid == request.auth.uid));
+      allow update: if (isSuperAdmin()
+          || (canSell() && resource.data.ownerUid == request.auth.uid && unchanged('ownerUid')))
+        && unchanged('createdBy')
+        && (request.resource.data.status != 'ganada' || resource.data.status == 'ganada')
+        && (request.resource.data.status != 'postergada' || request.resource.data.get('postponedUntil', '') != '')
+        && (request.resource.data.status != 'perdida' || request.resource.data.get('lostReason', '') != '');
+      allow delete: if false;
+    }
+
+    // Filas del informe de oportunidades (las carga scripts/import-oportunidades.ts).
+    match /opportunityCandidates/{id} {
+      allow read: if canViewAllOpps();
+      allow update: if isSuperAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'opportunityId', 'loadedBy', 'loadedAt']);
+      allow create, delete: if false;
     }
 
     match /orders/{id} {

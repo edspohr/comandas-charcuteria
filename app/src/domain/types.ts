@@ -194,6 +194,8 @@ export interface Order {
   archived?: boolean;
   // Pedido con excepción: espera la aprobación de super administración.
   approval?: Approval;
+  // Oportunidad comercial (domain/opportunities.ts). Al facturarse, la gana.
+  opportunityId?: string;
   // Consumo interno de las muestras en Bsale (una vez por pedido).
   samplesConsumption?: { at: number; by: string; ref: string; dryRun?: boolean; skipped?: boolean; reason?: 'sin_muestras' | 'escrituras_apagadas'; manual?: boolean; logId?: string };
   invoicingComplete: boolean;

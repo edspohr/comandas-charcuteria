@@ -21,6 +21,8 @@ import { hasSamples, isSampleOnly, lineKey } from '@/domain/samples';
 import { formatWindow, type DeliveryWindow } from '@/domain/delivery';
 import { autoReasons, EXCEPTION_KINDS, type Approval, type ExceptionKind } from '@/domain/exceptions';
 import type { DocumentReference, Transaction } from 'firebase/firestore';
+import { opportunityOrderPatch } from './opportunities';
+import type { Opportunity } from '@/domain/opportunities';
 
 // One read per stock doc, even when several lines share it (a Coppa line and
 // a Coppa sample both come out of the bulk format): reading it twice and
@@ -78,6 +80,8 @@ export interface DraftOrderInput {
   exception?: { kinds: ExceptionKind[]; note: string };
   source: 'app' | 'pasted';
   rawText?: string;
+  // Oportunidad comercial a la que pertenece (muestras o venta).
+  opportunityId?: string;
 }
 
 export interface CreateOrderResult {
@@ -104,6 +108,9 @@ export async function createOrder(
     const orderId = `PED-${year}-${String(nextN).padStart(4, '0')}`;
 
     const stockReads = await readStocks(tx, input.lines);
+    const oppRef = input.opportunityId ? doc(db, 'opportunities', input.opportunityId) : null;
+    const opp = oppRef ? ((await tx.get(oppRef)).data() as Opportunity | undefined) : undefined;
+    if (oppRef && !opp) throw new Error('La oportunidad ya no existe.');
     // Available per stock doc, consumed line by line: regular lines first so
     // a sample never takes stock a sale needs.
     const left = new Map([...stockReads].map(([id, r]) => [id, r.prev ? Math.max(0, r.prev.onHand - r.prev.reserved) : 0]));
@@ -184,6 +191,7 @@ export async function createOrder(
       ],
       source: input.source,
       rawText: input.rawText,
+      ...(input.opportunityId ? { opportunityId: input.opportunityId } : {}),
       invoicingComplete: input.client.invoicingComplete,
       createdAt: now,
       updatedAt: now,
@@ -217,6 +225,7 @@ export async function createOrder(
 
     tx.set(counterRef, { last: nextN }, { merge: true });
     tx.set(doc(db, 'orders', orderId), order);
+    if (oppRef && opp) tx.update(oppRef, opportunityOrderPatch(opp, orderId, createdByUid, order.kind === 'muestras', enriched.some((l) => l.sample), now));
 
     return { orderId, status, parcialLines, awaitingApproval: !!order.approval };
   });

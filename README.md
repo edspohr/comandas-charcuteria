@@ -91,6 +91,23 @@ Cada persona tiene **un perfil**, que viaja como *custom claim* `role`. La matri
   - se cuenta conversión si el cliente compra el producto dentro de 60 días;
   - Panel → Muestras muestra los kg por cliente nuevo ganado.
 
+## Oportunidades ([ADR-0016](docs/adr/0016-oportunidades-comerciales.md))
+
+Gestión comercial antes del pedido, en **Oportunidades**:
+- **Ejecutivo** (vendedor o tienda):
+  - su **Agenda**, con lo que toca hoy o está vencido;
+  - registra visitas y llamadas con el siguiente paso;
+  - crea «Muestras o pedido» desde la oportunidad;
+  - la posterga con fecha o la da por perdida con un motivo.
+- **Super administración:**
+  - crea y **asigna** oportunidades, y las reasigna;
+  - gestiona cualquiera;
+  - ve **Equipo** (abiertas, vencidas, ganadas, perdidas, conversión y muestras por ejecutivo) y la bandeja **Sin asignar**;
+  - elige qué clientes del **informe de oportunidades** cargar (`scripts/import-oportunidades.ts`).
+- **Administración y consultor:** solo leen.
+
+Una oportunidad se **gana sola cuando un pedido ligado se factura** (`opportunityWonOnInvoice`).
+
 ## Producción ([ADR-0014](docs/adr/0014-bitacora-produccion.md))
 
 La pantalla diaria de Producción tiene cuatro partes:
@@ -129,7 +146,8 @@ Cada intento queda en `bsale/writes/log`. Funciones en [`functions/src/bsale/`](
   - escrituras: `bsaleReceiveProduction`, `bsaleTransferToStore`, `bsaleCreateClient`, `bsaleUpdateClient`, `bsaleConsumeSamples`;
   - facturación: `bsaleInvoicePreview`, `bsaleEmitInvoice`;
   - historia y costos: `bsaleFactsBackfill`, `bsaleRefreshCosts`, `bsaleDailyCosts`;
-  - proxy de solo lectura: `bsaleProxy` (solo GET).
+  - proxy de solo lectura: `bsaleProxy` (solo GET);
+- oportunidades: `opportunityWonOnInvoice` (trigger de `orders/*`).
 
 ## Panel de gestión
 
@@ -169,6 +187,8 @@ Si Gemini falla, el texto cae a un intérprete determinista (`domain/parse/local
 | `userPins/*` | hash scrypt del PIN | solo servidor (deny-all a clientes) |
 | `pinLog/*` | auditoría de cada uso del PIN | solo servidor |
 | `sampleFeedback/*` | seguimiento de muestras | vendedor |
+| `opportunities/*` | oportunidades comerciales (estado, próxima acción, historial, pedidos) | ejecutivo dueño / superAdmin; «ganada» solo el servidor |
+| `opportunityCandidates/*` | filas del informe de oportunidades | script (crea), superAdmin (marca cargada o descartada) |
 | `settings/app`, `settings/bsale`, `settings/bsaleSync` | configuración y estado de sincronización | superAdmin / servidor |
 | `bsale/**` | espejos, hechos de venta, bitácoras de escrituras y webhooks | servidor |
 

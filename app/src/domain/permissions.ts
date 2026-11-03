@@ -19,6 +19,10 @@ export type Capability =
   | 'order.dispatch'        // marcar salida (despachado)
   | 'order.deliver'         // marcar entregado con nota
   | 'transfer.receive'      // tienda confirma recepción del traslado
+  // Oportunidades comerciales
+  | 'opportunity.manageOwn' // crear y gestionar las propias
+  | 'opportunity.manageAll' // asignar, reasignar y gestionar cualquiera; cargar el informe
+  | 'opportunity.viewAll'   // ver todas y el resumen del equipo
   // Clientes
   | 'client.quickCreate'
   | 'client.edit'           // datos de facturación (van a Bsale) + cartera
@@ -38,25 +42,25 @@ export const ROLES: Role[] = [
 ];
 
 const ROLE_CAPS: Record<Role, Capability[]> = {
-  vendedor: ['order.create', 'order.cancelOwn', 'client.quickCreate'],
+  vendedor: ['order.create', 'order.cancelOwn', 'client.quickCreate', 'opportunity.manageOwn'],
   // La tienda también toma pedidos de clientes (Lucy), además de su reposición.
-  tienda: ['order.create', 'order.createTransfer', 'order.cancelOwn', 'transfer.receive', 'client.quickCreate'],
+  tienda: ['order.create', 'order.createTransfer', 'order.cancelOwn', 'transfer.receive', 'client.quickCreate', 'opportunity.manageOwn'],
   despacho: ['order.pack', 'order.dispatch', 'stock.sync'],
   reparto: ['order.dispatch', 'order.deliver'],
   produccion: ['production.receive', 'stock.sync'],
   admin: [
     'order.create', 'order.createTransfer', 'order.cancelOwn', 'order.cancelAny', 'order.pack', 'order.link',
     'order.dispatch', 'order.deliver', 'transfer.receive', 'client.quickCreate', 'client.edit', 'stock.sync',
-    'production.receive', 'catalog.map', 'bsale.explore', 'panel.view',
+    'production.receive', 'catalog.map', 'bsale.explore', 'panel.view', 'opportunity.viewAll',
   ],
   superAdmin: [
     'order.create', 'order.createTransfer', 'order.cancelOwn', 'order.cancelAny', 'order.pack', 'order.link',
     'order.dispatch', 'order.deliver', 'transfer.receive', 'client.quickCreate', 'client.edit', 'stock.sync',
     'production.receive', 'catalog.map', 'bsale.explore', 'bsale.configure', 'panel.view', 'users.manage',
-    'settings.edit', 'order.invoiceLate', 'order.approve',
+    'settings.edit', 'order.invoiceLate', 'order.approve', 'opportunity.manageOwn', 'opportunity.manageAll', 'opportunity.viewAll',
   ],
   // Auditor: ve todo, no escribe nada.
-  consultor: ['bsale.explore', 'panel.view'],
+  consultor: ['bsale.explore', 'panel.view', 'opportunity.viewAll'],
 };
 
 // Perfiles que venden y entran en los análisis de fuerza de ventas (cartera,
@@ -105,7 +109,7 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
 // lectura; las pantallas esconden sus acciones con `can()`.
 export type RouteKey =
   | 'tablero' | 'nuevoPedido' | 'pedidoIA' | 'detallePedido' | 'armado' | 'clientes' | 'fichaCliente' | 'produccion'
-  | 'panel' | 'catalogo' | 'usuarios' | 'bsaleConsola' | 'bsaleExplorer' | 'pendienteBsale' | 'ayuda';
+  | 'panel' | 'catalogo' | 'usuarios' | 'bsaleConsola' | 'bsaleExplorer' | 'pendienteBsale' | 'oportunidades' | 'ayuda';
 
 const everyone = () => true;
 export const ROUTE_ACCESS: Record<RouteKey, (role: Role) => boolean> = {
@@ -124,6 +128,7 @@ export const ROUTE_ACCESS: Record<RouteKey, (role: Role) => boolean> = {
   bsaleConsola: (r) => can(r, 'bsale.configure'),
   bsaleExplorer: (r) => can(r, 'bsale.explore'),
   pendienteBsale: (r) => can(r, 'order.link') || isReadOnly(r),
+  oportunidades: (r) => canAny(r, ['opportunity.manageOwn', 'opportunity.viewAll']),
 };
 
 export const ROLE_HOME: Record<Role, string> = {

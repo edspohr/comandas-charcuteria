@@ -33,6 +33,13 @@ const GUIDES: Record<Role, Guide> = {
       'Puede anular un pedido suyo mientras no esté facturado (pide su PIN).',
       'Siete días después de entregar una muestra aparece «¿Qué le pareció…?»: responda en un toque.',
     ]],
+    ['Oportunidades', [
+      '«Oportunidades» → «Agenda»: lo que toca hoy o está atrasado (franja roja). Ahí aparecen las visitas que le asigna Ciro y las suyas.',
+      'Abra una oportunidad y toque «Registrar visita o llamada»: anote qué pasó y el siguiente paso con fecha.',
+      '«Muestras o pedido» abre Nuevo pedido con el cliente listo y ligado a la oportunidad. Las muestras se agregan con «+ Muestra».',
+      'Si el cliente pide esperar, «Postergar» con la fecha en que vuelve a su agenda. Si no resultó, «Perdida» con el motivo.',
+      'Se gana sola cuando el pedido se factura. Para crear una propia: «+ Oportunidad».',
+    ]],
     ['Clientes', ['«Clientes» → «Mi cartera»: quién está en riesgo o dejó de comprar. Toque un cliente para ver su historial y lo que compra.']],
   ] },
   tienda: { title: 'Tienda', sections: [
@@ -42,6 +49,7 @@ const GUIDES: Record<Role, Guide> = {
       'Despacho lo arma y registra el traslado. Cuando llegue, en «Pedidos» toque «Recibir en tienda» y revise lo recibido.',
     ]],
     ['Seguir sus pedidos', ['«Pedidos» muestra los pedidos de la tienda por etapa. Rojo = atrasado o con problema.']],
+    ['Oportunidades', ['Igual que un vendedor: «Oportunidades» → «Agenda», registre visitas y llamadas, y cree muestras o pedidos desde la oportunidad.']],
   ] },
   despacho: { title: 'Despacho y armado', sections: [
     ACCESS,
@@ -75,18 +83,24 @@ const GUIDES: Record<Role, Guide> = {
     ACCESS,
     ['Facturar', ['En «Pedidos», columna Por facturar: emita en el POS de Bsale con los pesos del armado y toque «Facturar» para vincular el documento (pide PIN). La reserva de stock se libera sola.', 'Si el documento trae el número del pedido en la referencia, o es del mismo RUT con un total parecido, Comandas lo marca «Sugerido»: revíselo y confírmelo.', '«Ver cómo lo facturaría Comandas» muestra la factura que emitiría la app (no emite nada). Compárela con la del POS: si calzan varios días seguidos, se enciende la facturación desde Comandas.']],
     ['Pendiente en Bsale', ['Su lista de trabajo del día: pedidos armados o entregados sin documento (con «Confirmar» cuando hay sugerencia), envíos a Bsale con error, producción y muestras que no llegaron a Bsale y clientes por revisar. Déjela en cero antes de irse.']],
-    ['Todo lo demás', ['Puede tomar pedidos, armar, despachar, ver el Panel y el Catálogo como los perfiles de operación.']],
+    ['Todo lo demás', ['Puede tomar pedidos, armar, despachar, ver el Panel y el Catálogo como los perfiles de operación. «Oportunidades» la ve en modo lectura.']],
   ] },
   superAdmin: { title: 'Super administración', sections: [
     ACCESS,
     ['Aprobar excepciones', ['Arriba del Tablero aparece «Pedidos por aprobar». Revise y apruebe o rechace con su PIN (rechazar anula el pedido con el motivo).']],
+    ['Oportunidades', [
+      '«+ Oportunidad»: elija el cliente, qué se busca, el ejecutivo y la primera acción con fecha. Sin ejecutivo queda en «Sin asignar».',
+      '«Del informe»: marque los clientes del informe de oportunidades que quiere trabajar, elija el ejecutivo de cada uno y «Cargar».',
+      '«Equipo»: abiertas, vencidas, postergadas, ganadas, perdidas, conversión y muestras por ejecutivo (90 días). Toque a alguien para ver sus abiertas.',
+      'En cualquier oportunidad puede cambiar el ejecutivo y hacer lo mismo que él: registrar, postergar, dar por perdida o crear muestras y pedidos.',
+    ]],
     ['Personas', ['«Usuarios» → «+ Agregar persona» o «Invitar con su historial» (trae los pedidos y la cartera de WhatsApp). Cada persona crea su PIN al entrar. Aquí se desactiva a alguien o se borra su PIN.']],
     ['Gestión', ['«Panel de gestión»: ventas de Bsale, margen, clientes, vendedores, stock y muestras (incluye kg de muestra por cliente nuevo). «Catálogo»: qué productos se ofrecen en pedidos.']],
     ['Facturar después de entregar', ['Desde «Facturar» puede «Despachar sin factura»; al entregarse aparece «Facturar» en Cerrado.']],
   ] },
   consultor: { title: 'Consulta', sections: [
     ACCESS,
-    ['Qué puede ver', ['Todo en modo lectura: Panel de gestión, Ventana a Bsale, Pedidos, Clientes, Catálogo y Usuarios. No puede modificar nada.']],
+    ['Qué puede ver', ['Todo en modo lectura: Panel de gestión, Ventana a Bsale, Pedidos, Oportunidades (con la vista Equipo), Clientes, Catálogo y Usuarios. No puede modificar nada.']],
   ] },
 };
 

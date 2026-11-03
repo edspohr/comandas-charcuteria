@@ -5,7 +5,7 @@ const normText = (x: string) => x.toLocaleLowerCase('es').normalize('NFD').repla
 import { confirmPin } from '@/data/pin';
 import NewOrderTabs from '@/components/orders/NewOrderTabs';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Button from '@/components/ui/Button';
 import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
 import SemaphoreBadge from '@/components/ui/SemaphoreBadge';
@@ -17,6 +17,9 @@ import { useProducts } from '@/data/products';
 import { useAllStock, availableFor, semaphore } from '@/data/stock';
 import { createOrder, useLastOrderForClient, type DraftLine } from '@/data/orders';
 import { useSettings } from '@/data/settings';
+import { useClientOpportunities, useOpportunity } from '@/data/opportunities';
+import { isOpen } from '@/domain/opportunities';
+import { can } from '@/domain/permissions';
 import { clearDraft, loadDraft, saveDraft } from '@/lib/draft';
 import { defaultRequestedDate, minRequestedDate } from '@/domain/cutoff';
 import { formatDateLong, formatDateShort, formatQty } from '@/lib/format';
@@ -45,6 +48,8 @@ interface Draft {
   exceptionOn?: boolean;
   exceptionKinds?: ExceptionKind[];
   exceptionNote?: string;
+  // Oportunidad comercial a la que pertenece (muestras o venta).
+  opportunityId?: string;
   step: number;
 }
 
@@ -96,6 +101,20 @@ export default function NuevoPedido() {
   );
   const lastOrder = useLastOrderForClient(uid, draft.clientId);
 
+  // «Muestras o pedido» desde una oportunidad: trae el cliente y la liga.
+  const [params, setParams] = useSearchParams();
+  const fromOpp = useOpportunity(params.get('oportunidad'));
+  useEffect(() => {
+    if (!fromOpp) return;
+    setDraft((d) => (d.opportunityId === fromOpp.id ? d : { ...emptyDraft(settings.cutoffHour), clientId: fromOpp.clientId, opportunityId: fromOpp.id, step: 2 }));
+    setParams((p) => { p.delete('oportunidad'); return p; }, { replace: true });
+  }, [fromOpp, settings.cutoffHour, setParams]);
+  const role = current!.appUser.role;
+  const manageAllOpps = can(role, 'opportunity.manageAll');
+  const clientOpps = useClientOpportunities(can(role, 'opportunity.manageOwn') ? draft.clientId : null, manageAllOpps ? { all: true } : { ownerUid: uid });
+  const openOpps = useMemo(() => clientOpps.filter((o) => isOpen(o) && o.ownerUid && (manageAllOpps || o.ownerUid === uid)), [clientOpps, manageAllOpps, uid]);
+  const linkedOpp = clientOpps.find((o) => o.id === draft.opportunityId) ?? null;
+
   useEffect(() => { saveDraft(uid, draft); }, [draft, uid]);
 
   function update<K extends keyof Draft>(key: K, value: Draft[K]) {
@@ -123,6 +142,7 @@ export default function NuevoPedido() {
         fantasyName: draft.fantasyName?.trim() || undefined,
         ...(draft.exceptionOn && draft.exceptionNote?.trim() ? { exception: { kinds: draft.exceptionKinds ?? [], note: draft.exceptionNote.trim() } } : {}),
         source: 'app',
+        ...(draft.opportunityId && linkedOpp ? { opportunityId: draft.opportunityId } : {}),
       });
       clearDraft(uid);
       navigate('/tablero', {
@@ -150,6 +170,16 @@ export default function NuevoPedido() {
 
       <Steps current={draft.step} onGo={goto} />
 
+      {linkedOpp && (
+        <div className="mb-4 rounded-md border border-brass-300 bg-brass-50 px-3.5 py-2.5 text-sm text-brass-700 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p>Oportunidad · <span className="font-semibold">{linkedOpp.title}</span></p>
+            {linkedOpp.productsOfInterest.length > 0 && <p className="text-xs mt-0.5">Productos de interés: {linkedOpp.productsOfInterest.join(' · ')}. Para muestras use «+ Muestra».</p>}
+          </div>
+          <button onClick={() => update('opportunityId', undefined)} className="text-xs underline shrink-0">Quitar</button>
+        </div>
+      )}
+
       {draft.step > 1 && client && (
         <button onClick={() => goto(1)} className="mb-4 w-full card px-3.5 py-2.5 flex items-center justify-between gap-2 text-left">
           <span className="min-w-0 text-sm text-charcoal-500 truncate">Cliente · <span className="font-semibold text-charcoal-900">{client.fantasyName ?? client.name}</span></span>
@@ -164,7 +194,7 @@ export default function NuevoPedido() {
           selectedId={draft.clientId}
           onSelect={(c) => {
             // A different client brings its own usual window and fantasy name.
-            if (c.id !== draft.clientId) setDraft((d) => ({ ...d, deliveryFrom: undefined, deliveryTo: undefined, deliveryNote: undefined, fantasyName: undefined }));
+            if (c.id !== draft.clientId) setDraft((d) => ({ ...d, deliveryFrom: undefined, deliveryTo: undefined, deliveryNote: undefined, fantasyName: undefined, opportunityId: undefined }));
             update('clientId', c.id); update('deliveryMode', c.deliveryMode); goto(2);
           }}
           onRepeat={() => {
@@ -213,6 +243,7 @@ export default function NuevoPedido() {
         <StepConfirmar
           client={client}
           draft={draft}
+          openOpps={openOpps}
           stock={stock}
           submitting={submitting}
           error={error}
@@ -805,10 +836,11 @@ function StepEntrega({
 // ---------- Step 4: Confirmar ----------
 
 function StepConfirmar({
-  client, draft, stock, submitting, error, onUpdate, onBack, onSubmit,
+  client, draft, openOpps, stock, submitting, error, onUpdate, onBack, onSubmit,
 }: {
   client: Client;
   draft: Draft;
+  openOpps: Array<{ id: string; title: string }>;
   stock: Map<string, StockDoc>;
   submitting: boolean;
   error: string | null;
@@ -857,6 +889,16 @@ function StepConfirmar({
             <p className="text-xs text-red-700 mt-0.5">Falta el horario de entrega (paso Entrega).</p>
           )}
         </div>
+
+        {openOpps.length > 0 && (
+          <div className="border-t border-charcoal-100 pt-2">
+            <label className="eyebrow block">Oportunidad</label>
+            <select value={draft.opportunityId ?? ''} onChange={(e) => onUpdate('opportunityId', e.target.value || undefined)} className="field h-9 text-sm w-full mt-1">
+              <option value="">No es de una oportunidad</option>
+              {openOpps.map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
+            </select>
+          </div>
+        )}
 
         {!client.invoicingComplete && (
           <p className="text-xs text-brass-700 bg-brass-50 border border-brass-300 rounded px-2 py-1.5">

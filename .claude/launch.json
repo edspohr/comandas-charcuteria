@@ -23,7 +23,7 @@
         "firebase",
         "emulators:start",
         "--only",
-        "auth,firestore,functions",
+        "auth,firestore,functions,storage",
         "--project",
         "comandas-charcuteria-demo"
       ],

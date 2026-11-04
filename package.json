@@ -2,7 +2,7 @@
   "name": "comandas-charcuteria",
   "private": true,
   "version": "0.1.0",
-  "description": "Comandas: toma y seguimiento de pedidos integrada con Bsale para La Charcutería Artesanal (Cecinas Marcosi SpA)",
+  "description": "Comandas: toma y seguimiento de pedidos integrada con Bsale para La Charcuter\u00eda Artesanal (Cecinas Marcosi SpA)",
   "workspaces": [
     "app",
     "functions"
@@ -14,9 +14,10 @@
     "seed": "tsx scripts/seed.ts",
     "test:rules": "vitest run tests/rules",
     "deploy": "npm run build && firebase deploy --only hosting --project comandas-charcuteria",
-    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes --project comandas-charcuteria",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,storage --project comandas-charcuteria",
     "appcheck:setup": "node scripts/appcheck-setup.mjs",
-    "test:rules:emu": "PATH=\"/opt/homebrew/opt/openjdk@21/bin:$PATH\" firebase emulators:exec --only firestore --project comandas-rules-test \"npm run test:rules\""
+    "test:rules:emu": "PATH=\"/opt/homebrew/opt/openjdk@21/bin:$PATH\" firebase emulators:exec --only firestore --project comandas-rules-test \"npm run test:rules\"",
+    "test:unit": "vitest run tests/unit"
   },
   "dependencies": {
     "firebase-admin": "^12.7.0"

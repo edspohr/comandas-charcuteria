@@ -2,6 +2,7 @@ import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { initializeFirestore, connectFirestoreEmulator, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from 'firebase/app-check';
 
 const useEmulators = import.meta.env.VITE_USE_EMULATORS === 'true';
@@ -11,6 +12,9 @@ const config: FirebaseOptions = {
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? 'localhost',
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'comandas-charcuteria-demo',
   appId: import.meta.env.VITE_FIREBASE_APP_ID ?? 'demo-app-id',
+  // Proyectos creados desde fines de 2024 usan <proyecto>.firebasestorage.app;
+  // los más antiguos, <proyecto>.appspot.com (se fija con la variable).
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? `${import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'comandas-charcuteria-demo'}.firebasestorage.app`,
 };
 
 export const app = initializeApp(config);
@@ -51,10 +55,13 @@ export const db = initializeFirestore(app, {
   ...(typeof indexedDB !== 'undefined' && !useEmulators ? { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) } : {}),
 });
 export const functions = getFunctions(app, 'us-central1');
+// Documentos de compra (ADR-0017).
+export const storage = getStorage(app);
 
 if (useEmulators && typeof window !== 'undefined' && !(globalThis as any).__emulatorsWired) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
   connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+  connectStorageEmulator(storage, '127.0.0.1', 9199);
   (globalThis as any).__emulatorsWired = true;
 }

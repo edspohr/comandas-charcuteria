@@ -29,6 +29,7 @@ export type Capability =
   // Stock / Bsale
   | 'stock.sync'            // pedir una sincronización con Bsale
   | 'production.receive'    // registrar producción terminada → recepción Bsale
+  | 'purchase.receive'      // recibir compras e insumos (ADR-0017; prototipo: solo superAdmin)
   | 'catalog.map'           // cruzar variantes Bsale ↔ catálogo de la app
   | 'bsale.explore'         // ventana de solo lectura a los datos de Bsale
   | 'bsale.configure'       // sucursales, lista de precios, escrituras on/off
@@ -58,6 +59,7 @@ const ROLE_CAPS: Record<Role, Capability[]> = {
     'order.dispatch', 'order.deliver', 'transfer.receive', 'client.quickCreate', 'client.edit', 'stock.sync',
     'production.receive', 'catalog.map', 'bsale.explore', 'bsale.configure', 'panel.view', 'users.manage',
     'settings.edit', 'order.invoiceLate', 'order.approve', 'opportunity.manageOwn', 'opportunity.manageAll', 'opportunity.viewAll',
+    'purchase.receive',
   ],
   // Auditor: ve todo, no escribe nada.
   consultor: ['bsale.explore', 'panel.view', 'opportunity.viewAll'],
@@ -109,7 +111,7 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
 // lectura; las pantallas esconden sus acciones con `can()`.
 export type RouteKey =
   | 'tablero' | 'nuevoPedido' | 'pedidoIA' | 'detallePedido' | 'armado' | 'clientes' | 'fichaCliente' | 'produccion'
-  | 'panel' | 'catalogo' | 'usuarios' | 'bsaleConsola' | 'bsaleExplorer' | 'pendienteBsale' | 'oportunidades' | 'ayuda';
+  | 'panel' | 'catalogo' | 'usuarios' | 'bsaleConsola' | 'bsaleExplorer' | 'pendienteBsale' | 'oportunidades' | 'compras' | 'ayuda';
 
 const everyone = () => true;
 export const ROUTE_ACCESS: Record<RouteKey, (role: Role) => boolean> = {
@@ -129,6 +131,7 @@ export const ROUTE_ACCESS: Record<RouteKey, (role: Role) => boolean> = {
   bsaleExplorer: (r) => can(r, 'bsale.explore'),
   pendienteBsale: (r) => can(r, 'order.link') || isReadOnly(r),
   oportunidades: (r) => canAny(r, ['opportunity.manageOwn', 'opportunity.viewAll']),
+  compras: (r) => can(r, 'purchase.receive'),
 };
 
 export const ROLE_HOME: Record<Role, string> = {

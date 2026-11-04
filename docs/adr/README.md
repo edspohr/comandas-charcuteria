@@ -20,3 +20,4 @@ Formato corto: contexto, decisión y consecuencias. Una decisión nueva que reem
 | [0014](0014-bitacora-produccion.md) | Bitácora de producción en Comandas, independiente de las escrituras a Bsale | Aceptada | 24-10-2026 |
 | [0015](0015-salud-de-cliente.md) | Reglas de salud de cliente (activo, en riesgo, inactivo/perdido) | Aceptada, con revisión pendiente | 19-10-2026 |
 | [0016](0016-oportunidades-comerciales.md) | Oportunidades comerciales dentro de Comandas; se ganan al facturar | Aceptada | 03-11-2026 |
+| [0017](0017-compras-e-insumos.md) | Compras e insumos: recepción con el celular escaneando timbre y etiquetas GS1; stock de insumos en Comandas | Aceptada (prototipo) | 03-11-2026 |

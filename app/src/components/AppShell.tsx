@@ -28,6 +28,7 @@ const NAV: NavItem[] = [
   { to: '/oportunidades', label: 'Oportunidades', route: 'oportunidades', group: 'clientes', icon: 'sparkle' },
   { to: '/clientes', label: 'Clientes', route: 'clientes', group: 'clientes', icon: 'users' },
   { to: '/produccion', label: 'Producción', route: 'produccion', group: 'produccion', icon: 'factory' },
+  { to: '/compras', label: 'Compras e insumos', short: 'Compras', route: 'compras', group: 'produccion', icon: 'scan' },
   { to: '/admin/panel', label: 'Panel de gestión', short: 'Panel', route: 'panel', group: 'gestion', icon: 'chart' },
   { to: '/bsale', label: 'Ventana a Bsale', short: 'Bsale', route: 'bsaleExplorer', group: 'gestion', icon: 'window' },
   { to: '/admin/catalogo', label: 'Catálogo y stock', short: 'Catálogo', route: 'catalogo', group: 'gestion', icon: 'box' },

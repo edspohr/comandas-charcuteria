@@ -94,6 +94,11 @@ const GUIDES: Record<Role, Guide> = {
       '«Equipo»: abiertas, vencidas, postergadas, ganadas, perdidas, conversión y muestras por ejecutivo (90 días). Toque a alguien para ver sus abiertas.',
       'En cualquier oportunidad puede cambiar el ejecutivo y hacer lo mismo que él: registrar, postergar, dar por perdida o crear muestras y pedidos.',
     ]],
+    ['Compras e insumos (piloto)', [
+      '«Recibir»: 1) «Con factura o guía»: foto del documento o «Desde archivo» (foto de la galería o PDF), que queda guardado y la app lee el timbre y las líneas; o «Sin documento», con el proveedor opcional; 2) «Escanear cajas»: cada etiqueta suma peso, lote y vencimiento, y la primera vez un código pregunta qué insumo es; 3) confirmar con su PIN. Cuadrar las líneas del documento con los insumos es opcional.',
+      '«Compras»: el historial con su documento (toque la miniatura para abrirlo) y «+ Agregar foto o PDF», también para las compras sin documento. «Stock de insumos»: los lotes por insumo con su vencimiento y «+ Insumo nuevo».',
+      '«Laboratorio»: escanee etiquetas o elija fotos y PDF para ver qué lee la app. No crea compras ni stock.',
+    ]],
     ['Personas', ['«Usuarios» → «+ Agregar persona» o «Invitar con su historial» (trae los pedidos y la cartera de WhatsApp). Cada persona crea su PIN al entrar. Aquí se desactiva a alguien o se borra su PIN.']],
     ['Gestión', ['«Panel de gestión»: ventas de Bsale, margen, clientes, vendedores, stock y muestras (incluye kg de muestra por cliente nuevo). «Catálogo»: qué productos se ofrecen en pedidos.']],
     ['Facturar después de entregar', ['Desde «Facturar» puede «Despachar sin factura»; al entregarse aparece «Facturar» en Cerrado.']],

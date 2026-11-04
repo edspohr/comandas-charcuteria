@@ -46,7 +46,7 @@ Según el plan del 08-10, reajustado por el atraso del token de Bsale (llegó el
 | hasta 19-10 | Bsale real + usuarios | Hecho (lectura, cruce, Panel) |
 | 24-10 → 31-10 | Comandas en marcha blanca, todos los perfiles en paralelo a WhatsApp | En curso (1.0 desde el 26-10) |
 | 1-11 → 15-11 | Comandas completa + capacitación + 2.ª visita a la planta | Pendiente |
-| 16-11 → 30-11 | Panel con cifras reales + compras con foto (piloto) | Pendiente |
+| 16-11 → 30-11 | Panel con cifras reales + compras e insumos (piloto). Prototipo listo el 03-11 ([ADR-0017](adr/0017-compras-e-insumos.md)), solo superAdmin: depurar con etiquetas reales en la fábrica (Laboratorio) y abrirlo a la fábrica | En curso |
 | dic → ene | Kilos por proceso, stock de materia prima, rendimientos y mermas (alcance original: compras/insumos + procesos 80 % de los kilos) | Próxima etapa |
 
 ## 3. Fuera de alcance (no cotizado)

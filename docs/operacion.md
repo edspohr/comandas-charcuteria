@@ -28,6 +28,7 @@ Cómo desplegar, probar y operar Comandas. Actualizado al 03-11-2026.
    npm run deploy                                                           # build + hosting
    ```
    Las reglas van **antes** que el hosting cuando la app nueva escribe en una colección nueva.
+   Las reglas de Storage (`storage.rules`, documentos de compra) van con `firebase deploy --only storage --project comandas-charcuteria`, o todas juntas con `npm run deploy:rules`. La primera vez hay que activar Storage en la consola de Firebase (Storage → Comenzar). Si el bucket del proyecto no es `<proyecto>.firebasestorage.app`, fijarlo con `VITE_FIREBASE_STORAGE_BUCKET` en `app/.env.production`.
 3. Verificar en el teléfono. Hosting sirve `index.html`, `sw.js` y el manifest con `no-cache`; aun así, un dispositivo con la versión anterior abierta ve «Nueva versión disponible — Recargar». Si algo no aparece, cerrar la pestaña o la app y volver a abrir.
 4. Actualizar la landing (`Login.tsx`) y la Guía de uso (`Ayuda.tsx`) si cambió algo visible.
 

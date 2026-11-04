@@ -22,6 +22,9 @@ service cloud.firestore {
     function canQuickClient() { return roleIn(['vendedor', 'tienda', 'admin', 'superAdmin']); }
     function canSell()        { return roleIn(['vendedor', 'tienda']); }
     function canViewAllOpps() { return roleIn(['admin', 'superAdmin', 'consultor']); }
+    // Compras e insumos (ADR-0017): prototipo, solo super administración.
+    // Para abrirlo a la fábrica, agregar los perfiles aquí y en permissions.ts.
+    function canReceivePurchases() { return roleIn(['superAdmin']); }
     // Lectura: cualquier perfil (el consultor ve todo, sin escribir nada).
     function canRead()        { return hasRole(); }
 
@@ -199,6 +202,39 @@ service cloud.firestore {
       allow update: if isSuperAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'opportunityId', 'loadedBy', 'loadedAt']);
       allow create, delete: if false;
+    }
+
+    // Compras e insumos (ADR-0017). Compras y lotes solo se crean, nunca se
+    // editan ni se borran: el stock de insumos es la suma de los lotes.
+    match /suppliers/{id} {
+      allow read: if canReceivePurchases();
+      allow create, update: if canReceivePurchases();
+      allow delete: if false;
+    }
+    match /supplies/{id} {
+      allow read: if canReceivePurchases();
+      allow create: if canReceivePurchases() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if canReceivePurchases() && unchanged('createdBy');
+      allow delete: if false;
+    }
+    match /purchases/{id} {
+      allow read: if canReceivePurchases();
+      allow create: if canReceivePurchases() && request.resource.data.receivedBy == request.auth.uid;
+      // Solo se pueden agregar documentos (fotos o PDF) a una compra ya registrada.
+      allow update: if canReceivePurchases()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['documents'])
+        && request.resource.data.documents.size() > resource.data.get('documents', []).size();
+      allow delete: if false;
+    }
+    match /supplyLots/{id} {
+      allow read: if canReceivePurchases();
+      allow create: if canReceivePurchases() && request.resource.data.receivedBy == request.auth.uid && request.resource.data.kg >= 0;
+      allow update, delete: if false;
+    }
+    match /scanTests/{id} {
+      allow read: if canReceivePurchases();
+      allow create: if canReceivePurchases() && request.resource.data.by == request.auth.uid;
+      allow update, delete: if false;
     }
 
     match /orders/{id} {

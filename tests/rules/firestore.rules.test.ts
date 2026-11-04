@@ -243,3 +243,27 @@ describe('oportunidades', () => {
     await assertFails(getDoc(doc(as('u-rafael', 'vendedor'), 'opportunityCandidates', 'inf-1')));
   });
 });
+
+describe('compras e insumos (prototipo, solo superAdmin)', () => {
+  const purchase = (by: string) => ({ id: '761234567-33-10', supplierRut: '76.123.456-7', supplierName: 'Proveedor', docKind: 'factura', folio: '10', lines: [], boxes: [], summary: [], read: { timbre: true, foto: false }, receivedBy: by, receivedByName: 'X', receivedAt: 1 });
+  it('superAdmin registra la compra; nadie la edita después', async () => {
+    const ciro = as('u-ciro', 'superAdmin');
+    await assertSucceeds(setDoc(doc(ciro, 'purchases', '761234567-33-10'), purchase('u-ciro')));
+    await assertFails(updateDoc(doc(ciro, 'purchases', '761234567-33-10'), { folio: '11' }));
+    // Solo se agregan documentos (foto o PDF) a una compra registrada.
+    const d1 = { path: 'purchases/761234567-33-10/1-doc.jpg', name: 'doc.jpg', contentType: 'image/jpeg', size: 10, uploadedAt: 2, uploadedBy: 'u-ciro' };
+    await assertSucceeds(updateDoc(doc(ciro, 'purchases', '761234567-33-10'), { documents: [d1] }));
+    await assertFails(updateDoc(doc(ciro, 'purchases', '761234567-33-10'), { documents: [] }));
+    await assertFails(updateDoc(doc(ciro, 'purchases', '761234567-33-10'), { documents: [d1, { ...d1, path: 'x' }], folio: '12' }));
+    await assertFails(setDoc(doc(ciro, 'purchases', 'otra'), purchase('u-otro')));
+    await assertSucceeds(setDoc(doc(ciro, 'supplyLots', 'l-1'), { supplyId: 's-1', kg: 12.5, receivedBy: 'u-ciro', receivedAt: 1 }));
+    await assertFails(updateDoc(doc(ciro, 'supplyLots', 'l-1'), { kg: 99 }));
+  });
+  it('los demás perfiles no ven ni registran compras', async () => {
+    await seed('purchases/p-1', purchase('u-ciro'));
+    for (const [uid, role] of [['u-yury', 'produccion'], ['u-miguel', 'admin'], ['u-ed', 'consultor'], ['u-edu', 'despacho']] as const) {
+      await assertFails(getDoc(doc(as(uid, role), 'purchases', 'p-1')));
+      await assertFails(setDoc(doc(as(uid, role), 'supplies', `s-${uid}`), { name: 'x', createdBy: uid }));
+    }
+  });
+});

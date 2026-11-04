@@ -7,11 +7,20 @@ import Logo, { LogoLockup } from '@/components/ui/Logo';
 import Button from '@/components/ui/Button';
 import type { Role } from '@/domain/types';
 
-// Login como landing: quien entra todos los días tiene el acceso arriba (en
-// móvil va justo después del titular), y quien la ve por primera vez —dueños,
-// equipo nuevo— entiende qué hace la app y cómo viaja un pedido.
+// La landing es la página de ingreso: una sola página con el acceso arriba
+// (en el teléfono, justo después del titular) y, más abajo, todo lo que hace
+// Comandas para quien la ve por primera vez —dueños, equipo nuevo—.
+// Mantenerla al día cada vez que sale una funcionalidad visible.
 // Tarjetas por persona solo en desarrollo (emuladores con la seed).
 const DEMO_LOGIN = import.meta.env.VITE_DEMO_LOGIN === 'true';
+
+const NAV: Array<[string, string]> = [
+  ['#como-funciona', 'Cómo funciona'],
+  ['#funcionalidades', 'Funcionalidades'],
+  ['#bsale', 'Bsale'],
+  ['#perfiles', 'Perfiles'],
+  ['#primeros-pasos', 'Primeros pasos'],
+];
 
 export default function Login() {
   return (
@@ -22,6 +31,7 @@ export default function Login() {
       <Features />
       <BsaleSection />
       <Profiles />
+      <FirstSteps />
       <Footer />
     </main>
   );
@@ -29,16 +39,19 @@ export default function Login() {
 
 function TopBar() {
   return (
-    <div className="bg-charcoal-900 text-cream-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+    <div className="sticky top-0 z-30 bg-charcoal-900/95 backdrop-blur text-cream-50 border-b border-cream-100/10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
         {/* Solo la palabra: la marca completa va en el hero, dos logos competían. */}
-        <span className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.32em] text-brass-300">
+        <a href="#top" className="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.32em] text-brass-300">
           <span aria-hidden className="h-4 w-[3px] rounded-full bg-brass-500" />
           Comandas
-        </span>
+        </a>
+        <nav className="hidden md:flex items-center gap-5 text-[11px] uppercase tracking-display text-cream-100/70">
+          {NAV.map(([href, label]) => <a key={href} href={href} className="hover:text-cream-50">{label}</a>)}
+        </nav>
         <div className="flex items-center gap-2">
           <InstallButton />
-          <a href="#ingresar" className="lg:hidden text-[11px] uppercase tracking-display border border-cream-100/30 rounded-md px-3 py-1.5 hover:border-cream-100/60">Ingresar</a>
+          <a href="#ingresar" className="text-[11px] uppercase tracking-display bg-brass-500 text-charcoal-900 font-semibold rounded-md px-3 py-1.5 hover:bg-brass-300">Ingresar</a>
         </div>
       </div>
     </div>
@@ -47,22 +60,23 @@ function TopBar() {
 
 function Hero() {
   return (
-    <section className="bg-charcoal-900 text-cream-50">
+    <section id="top" className="bg-charcoal-900 text-cream-50 scroll-mt-14">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-14 lg:pt-14 lg:pb-20 grid gap-6 lg:gap-10 lg:grid-cols-[1.15fr_0.85fr] items-start">
         <div>
           <div className="mb-6 text-[15px] sm:text-lg"><LogoLockup size={52} /></div>
           <p className="text-[11px] uppercase tracking-display text-brass-300 font-semibold">Comandas · Barrio Franklin</p>
           <h1 className="mt-3 text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight tracking-[0.01em]">
-            Del pedido a la entrega,<br className="hidden sm:block" /> sin perder nada en el camino.
+            De la compra de la carne al pedido entregado.
           </h1>
           <p className="mt-4 text-sm sm:text-lg text-cream-100/80 max-w-xl">
-            Comandas reemplaza el grupo de WhatsApp y trabaja junto a Bsale: cada pedido con su formato y el stock real
-            a la vista, un responsable en cada etapa, la factura emitida desde la misma app y las cifras del negocio para los dueños.
+            Comandas es la app de trabajo de La Charcutería Artesanal. Reemplaza el grupo de WhatsApp y trabaja junto a Bsale:
+            pedidos con stock real, un responsable en cada etapa, la factura del POS ligada a cada pedido, la gestión comercial
+            del equipo de ventas, las compras de insumos y las cifras del negocio para los dueños.
           </p>
           <Stats className="hidden lg:grid" />
         </div>
         {/* En móvil el acceso va antes de las cifras: el equipo entra sin scroll. */}
-        <div id="ingresar" className="scroll-mt-4">
+        <div id="ingresar" className="scroll-mt-20">
           <AccessCard />
           {DEMO_LOGIN && <DemoTiles />}
         </div>
@@ -76,9 +90,9 @@ function Stats({ className }: { className: string }) {
   return (
     <ul className={`mt-8 grid-cols-2 gap-3 max-w-xl ${className}`}>
       <Stat value="4 pasos" label="para tomar un pedido desde el teléfono" />
-      <Stat value="Sin retipeo" label="producción, traslados y muestras se escriben en Bsale" />
+      <Stat value="Sin retipeo" label="producción, traslados, muestras y clientes se escriben en Bsale" />
       <Stat value="2 años" label="de ventas de Bsale en el panel de gestión" />
-      <Stat value="8 perfiles" label="cada persona ve solo lo suyo" />
+      <Stat value="8 perfiles" label="cada persona ve solo lo suyo, con su PIN" />
     </ul>
   );
 }
@@ -243,17 +257,18 @@ function LoginCard({ onPin }: { onPin: () => void }) {
 // ---------- Cómo viaja un pedido ----------
 
 const STEPS: Array<{ who: string; title: string; text: string }> = [
-  { who: 'Vendedor', title: 'Toma el pedido', text: 'Elige cliente, productos, fecha y horario en que el cliente recibe, viendo el stock disponible. Si falta, la app avisa a producción.' },
-  { who: 'Producción', title: 'Ve lo que falta', text: 'Lo que esperan los pedidos para hoy, mañana y los próximos días. Carga lo producido con una foto de la planilla o a mano, con su PIN, y queda registrado lo cargado en el día.' },
-  { who: 'Despacho', title: 'Arma con peso real', text: 'Ve los pedidos ordenados por hora de entrega, registra lo que realmente se empacó y lo deja listo para facturar.' },
-  { who: 'Administración', title: 'Factura en el POS de Bsale', text: 'Emite con los pesos empacados y Comandas sugiere el documento que corresponde a cada pedido: se confirma con un toque y el PIN. La reserva se libera sola.' },
-  { who: 'Reparto', title: 'Entrega', text: 'Marca la salida y la entrega con una nota. El vendedor ve el estado sin preguntar.' },
+  { who: 'Vendedor', title: 'Toma el pedido', text: 'Cliente, productos, fecha y horario en que el cliente recibe, viendo el stock disponible. Lo confirma con su PIN. Si falta producto, la app avisa a producción.' },
+  { who: 'Producción', title: 'Produce lo que falta', text: 'Ve lo que esperan los pedidos de hoy y los próximos días. Carga lo producido con una foto de la planilla o a mano, y entra a Bsale como recepción.' },
+  { who: 'Despacho', title: 'Arma con peso real', text: 'Toma los pedidos por hora de entrega, registra lo que realmente se empacó y rotula las muestras.' },
+  { who: 'Administración', title: 'Factura en el POS', text: 'Emite en Bsale con los pesos del armado. Comandas sugiere el documento de cada pedido y la oficina lo confirma con su PIN.' },
+  { who: 'Reparto', title: 'Entrega', text: 'Marca la salida y la entrega con quién recibió. El vendedor ve el estado sin preguntar.' },
 ];
 
 function Flow() {
   return (
-    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14">
-      <SectionTitle eyebrow="Cómo viaja un pedido" title="Un responsable en cada etapa" />
+    <section id="como-funciona" className="max-w-6xl mx-auto px-4 sm:px-6 py-14 scroll-mt-14">
+      <SectionTitle eyebrow="Cómo funciona" title="Un responsable en cada etapa" />
+      <p className="mt-3 text-sm text-charcoal-500 text-center max-w-2xl mx-auto">Así viaja un pedido. Cada paso queda a nombre de quien lo hizo y el tablero muestra en qué etapa está cada pedido, con montos, kilos y atrasos.</p>
       <ol className="mt-8 grid gap-3 md:grid-cols-5">
         {STEPS.map((s, i) => (
           <li key={s.who} className="card p-4 relative">
@@ -270,34 +285,81 @@ function Flow() {
   );
 }
 
-// ---------- Funcionalidades ----------
+// ---------- Funcionalidades, por área ----------
 
-const FEATURES: Array<{ icon: ReactNode; title: string; text: string }> = [
-  { icon: <IconPhone />, title: 'Pedido en 4 pasos', text: 'Cliente, productos, entrega y confirmar. Con una mano, desde el teléfono, "Repetir último pedido" para los habituales, muestras sin cargo y condiciones especiales que Ciro aprueba antes de confirmar.' },
-  { icon: <IconSpark />, title: 'Pedido IA', text: 'Pegue el mensaje de WhatsApp del cliente y la app lo convierte en un pedido con productos, cantidades, muestras ("incluir muestra de…") y datos del cliente.' },
-  { icon: <IconBox />, title: 'Stock real de Bsale', text: 'Semáforo por producto con lo que reporta Bsale menos lo ya reservado. Nadie vende lo que no hay.' },
-  { icon: <IconBoard />, title: 'Tablero con visión y detalle', text: 'Resumen por etapa con montos y kilos, vista en tarjetas, compacta o lista, y el detalle del pedido a un clic. Rojo si se atrasa.' },
-  { icon: <IconScale />, title: 'Sin retipeo', text: 'La producción, los traslados, las muestras y los clientes nuevos se escriben solos en Bsale. «Pendiente en Bsale» reúne lo que la oficina aún debe cerrar: pedidos sin documento y envíos con error.' },
-  { icon: <IconStore />, title: 'Reposición de tienda', text: 'La tienda pide por el mismo canal, el panel sugiere qué llevar según lo que vende y el traslado se registra en Bsale.' },
-  { icon: <IconUsers />, title: 'Oportunidades y cartera', text: 'Ciro asigna visitas y cada ejecutivo gestiona sus oportunidades: agenda del día, muestras y pedidos ligados, postergar con fecha o perder con motivo. Se gana sola al facturar. Más el ritmo de compra de cada cliente y quién está en riesgo.' },
-  { icon: <IconChart />, title: 'Panel de gestión', text: 'Dos años de ventas de Bsale: margen, productos ABC, clientes, vendedores, estacionalidad, stock, muestras que terminan en venta y un explorador con exportación a Excel.' },
+interface Feature { icon: ReactNode; title: string; text: string; tag?: string }
+const AREAS: Array<{ title: string; intro: string; features: Feature[] }> = [
+  {
+    title: 'Ventas y clientes',
+    intro: 'Para vendedores, la tienda y Ciro.',
+    features: [
+      { icon: <IconPhone />, title: 'Pedido en 4 pasos', text: 'Cliente, productos, entrega y confirmar, con una mano desde el teléfono. Horario de recepción obligatorio, «Repetir último pedido» para los habituales y condiciones especiales (precio, plazo, despacho) que Ciro aprueba antes de armar.' },
+      { icon: <IconSpark />, title: 'Pedido IA', text: 'Pegue el mensaje de WhatsApp del cliente y la app lo convierte en pedido: productos, formatos, cantidades, muestras y datos del cliente. Usted revisa y confirma.' },
+      { icon: <IconGift />, title: 'Muestras con seguimiento', text: 'Se agregan al pedido o salen solas, como consumo interno en Bsale. A los 7 días la app pide la opinión del cliente y mide cuántas terminan en venta a 60 días.' },
+      { icon: <IconTarget />, title: 'Oportunidades', text: 'Ciro asigna visitas o las carga desde el informe de venta cruzada. Cada ejecutivo tiene su agenda del día: registra visitas, crea muestras y pedidos ligados, posterga con fecha o pierde con motivo. Se gana sola cuando el pedido se factura.' },
+      { icon: <IconUsers />, title: 'Clientes y cartera', text: 'Ficha con historial, ritmo de compra y salud del cliente (activo, en riesgo, perdido). Un cliente nuevo se crea desde el pedido y se registra en Bsale con sus datos tributarios.' },
+    ],
+  },
+  {
+    title: 'Operación en la fábrica',
+    intro: 'Para producción, despacho, reparto y la tienda.',
+    features: [
+      { icon: <IconBoard />, title: 'Tablero de pedidos', text: 'Resumen por etapa con montos y kilos, vista en tarjetas, compacta o lista, filtros y el detalle a un toque. En rojo lo que se atrasa.' },
+      { icon: <IconFactory />, title: 'Producción', text: 'Lo que falta producir según los pedidos, por día. La carga se hace con una foto de la planilla o a mano, entra a Bsale como recepción y reasigna el stock a los pedidos que esperaban.' },
+      { icon: <IconScale />, title: 'Armado con peso real', text: 'Despacho registra lo que realmente se empacó: el pedido se factura con esos pesos y la diferencia queda medida.' },
+      { icon: <IconStore />, title: 'Reposición de tienda', text: 'La tienda pide por el mismo canal, despacho registra el traslado en Bsale y la tienda confirma lo que llegó.' },
+      { icon: <IconScan />, title: 'Compras e insumos', tag: 'Piloto', text: 'Al recibir una compra se escanean las etiquetas de cada caja: peso, lote y vencimiento. Con factura o guía, la foto o el PDF queda guardado, la app lee el timbre y las líneas y, si quiere, cuadra los kilos y el costo por kilo; también se puede registrar sin documento. Arma el stock de insumos por lote.' },
+    ],
+  },
+  {
+    title: 'Oficina y Bsale',
+    intro: 'Para administración: lo que antes se digitaba dos veces.',
+    features: [
+      { icon: <IconSync />, title: 'Pendiente en Bsale', text: 'La lista de trabajo de la oficina: pedidos sin documento con el documento del POS sugerido, envíos a Bsale con error, producción y muestras por cargar y clientes por revisar. Se cierra el día en cero.' },
+      { icon: <IconReceipt />, title: 'Factura ligada al pedido', text: 'Comandas encuentra el documento emitido en el POS (por referencia, RUT y total) y se confirma con el PIN. Antes de vincular, muestra cómo lo facturaría Comandas para comparar.' },
+      { icon: <IconBox />, title: 'Stock y catálogo', text: 'Semáforo por producto con el stock de Bsale menos lo reservado, sincronizado cada 10 minutos. El cruce del catálogo con las variantes de Bsale se mantiene desde la app.' },
+    ],
+  },
+  {
+    title: 'Gestión y control',
+    intro: 'Para los dueños y quien audita.',
+    features: [
+      { icon: <IconChart />, title: 'Panel de gestión', text: 'Dos años de ventas de Bsale: margen, productos ABC, clientes en riesgo, vendedores, estacionalidad, muestras que terminan en venta y un explorador con exportación a Excel.' },
+      { icon: <IconWindow />, title: 'Ventana a Bsale', text: 'Documentos, stock, clientes y productos de Bsale en modo solo lectura, sin entrar a Bsale.' },
+      { icon: <IconShield />, title: 'PIN y trazabilidad', text: 'Cada acción importante se confirma con el PIN personal y queda a nombre de quien la hizo. Cada escritura en Bsale queda en una bitácora. La app se bloquea tras 30 minutos sin uso.' },
+      { icon: <IconKey />, title: 'Usuarios y perfiles', text: 'Super administración invita a cada persona con su perfil; quien vendía por WhatsApp entra con su historial y su cartera. El consultor ve todo sin poder modificar nada.' },
+    ],
+  },
 ];
 
 function Features() {
   return (
-    <section className="bg-cream-100/60 border-y border-charcoal-100">
+    <section id="funcionalidades" className="bg-cream-100/60 border-y border-charcoal-100 scroll-mt-14">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14">
         <SectionTitle eyebrow="Funcionalidades" title="Hecho para cómo trabaja la fábrica" />
-        <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {FEATURES.map((f) => (
-            <article key={f.title} className="card p-5">
-              <div className="w-10 h-10 rounded-md bg-charcoal-900 text-brass-300 flex items-center justify-center mb-3">{f.icon}</div>
-              <h3 className="font-semibold text-charcoal-900 text-sm">{f.title}</h3>
-              <p className="text-xs text-charcoal-500 mt-1.5 leading-relaxed">{f.text}</p>
-            </article>
+        <div className="mt-10 space-y-10">
+          {AREAS.map((a) => (
+            <div key={a.title}>
+              <div className="flex items-baseline gap-3 flex-wrap mb-3">
+                <h3 className="text-sm font-semibold uppercase tracking-display text-charcoal-900">{a.title}</h3>
+                <p className="text-xs text-charcoal-500">{a.intro}</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {a.features.map((f) => (
+                  <article key={f.title} className="card p-5">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-md bg-charcoal-900 text-brass-300 flex items-center justify-center shrink-0">{f.icon}</div>
+                      <h4 className="font-semibold text-charcoal-900 text-sm">{f.title}</h4>
+                      {f.tag && <span className="ml-auto text-[10px] uppercase tracking-display rounded border border-brass-300 bg-brass-50 text-brass-700 px-1.5 py-0.5">{f.tag}</span>}
+                    </div>
+                    <p className="text-xs text-charcoal-500 leading-relaxed">{f.text}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
-        <p className="mt-6 text-xs text-charcoal-500 text-center">Se instala en el teléfono como una app y guarda el borrador del pedido aunque se corte la señal.</p>
+        <p className="mt-8 text-xs text-charcoal-500 text-center">Se instala en el teléfono como una app y guarda los borradores aunque se corte la señal.</p>
       </div>
     </section>
   );
@@ -306,13 +368,13 @@ function Features() {
 // ---------- Comandas + Bsale ----------
 
 const OWNERSHIP: Array<[string, string[]]> = [
-  ['Bsale es la fuente de', ['Catálogo, precios y costos', 'Clientes y sus datos tributarios', 'Stock de fábrica y tienda', 'Facturas, boletas y notas de crédito']],
-  ['Comandas es la fuente de', ['Pedidos, estados y responsables', 'Reservas de stock y pesos empacados', 'Cartera de cada vendedor', 'Demanda pendiente para producción']],
+  ['Bsale es la fuente de', ['Catálogo, precios y costos', 'Clientes y sus datos tributarios', 'Stock de venta en fábrica y tienda', 'Facturas, boletas y notas de crédito']],
+  ['Comandas es la fuente de', ['Pedidos, estados, responsables y pesos empacados', 'Reservas de stock y demanda para producción', 'Oportunidades, muestras y cartera de cada vendedor', 'Compras de insumos, sus documentos y lotes']],
 ];
 
 function BsaleSection() {
   return (
-    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14">
+    <section id="bsale" className="max-w-6xl mx-auto px-4 sm:px-6 py-14 scroll-mt-14">
       <SectionTitle eyebrow="Integración con Bsale" title="Una sola verdad, sin digitar dos veces" />
       <div className="mt-8 grid gap-3 md:grid-cols-2">
         {OWNERSHIP.map(([title, items]) => (
@@ -325,7 +387,7 @@ function BsaleSection() {
         ))}
       </div>
       <p className="mt-5 text-xs text-charcoal-500 text-center max-w-2xl mx-auto">
-        Se sincroniza cada 10 minutos y con avisos de Bsale. Comandas solo escribe en Bsale lo que nace en la operación (facturas, producción, traslados, muestras y clientes nuevos), primero en simulacro y siempre con registro. Cada escritura en Bsale y cada acción importante se confirma con el PIN personal de quien la hace.
+        Se sincroniza cada 10 minutos y con avisos de Bsale. Comandas escribe en Bsale solo lo que nace en la operación: producción, traslados a la tienda, muestras y clientes nuevos. Cada escritura queda registrada y se confirma con el PIN de quien la hace. Las compras de insumos se quedan en Comandas: en Bsale vive solo el stock de venta.
       </p>
     </section>
   );
@@ -333,15 +395,44 @@ function BsaleSection() {
 
 function Profiles() {
   return (
-    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14">
-      <SectionTitle eyebrow="Perfiles" title="Cada persona ve lo que necesita" />
-      <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {ROLES.map((r) => (
-          <div key={r} className="rounded-lg border border-charcoal-100 bg-white p-4">
-            <p className="text-[10px] uppercase tracking-display font-semibold text-brass-600">{ROLE_LABEL[r]}</p>
-            <p className="text-xs text-charcoal-500 mt-1 leading-relaxed">{ROLE_DESCRIPTION[r]}</p>
-          </div>
+    <section id="perfiles" className="bg-cream-100/60 border-y border-charcoal-100 scroll-mt-14">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14">
+        <SectionTitle eyebrow="Perfiles" title="Cada persona ve lo que necesita" />
+        <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {ROLES.map((r) => (
+            <div key={r} className="rounded-lg border border-charcoal-100 bg-white p-4">
+              <p className="text-[10px] uppercase tracking-display font-semibold text-brass-600">{ROLE_LABEL[r]}</p>
+              <p className="text-xs text-charcoal-500 mt-1 leading-relaxed">{ROLE_DESCRIPTION[r]}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const FIRST_STEPS: Array<[string, string]> = [
+  ['Instale la app', 'Abra esta página en el teléfono y toque «Instalar app». En iPhone: Safari → Compartir → «Agregar a inicio».'],
+  ['Entre por primera vez', 'Con «Continuar con Google» o con el correo para crear contraseña que le llegó. El acceso es por invitación: si no puede entrar, pídale a Ciro que lo agregue.'],
+  ['Cree su PIN', 'Cuatro dígitos, personales. Desde ahí entra con correo y PIN, y lo usa para confirmar las acciones importantes.'],
+  ['Siga la guía de su perfil', 'En su nombre → «Guía de uso» está lo que hace su perfil, paso a paso. Si olvida el PIN, Ciro lo borra y usted crea uno nuevo.'],
+];
+
+function FirstSteps() {
+  return (
+    <section id="primeros-pasos" className="max-w-6xl mx-auto px-4 sm:px-6 py-14 scroll-mt-14">
+      <SectionTitle eyebrow="Primeros pasos" title="Listo en cinco minutos" />
+      <ol className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {FIRST_STEPS.map(([title, text], i) => (
+          <li key={title} className="card p-4">
+            <span className="w-6 h-6 rounded-full bg-brass-500 text-charcoal-900 text-xs font-semibold flex items-center justify-center">{i + 1}</span>
+            <p className="font-semibold text-charcoal-900 text-sm mt-2">{title}</p>
+            <p className="text-xs text-charcoal-500 mt-1 leading-relaxed">{text}</p>
+          </li>
         ))}
+      </ol>
+      <div className="mt-8 text-center">
+        <a href="#ingresar" className="inline-flex items-center justify-center rounded-md bg-charcoal-700 text-cream-50 px-5 py-3 text-sm font-medium hover:bg-charcoal-900 shadow-soft">Ingresar a Comandas</a>
       </div>
     </section>
   );
@@ -411,6 +502,15 @@ function IconScale() { return <Svg><path d="M12 4v16M5 20h14M6 8h12M6 8l-3 6a3 3
 function IconStore() { return <Svg><path d="M4 9.5 5.5 4h13L20 9.5M4 9.5V20h16V9.5M4 9.5h16M10 20v-5h4v5" /></Svg>; }
 function IconUsers() { return <Svg><circle cx="9" cy="8" r="3.2" /><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 4.8a3.2 3.2 0 0 1 0 6.4M18 14.8c1.8.6 3 2.4 3 5.2" /></Svg>; }
 function IconChart() { return <Svg><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></Svg>; }
+function IconGift() { return <Svg><path d="M4 11h16v9H4zM3 7h18v4H3zM12 7v13M12 7c-1.5-3-5-3-5-1s3 1 5 1zM12 7c1.5-3 5-3 5-1s-3 1-5 1z" /></Svg>; }
+function IconTarget() { return <Svg><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.8" /></Svg>; }
+function IconFactory() { return <Svg><path d="M3 21V10l6 4V10l6 4V6h6v15zM7 21v-3m5 3v-3m5 3v-3" /></Svg>; }
+function IconScan() { return <Svg><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 8v8M10 8v8M13 8v8M17 8v8" /></Svg>; }
+function IconSync() { return <Svg><path d="M20 11a8 8 0 0 0-14.6-4.4L4 8M4 4v4h4M4 13a8 8 0 0 0 14.6 4.4L20 16M20 20v-4h-4" /></Svg>; }
+function IconReceipt() { return <Svg><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3" /></Svg>; }
+function IconWindow() { return <Svg><path d="M3 5h18v14H3zM3 9h18M7 7h.01M10 7h.01" /></Svg>; }
+function IconShield() { return <Svg><path d="M12 3 4.5 6v6c0 4.4 3.2 7.9 7.5 9 4.3-1.1 7.5-4.6 7.5-9V6z" /><path d="m9 12 2 2 4-4" /></Svg>; }
+function IconKey() { return <Svg><circle cx="8" cy="15" r="4" /><path d="m11 12 9-9M17 6l3 3M15 8l2 2" /></Svg>; }
 
 function GoogleMark() {
   return (

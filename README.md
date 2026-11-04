@@ -3,7 +3,7 @@
 Toma y seguimiento de pedidos para **Cecinas Marcosi SpA** (La Charcutería Artesanal, Barrio Franklin, Santiago).
 Reemplaza el grupo de WhatsApp sin formato por una app móvil (PWA) que muestra el stock real de Bsale, deja un responsable en cada etapa del pedido y le da a los dueños las cifras del negocio.
 
-**Estado (03-11-2026):** versión **1.0**. Arranca con todo el equipo el miércoles 04-11 (no partió el 26-10); checklist y guía en [docs/arranque-04-11.md](docs/arranque-04-11.md). Desde el 04-11 se encienden las escrituras hacia Bsale (producción, traslados, muestras y clientes, sin simulacro). La facturación sigue en el POS de Bsale: Comandas sugiere el documento y la oficina lo confirma en **Pendiente en Bsale**.
+**Estado (03-11-2026):** versión **1.0**. Arranca con todo el equipo el jueves 05-11 en la tarde (no partió el 26-10 ni el 04-11); checklist y guía en [docs/arranque-05-11.md](docs/arranque-05-11.md). Desde el 04-11 se encienden las escrituras hacia Bsale (producción, traslados, muestras y clientes, sin simulacro). La facturación sigue en el POS de Bsale: Comandas sugiere el documento y la oficina lo confirma en **Pendiente en Bsale**.
 
 ---
 
@@ -23,7 +23,7 @@ Reemplaza el grupo de WhatsApp sin formato por una app móvil (PWA) que muestra 
 | [docs/operacion.md](docs/operacion.md) | Runbook: deploy, staging, usuarios y PIN, interruptores de Bsale, scripts, alertas |
 | [docs/adr/](docs/adr/README.md) | Decisiones de arquitectura (ADR) y por qué se tomaron |
 | [docs/deuda-tecnica.md](docs/deuda-tecnica.md) | Deuda técnica conocida, priorizada |
-| [docs/arranque-04-11.md](docs/arranque-04-11.md) | Checklist del arranque con el equipo, guía de 15 minutos por perfil y cuentas por crear |
+| [docs/arranque-05-11.md](docs/arranque-05-11.md) | Checklist del arranque con el equipo, guía de 15 minutos por perfil y cuentas por crear |
 | [docs/backlog.md](docs/backlog.md) | Pendientes de la puesta en marcha, plan a noviembre y backlog fuera de alcance |
 | [docs/QA-guion-demo.md](docs/QA-guion-demo.md) | QA de la demo del 22-09 (histórico) |
 | En la app: Mi cuenta → **Guía de uso** | Guía de una página por perfil ([`app/src/routes/Ayuda.tsx`](app/src/routes/Ayuda.tsx)) |

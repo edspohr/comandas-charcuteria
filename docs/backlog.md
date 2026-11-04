@@ -1,7 +1,7 @@
 # Backlog
 
 Actualizado al 03-11-2026. Tres partes:
-1. lo que falta para que la 1.0 funcione con todos (no arrancó el 26-10; arranca el miércoles 04-11, ver [arranque-04-11.md](arranque-04-11.md));
+1. lo que falta para que la 1.0 funcione con todos (no arrancó el 26-10; arranca el jueves 05-11 en la tarde, ver [arranque-05-11.md](arranque-05-11.md));
 2. el plan del contrato hasta el 30-11;
 3. el backlog fuera de alcance, que no está cotizado.
 
@@ -11,7 +11,7 @@ La deuda técnica está en [deuda-tecnica.md](deuda-tecnica.md).
 
 | # | Pendiente | Quién | Estado |
 |---|---|---|---|
-| 1 | Correos y perfiles del equipo: Rafael, Gabriela, Ramiro, Juan, Tania, Lucy, Edu, Morena, Miguel y reparto. Ciro los crea en Usuarios (tabla en arranque-04-11.md §3) | Ciro | 04-11 |
+| 1 | Correos y perfiles del equipo: Rafael, Gabriela, Ramiro, Juan, Tania, Lucy, Edu, Morena, Miguel y reparto. Ciro los crea en Usuarios (tabla en arranque-05-11.md §3) | Ciro | 04-11 |
 | 2 | Ciro y Luis ingresan y crean su PIN (la invitación de Luis sigue sin usar) | Ciro, Luis | Pendiente |
 | 3 | Yury prueba Producción con datos reales (foto de la planilla + carga a mano) | Yury | En curso (24-10) |
 | 4 | Escrituras a Bsale desde el día 1, sin simulacro: producción, traslados, muestras y clientes. La facturación sigue en el POS + vincular con sugerencia | Edmundo | Decidido 03-11; se encienden el 04-11 |
@@ -24,7 +24,7 @@ La deuda técnica está en [deuda-tecnica.md](deuda-tecnica.md).
 | 11 | Elizabeth: reactivar su cuenta cuando corresponda (fue desactivada el 24-10) | Ciro | Por decidir |
 
 ### Encendido de escrituras a Bsale
-El plan original era encenderlas una a la vez y con simulacro. El 03-11 Edmundo decidió encender los pasos 1 a 3 juntos y en real desde el 04-11, revisando en Bsale la primera vez de cada una (checklist en arranque-04-11.md). Siguen pendientes los pasos 4 y 5:
+El plan original era encenderlas una a la vez y con simulacro. El 03-11 Edmundo decidió encender los pasos 1 a 3 juntos y en real desde el arranque (05-11), revisando en Bsale la primera vez de cada una (checklist en arranque-05-11.md). Siguen pendientes los pasos 4 y 5:
 
 1. **Recepción de producción.** Es la de mayor ahorro y la de menor riesgo.
 2. **Consumo de muestras y traslados a tienda.**

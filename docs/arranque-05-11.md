@@ -1,68 +1,96 @@
-# Arranque con el equipo — miércoles 04-11-2026
+# Puesta en marcha con el equipo — jueves 05-11-2026, en la tarde
 
-La 1.0 no arrancó el 26-10. El miércoles 04-11 es el primer día con el equipo completo.
+La 1.0 no arrancó el 26-10 ni el 04-11. Se acordó con Ciro partir el **jueves 05-11 en la tarde** con el equipo completo.
+Versión para ir marcando: `docs/checklist-puesta-en-marcha-05-11.docx`.
 
 Decisiones de Edmundo (03-11):
 - **Escrituras a Bsale encendidas, sin simulacro:** producción, traslados a tienda, muestras y clientes.
 - **Facturación en el POS de Bsale.** Comandas sugiere el documento de cada pedido y la oficina lo confirma con su PIN.
 - **Cuentas:** las crea Ciro en Usuarios.
+- **Compras e insumos:** piloto solo para super administración ([ADR-0017](adr/0017-compras-e-insumos.md)).
 
-Abajo están el checklist del día y la guía de arranque por perfil.
+Estado al 04-11: todo publicado en producción (reglas de Firestore y de Storage, funciones y hosting). Oportunidades: 10 clientes del informe cargados.
 
 ---
 
 ## 1. Checklist
 
-### Martes 03-11 (antes de irse)
+### Miércoles 04-11: probar producción en un teléfono real
 
 | ✓ | Qué | Quién |
 |---|---|---|
-| ☐ | Publicar las funciones (reintento de muestras) y después el hosting (Pendiente en Bsale y sugerencia de documento). No cambian reglas ni índices.<br>`firebase deploy --only functions --project comandas-charcuteria`<br>`npm run deploy` | Edmundo |
-| ☐ | Abrir la app en un teléfono y confirmar que aparece **Pedidos → Pendiente en Bsale** (si no aparece, cerrar y volver a abrir la app) | Edmundo |
-| ☐ | Revisar **Pendiente en Bsale → Producción por cargar**. Lo que está ahí se registró con las escrituras apagadas: cargarlo a mano en Bsale y marcar «Ya la cargué en Bsale». Si no, al encender las escrituras queda fuera de Bsale | Miguel |
-| ☐ | **Catálogo → Cruce con Bsale:** confirmar el cruce de los productos que fabrica Yury. Una carga con un producto sin cruce no llega a Bsale: queda en Pendiente en Bsale con el motivo «Sin cruce con Bsale» | Miguel |
-| ☐ | Crear el grupo de WhatsApp «Soporte Comandas» (Edmundo, Ciro, Miguel). Ahí se reportan las fallas, con una captura de pantalla | Edmundo |
-| ☐ | Mandar a Ciro la tabla de cuentas (sección 3) con los correos que faltan | Edmundo |
-| ☐ | Subir el informe de oportunidades: `npx tsx scripts/import-oportunidades.ts tools/oportunidades/output/oportunidades_resumen.csv --confirm comandas-charcuteria` (hoy el piloto de 10 clientes) | Edmundo |
+| ☐ | Abrir <https://comandas-charcuteria.web.app>: aparece la landing nueva (si no, cerrar y volver a abrir) | Edmundo |
+| ☐ | Instalar la app en Android y en iPhone; entrar con correo + PIN | Edmundo |
+| ☐ | **Pedido IA:** pegar un mensaje real de WhatsApp; lo interpreta Gemini, no el intérprete de respaldo | Edmundo |
+| ☐ | **Producción:** una foto de la planilla de Yury se lee con IA | Edmundo |
+| ☐ | **Compras «Sin documento»:** registrar una compra de prueba | Ciro (superAdmin) |
+| ☐ | **Compras con foto o PDF:** registrarla y abrir el documento desde «Compras» (primer uso de Storage en producción) | Ciro (superAdmin) |
+| ☐ | **Laboratorio:** escanear 2 o 3 etiquetas reales | Ciro (superAdmin) |
 
-### Miércoles 04-11, antes de abrir
+### Miércoles 04-11: Bsale
 
 | ✓ | Qué | Quién |
 |---|---|---|
-| ☐ | Crear las cuentas en **Usuarios** (sección 3). Quien vendía por WhatsApp entra con **«Invitar con su historial»**, eligiendo su nombre del historial, para que traiga sus pedidos y su cartera | Ciro |
-| ☐ | Reactivar a Elizabeth, si corresponde (fue desactivada el 24-10) | Ciro |
-| ☐ | Ciro y Luis entran por primera vez y crean su PIN | Ciro, Luis |
-| ☐ | En **Conexión Bsale → Configuración**, dejar:<ul><li>`Escrituras` encendido;</li><li>`Simulacro` apagado;</li><li>`Facturar desde Comandas` apagado.</li></ul>Revisar que las oficinas sigan en 1 (fábrica) y 2 (tienda) | Ciro (superAdmin) |
-| ☐ | Tocar «Sincronizar» una vez y revisar que el stock se ve | Ciro |
-| ☐ | **Oportunidades → Del informe:** elegir qué clientes trabajar y a qué ejecutivo. Crear también las visitas que quiera asignar («+ Oportunidad») | Ciro |
+| ☐ | **Catálogo → Cruce con Bsale:** cruzados todos los productos que fabrica Yury. Sin cruce, la carga no llega a Bsale | Miguel |
+| ☐ | **Pendiente en Bsale → Producción por cargar:** cargar a mano en Bsale lo acumulado y marcar «Ya la cargué en Bsale» | Miguel |
+| ☐ | **Conexión Bsale:** oficinas en 1 (fábrica) y 2 (tienda); tocar «Sincronizar» y ver el stock | Miguel |
 
-### Durante el día: primeras veces (revisarlas en Bsale apenas ocurran)
+### Miércoles 04-11: personas
 
-| ✓ | Primera vez que… | Qué revisar | Quién |
+| ✓ | Qué | Quién |
+|---|---|---|
+| ☐ | Mandar a Ciro la tabla de cuentas (sección 3) con correos y perfiles confirmados | Edmundo |
+| ☐ | Crear el grupo de WhatsApp «Soporte Comandas» (Edmundo, Ciro, Miguel) | Edmundo |
+| ☐ | Confirmar quiénes están el jueves en la tarde (uno por perfil) y que traigan el teléfono cargado | Ciro |
+
+### Jueves 05-11, en la mañana
+
+| ✓ | Qué | Quién |
+|---|---|---|
+| ☐ | **Congelar:** no publicar cambios hasta después de la sesión | Edmundo |
+| ☐ | Crear las cuentas en **Usuarios**. Quien vendía por WhatsApp: «Invitar con su historial». Reactivar a Elizabeth, si corresponde | Ciro |
+| ☐ | **Conexión Bsale → Configuración:** `Escrituras` encendido, `Simulacro` apagado, `Facturar desde Comandas` apagado | Ciro |
+| ☐ | **Oportunidades → Del informe:** elegir cuáles de los 10 clientes trabajar y a qué ejecutivo, para que haya agenda en la sesión | Ciro |
+
+### Jueves 05-11, en la tarde: la sesión
+
+**Para todos (15 minutos):** instalar la app, primer ingreso, crear el PIN y mostrar «Guía de uso» (sección 2).
+
+**Un pedido real de punta a punta, revisando en Bsale cada primera vez:**
+
+| ✓ | Paso | Quién | Qué revisar |
 |---|---|---|---|
-| ☐ | **Yury carga producción** (foto o a mano) | En Bsale, una **recepción** en «MARCOSI (SALA DE PROCESO)» con los mismos productos y cantidades. En Conexión Bsale → Bitácora, la línea «recepcion_produccion» con estado **ok**. En Comandas, el stock sube tras la sincronización y se reasignan los pedidos que esperaban | Yury + Miguel |
-| ☐ | **Despacho registra un traslado** a la tienda | En Bsale, un **consumo** en la fábrica y una **recepción** en «LA CHARCUTERIA» con las cantidades empacadas | Edu + Miguel |
-| ☐ | **Sale una muestra** (al vincular el documento o con «Registrar salida») | En Bsale, un consumo interno con la nota «Muestra · cliente · pedido» | Miguel |
-| ☐ | **Un vendedor crea un cliente** nuevo | El cliente aparece en Bsale con el RUT, el giro y la dirección | Miguel |
-| ☐ | **Cada documento que se vincula** (mañana y pasado) | En el diálogo de vincular, «Ver cómo lo facturaría Comandas»: comparar las líneas, los precios, los kilos, el tipo de documento y el total con lo emitido en el POS. Anotar en soporte las diferencias | Miguel |
-| ☐ | **Un pedido completo:** vendedor (PIN) → despacho arma → POS de Bsale → Pendiente en Bsale «Confirmar» (PIN) → despachar → entregar | Que en cada paso aparezca el botón que corresponde y que el vendedor vea el estado | Equipo |
+| ☐ | El vendedor crea un pedido con PIN, idealmente desde una oportunidad | Vendedor | Aparece en el Tablero con su horario de entrega |
+| ☐ | Producción carga lo producido (foto o a mano) | Yury + Miguel | Bsale: recepción en «MARCOSI (SALA DE PROCESO)». Bitácora: «recepcion_produccion» en ok |
+| ☐ | Despacho toma y arma el pedido con el peso real | Edu | Queda «armado» con los pesos empacados |
+| ☐ | La oficina emite en el POS con el número del pedido en la referencia | Miguel | Pendiente en Bsale sugiere ese documento. Comparar con «Ver cómo lo facturaría Comandas» |
+| ☐ | La oficina confirma el documento con su PIN | Miguel | Pedido «facturado». Si venía de una oportunidad, queda «ganada» |
+| ☐ | El repartidor marca la salida y la entrega | Reparto | El vendedor ve el estado |
+| ☐ | Un traslado a la tienda | Edu + Lucy | Bsale: consumo en la fábrica y recepción en «LA CHARCUTERIA» |
+| ☐ | Una muestra | Vendedor + Edu | Bsale: consumo interno «Muestra · cliente · pedido» |
+| ☐ | Un cliente nuevo | Vendedor | Aparece en Bsale con RUT, giro y dirección |
 
 **Si una escritura falla:** la app muestra el error y queda en **Pendiente en Bsale → Escrituras con error**.
 
-**Si algo sale mal en Bsale** (cantidades o productos equivocados), hay que volver atrás:
-1. En Conexión Bsale → Configuración, apagar `Escrituras`.
-2. Corregir a mano en Bsale.
-3. Avisar en el grupo de soporte.
+**Si algo sale mal en Bsale** (cantidades o productos equivocados):
+1. Ciro apaga `Escrituras` en Conexión Bsale → Configuración.
+2. Se corrige a mano en Bsale.
+3. Se avisa en el grupo de soporte.
 
-Con las escrituras apagadas la producción vuelve a quedar «Por cargar en Bsale» y nada se pierde.
+Con las escrituras apagadas, la producción queda «por cargar» y nada se pierde.
 
-### Al cierre
+### Al cierre del jueves
 
 | ✓ | Qué | Quién |
 |---|---|---|
 | ☐ | **Pendiente en Bsale en cero**, o con una explicación para cada pendiente | Miguel |
-| ☐ | Anotar las fallas y dudas del día en el grupo de soporte | Todos |
-| ☐ | Revisar la Bitácora de Bsale del día (todas las líneas en «ok») | Edmundo |
+| ☐ | Bitácora de Bsale del día: todas las líneas en «ok» | Edmundo |
+| ☐ | Anotar las fallas y dudas en el grupo de soporte | Todos |
+
+### Riesgos a vigilar
+
+- **Gemini** no se ha probado en producción desde los últimos cambios. Si falla, Pedido IA y la foto de la planilla caen al intérprete de respaldo o a la carga a mano.
+- **Las escrituras reales a Bsale** desde Comandas nunca se han ejecutado. Por eso se revisa en Bsale cada primera vez con el equipo presente.
 
 ---
 

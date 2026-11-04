@@ -47,7 +47,7 @@ Si la CLI responde con errores de autenticación: `firebase login --reauth`. Par
 
 ## Interruptores de Bsale
 
-Están en Conexión Bsale → Configuración (`settings/bsale`). Estado al 24-10 (el 04-11 se encienden las escrituras, sin simulacro: ver [arranque-04-11.md](arranque-04-11.md)):
+Están en Conexión Bsale → Configuración (`settings/bsale`). Estado al 24-10 (el 05-11 se encienden las escrituras, sin simulacro: ver [arranque-05-11.md](arranque-05-11.md)):
 
 | Campo | Valor | Efecto |
 |---|---|---|

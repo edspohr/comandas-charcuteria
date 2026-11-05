@@ -9,20 +9,37 @@ Decisiones de Edmundo (03-11):
 - **Cuentas:** las crea Ciro en Usuarios.
 - **Compras e insumos:** piloto solo para super administración ([ADR-0017](adr/0017-compras-e-insumos.md)).
 
-Estado al 04-11: todo publicado en producción (reglas de Firestore y de Storage, funciones y hosting). Oportunidades: 10 clientes del informe cargados.
+Estado al 04-11, noche: todo publicado en producción (reglas de Firestore y de Storage, funciones y hosting). Las funciones se volvieron a publicar con la comuna y la ciudad del cliente nuevo para Bsale (commit `e450828`). Oportunidades: 10 clientes del informe cargados.
 
 ---
 
 ## 1. Checklist
 
+### Miércoles 04-11, noche: ya probado por Claude
+
+Sin teléfono y sin el Bsale real. En producción no se guardó nada: el pedido y la planilla se leyeron sin enviarse.
+
+| ✓ | Qué | Resultado |
+|---|---|---|
+| ☑ | **Pruebas automáticas:** 12 unitarias (etiquetas GS1 y comuna) y 21 de reglas de Firestore; la app y las funciones compilan | Todo bien |
+| ☑ | **Producción = último commit:** el archivo principal coincide y los 61 archivos responden, incluidos el escáner y el lector de PDF | Todo bien |
+| ☑ | **Landing en producción** sin sesión, en escritorio y en pantalla angosta | Sin errores. Falta verla en un teléfono |
+| ☑ | **Pedido IA en producción:** un mensaje de prueba lo interpreta Gemini, no el intérprete de respaldo | 3 líneas: 2 verificadas y 1 a revisar (formato inexistente, correcto). No se envió |
+| ☑ | **Foto de la planilla en producción:** la lee Gemini | Planilla generada, no foto real: 4 de 4 líneas exactas. No se guardó |
+| ☑ | **Conexión Bsale** (solo mirar) | MARCOSI (SALA DE PROCESO) y LA CHARCUTERIA, lista mayorista. Escrituras apagado y Simulacro encendido: se cambian el jueves |
+| ☑ | **Pendiente en Bsale** (solo mirar) | Nada pendiente ni con error. 119 clientes por revisar |
+| ☑ | **Punta a punta en emuladores** contra el Bsale de prueba, con escrituras encendidas y sin simulacro: producción, cliente nuevo, pedido con muestra, armado con peso real, factura del POS con la referencia, despacho, entrega y traslado | Bitácora 8 de 8 en «ok». La factura se sugirió sola por la referencia; 19,6 kg con coma decimal se guardan bien |
+| ☑ | **Corrección:** el cliente nuevo llega a Bsale con comuna y ciudad (antes solo con dirección) | Probado contra el Bsale de prueba y publicado |
+| ☑ | **El checklist en Word** se ve bien | Revisado en Word |
+
 ### Miércoles 04-11: probar producción en un teléfono real
 
 | ✓ | Qué | Quién |
 |---|---|---|
-| ☐ | Abrir <https://comandas-charcuteria.web.app>: aparece la landing nueva (si no, cerrar y volver a abrir) | Edmundo |
+| ☑ | Abrir <https://comandas-charcuteria.web.app>: aparece la landing nueva (si no, cerrar y volver a abrir) — *Claude: bien en escritorio y pantalla angosta; mirarla en el teléfono al instalar* | Edmundo |
 | ☐ | Instalar la app en Android y en iPhone; entrar con correo + PIN | Edmundo |
-| ☐ | **Pedido IA:** pegar un mensaje real de WhatsApp; lo interpreta Gemini, no el intérprete de respaldo | Edmundo |
-| ☐ | **Producción:** una foto de la planilla de Yury se lee con IA | Edmundo |
+| ☑ | **Pedido IA:** pegar un mensaje real de WhatsApp; lo interpreta Gemini, no el intérprete de respaldo — *Claude: Gemini responde en producción* | Edmundo |
+| ☐ | **Producción:** una foto real de la planilla de Yury se lee con IA — *Claude: con una planilla generada, 4 de 4 líneas; falta una foto real* | Edmundo |
 | ☐ | **Compras «Sin documento»:** registrar una compra de prueba | Ciro (superAdmin) |
 | ☐ | **Compras con foto o PDF:** registrarla y abrir el documento desde «Compras» (primer uso de Storage en producción) | Ciro (superAdmin) |
 | ☐ | **Laboratorio:** escanear 2 o 3 etiquetas reales | Ciro (superAdmin) |
@@ -31,9 +48,9 @@ Estado al 04-11: todo publicado en producción (reglas de Firestore y de Storage
 
 | ✓ | Qué | Quién |
 |---|---|---|
-| ☐ | **Catálogo → Cruce con Bsale:** cruzados todos los productos que fabrica Yury. Sin cruce, la carga no llega a Bsale | Miguel |
-| ☐ | **Pendiente en Bsale → Producción por cargar:** cargar a mano en Bsale lo acumulado y marcar «Ya la cargué en Bsale» | Miguel |
-| ☐ | **Conexión Bsale:** oficinas en 1 (fábrica) y 2 (tienda); tocar «Sincronizar» y ver el stock | Miguel |
+| ☐ | **Catálogo → Cruce con Bsale:** cruzados todos los productos que fabrica Yury. Sin cruce, la carga no llega a Bsale — *al 04-11: 100 confirmados, 123 sugeridos, 43 sin cruce* | Miguel |
+| ☑ | **Pendiente en Bsale → Producción por cargar:** cargar a mano en Bsale lo acumulado y marcar «Ya la cargué en Bsale» — *al 04-11 no hay producción por cargar* | Miguel |
+| ☐ | **Conexión Bsale:** oficinas en 1 (fábrica) y 2 (tienda); tocar «Sincronizar» y ver el stock — *Claude: oficinas y lista bien elegidas; falta sincronizar* | Miguel |
 
 ### Miércoles 04-11: personas
 
@@ -68,7 +85,7 @@ Estado al 04-11: todo publicado en producción (reglas de Firestore y de Storage
 | ☐ | El repartidor marca la salida y la entrega | Reparto | El vendedor ve el estado |
 | ☐ | Un traslado a la tienda | Edu + Lucy | Bsale: consumo en la fábrica y recepción en «LA CHARCUTERIA» |
 | ☐ | Una muestra | Vendedor + Edu | Bsale: consumo interno «Muestra · cliente · pedido» |
-| ☐ | Un cliente nuevo | Vendedor | Aparece en Bsale con RUT, giro y dirección |
+| ☐ | Un cliente nuevo | Vendedor | Aparece en Bsale con RUT, giro, dirección, comuna y ciudad |
 
 **Si una escritura falla:** la app muestra el error y queda en **Pendiente en Bsale → Escrituras con error**.
 
@@ -89,8 +106,9 @@ Con las escrituras apagadas, la producción queda «por cargar» y nada se pierd
 
 ### Riesgos a vigilar
 
-- **Gemini** no se ha probado en producción desde los últimos cambios. Si falla, Pedido IA y la foto de la planilla caen al intérprete de respaldo o a la carga a mano.
-- **Las escrituras reales a Bsale** desde Comandas nunca se han ejecutado. Por eso se revisa en Bsale cada primera vez con el equipo presente.
+- **Las escrituras al Bsale real** desde Comandas nunca se han ejecutado; contra el Bsale de prueba funcionan todas. Por eso se revisa en Bsale cada primera vez con el equipo presente.
+- **Gemini** respondió bien en producción el 04-11. Si falla en la sesión, Pedido IA y la foto de la planilla caen al intérprete de respaldo o a la carga a mano.
+- **Sin probar en teléfono:** la instalación, la cámara y el peso con coma decimal en el teclado de cada teléfono.
 
 ---
 

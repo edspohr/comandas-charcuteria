@@ -5,6 +5,7 @@ import { DOC_PREFIX, requireFactory, type BsaleSettings, type DocKind } from './
 import { confirmedMap, documentFromRaw, stripUndefined, syncStock, variantLabels } from './sync';
 import { send } from './writes';
 import { consumeSamples } from './samples';
+import { comunaFromAddress, DEFAULT_CITY, DEFAULT_COMUNA } from './comuna';
 
 // Facturar desde Comandas: el pedido armado (con los pesos reales que
 // registró despacho) se emite como factura o boleta en Bsale, y queda
@@ -120,7 +121,7 @@ export async function buildInvoice(s: BsaleSettings, orderId: string, wanted?: '
   const clientPart = Number.isFinite(bsaleClientNum)
     ? { clientId: bsaleClientNum }
     : kind === 'factura'
-      ? { client: stripUndefined({ code: client.rut, company: client.name, activity: client.giro, address: client.address, municipality: 'Santiago', city: 'Santiago', companyOrPerson: 1 }) }
+      ? { client: stripUndefined({ code: client.rut, company: client.name, activity: client.giro, address: client.address, municipality: comunaFromAddress(client.address) ?? DEFAULT_COMUNA, city: DEFAULT_CITY, companyOrPerson: 1 }) }
       : {};
   if (!client.bsaleClientId && kind === 'factura') warnings.push('El cliente no está vinculado en Bsale: se creará con estos datos.');
   const payload = stripUndefined({

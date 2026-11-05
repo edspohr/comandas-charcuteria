@@ -5,6 +5,7 @@ import { BsaleHttpError, type BsaleApi, type RawClient } from './api';
 import { requireFactory, type BsaleSettings } from './config';
 import { confirmedMap, customerFromRaw, stripUndefined } from './sync';
 import { loadCosts } from './facts';
+import { bsaleLocality } from './comuna';
 
 // Escrituras hacia Bsale. Solo hechos que nacen en Comandas:
 //   - recepción de producción terminada (fábrica)
@@ -121,7 +122,8 @@ function clientBody(i: Partial<CustomerInput>) {
     code: i.rut,
     activity: i.giro,
     address: i.address,
-    city: i.city,
+    // Comuna y ciudad: el SII las pide en la factura emitida en el POS.
+    ...bsaleLocality(i.address, i.city),
     phone: i.phone,
     email: i.email,
     companyOrPerson: i.rut ? 1 : 0,

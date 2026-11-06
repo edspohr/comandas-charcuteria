@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { collection, doc, getDoc, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { confirmPin, PinCancelled } from './pin';
 import { callableMessage } from './userAdmin';
-import { registerProduction, type BsaleWriteOutcome } from './bsaleOps';
-import { isRealBsale } from '@/integrations/bsale/client';
+import { bsaleWritesOn, registerProduction, type BsaleWriteOutcome } from './bsaleOps';
 
 // Bitácora de producción cargada desde Comandas (productionLog/{id}). Queda
 // siempre, aunque las escrituras hacia Bsale estén apagadas: así la oficina
@@ -35,7 +34,7 @@ export async function loadProduction(lines: ProductionLine[], user: { uid: strin
   let outcome: BsaleWriteOutcome | null = null;
   let bsaleStatus: ProductionBsaleStatus;
   let bsaleError: string | undefined;
-  const writesOn = !isRealBsale || (await getDoc(doc(db, 'settings', 'bsale'))).data()?.writesEnabled === true;
+  const writesOn = await bsaleWritesOn();
   if (writesOn) {
     // Lo producido no se pierde si Bsale lo rechaza: queda «por cargar» con
     // el motivo y la oficina lo ve en Pendiente en Bsale.

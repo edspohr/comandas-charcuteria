@@ -577,6 +577,7 @@ export async function registrarTraslado(order: Order, by: string): Promise<{ dry
       kind: 'reposicion',
       status: 'facturado',
       invoiceRef: ref,
+      ...(result.skipped && isRealBsale ? { transferBsale: { at: now, by, ref, skipped: true } } : {}),
       updatedAt: now,
       statusHistory: [...fresh.statusHistory, { status: 'facturado', by, at: now, note: result.skipped ? `${ref} · solo en la app` : result.dryRun ? `${ref} · simulacro` : `${ref} · registrado en Bsale` }],
     });

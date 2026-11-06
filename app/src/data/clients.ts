@@ -3,6 +3,7 @@ import { collection, doc, getDocs, onSnapshot, query, setDoc, updateDoc, where, 
 import { bsale, isRealBsale } from '@/integrations/bsale/client';
 import type { BsaleCustomer } from '@/integrations/bsale/BsaleClient';
 import { db } from './firebase';
+import { bsaleWritesOn } from './bsaleOps';
 import { describeFirestoreError } from '@/lib/errors';
 import type { Client, DeliveryMode, Order } from '@/domain/types';
 import { cleanRut, formatRut, isValidRut } from '@/lib/rut';
@@ -243,6 +244,21 @@ export async function updateClientAdmin(client: Client, patch: ClientAdminPatch,
     phone: (patch.contactPhone ?? client.contactPhone)?.trim() || undefined,
     email: (patch.email ?? client.email)?.trim() || undefined,
   };
+  // Con las escrituras a Bsale apagadas no se puede cambiar el maestro: se
+  // guardan los datos propios de Comandas y se avisa que la facturación se
+  // corrige en Bsale (la próxima sincronización la trae).
+  if (client.bsaleClientId && isRealBsale && !(await bsaleWritesOn())) {
+    const own: Record<string, unknown> = {};
+    if (patch.receivingHours !== undefined) own.receivingHours = patch.receivingHours.trim() || null;
+    if (patch.deliveryMode !== undefined) own.deliveryMode = patch.deliveryMode;
+    if (patch.notes !== undefined) own.notes = patch.notes.trim() || null;
+    if (patch.ownerUid !== undefined) own.ownerUid = patch.ownerUid || null;
+    if (Object.keys(own).length) await updateDoc(doc(db, 'clients', client.id), own);
+    const billingChanged = (['name', 'fantasyName', 'rut', 'giro', 'address', 'phone', 'email'] as const)
+      .some((k) => (next[k] ?? '') !== ((k === 'phone' ? client.contactPhone : client[k]) ?? ''));
+    if (billingChanged) throw new Error('Se guardaron horario, despacho, notas y cartera. Las escrituras a Bsale están apagadas: corrija nombre, RUT, giro, dirección, teléfono o correo directamente en Bsale y se actualizarán con la próxima sincronización.');
+    return;
+  }
   if (client.bsaleClientId) {
     await bsale.updateClient(client.bsaleClientId, next);
   }

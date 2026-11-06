@@ -1,6 +1,7 @@
 import { withPin } from './pin';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from './firebase';
+import { db, functions } from './firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { isRealBsale } from '@/integrations/bsale/client';
 import { receiveProduction } from '@/integrations/bsale/mockAdmin';
 import { syncStockFromBsale, type SyncSummary } from './stock';
@@ -8,6 +9,13 @@ import { syncStockFromBsale, type SyncSummary } from './stock';
 // Operaciones que escriben en Bsale, con el mismo contrato en ambos modos.
 // En real pasan por Cloud Functions (bitácora + simulacro); en mock tocan el
 // Bsale simulado y sincronizan.
+
+// ¿Comandas puede escribir en Bsale? (settings/bsale). En mock, siempre.
+export async function bsaleWritesOn(): Promise<boolean> {
+  if (!isRealBsale) return true;
+  const s = (await getDoc(doc(db, 'settings', 'bsale'))).data();
+  return s?.enabled === true && s?.writesEnabled === true;
+}
 
 export interface QtyLine { productId: string; formatId: string; qty: number }
 export interface BsaleWriteOutcome { dryRun: boolean; summary: SyncSummary | null }
@@ -28,6 +36,9 @@ export async function registerProduction(lines: QtyLine[], uid: string, note?: s
 // simulada en Bsale: el traslado queda solo en la app.
 export async function registerTransfer(orderId: string, lines: QtyLine[]): Promise<{ dryRun: boolean; skipped?: boolean }> {
   if (!isRealBsale) return { dryRun: false, skipped: true };
+  // Con las escrituras apagadas el traslado queda solo en la app; la oficina
+  // lo registra a mano en Bsale desde Pendiente en Bsale.
+  if (!(await bsaleWritesOn())) return { dryRun: false, skipped: true };
   const r = (await withPin(`Traslado a tienda ${orderId}`, async (pin) => (await transferFn({ orderId, lines, pin })).data)) as { consumo?: { dryRun: boolean }; guia?: { dryRun: boolean } };
   return { dryRun: !!(r.consumo?.dryRun ?? r.guia?.dryRun) };
 }

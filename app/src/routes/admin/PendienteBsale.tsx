@@ -9,7 +9,7 @@ import { useBsaleDocuments } from '@/data/bsale';
 import { useBsaleSettings, useWriteLog } from '@/data/bsaleAdmin';
 import { useClients } from '@/data/clients';
 import { consumeSamplesAfterInvoice } from '@/data/orders';
-import { markSamplesLoadedManually, useOrdersAwaitingDocument, useProductionToLoad, useSamplesToRegister } from '@/data/pendienteBsale';
+import { markSamplesLoadedManually, markTransferLoadedManually, useOrdersAwaitingDocument, useProductionToLoad, useSamplesToRegister, useTransfersToRegister } from '@/data/pendienteBsale';
 import { markLoadedInBsale } from '@/data/productionLog';
 import { PinCancelled } from '@/data/pin';
 import { suggestDocument } from '@/domain/linking';
@@ -41,6 +41,7 @@ export default function PendienteBsale() {
   const { documents } = useBsaleDocuments({ limit: 150 });
   const production = useProductionToLoad();
   const samples = useSamplesToRegister();
+  const transfers = useTransfersToRegister();
   const writes = useWriteLog(100);
   const { clients } = useClients();
   const [linking, setLinking] = useState<Order | null>(null);
@@ -58,7 +59,7 @@ export default function PendienteBsale() {
     try { await fn(); } catch (e) { if (!(e instanceof PinCancelled)) setError(describeFirestoreError(e)); } finally { setBusy(null); }
   }
 
-  const total = orders.length + failed.length + production.length + samples.length;
+  const total = orders.length + failed.length + production.length + samples.length + transfers.length;
 
   return (
     <div className="space-y-6">
@@ -119,6 +120,22 @@ export default function PendienteBsale() {
                   {e.lines.map((l, i) => <li key={i}><span className="font-semibold">{formatQty(l.qty, l.unit)}</span> {l.productName} <span className="text-charcoal-300 text-xs">· {l.formatLabel}</span></li>)}
                 </ul>
                 {canAct && <Button size="sm" variant="secondary" className="mt-2" disabled={busy != null} onClick={() => run(e.id, () => markLoadedInBsale(e.id, uid))}>{busy === e.id ? '…' : 'Ya la cargué en Bsale'}</Button>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      <Section title="Traslados a tienda sin registrar en Bsale" count={transfers.length} hint="Salieron a la tienda con las escrituras apagadas. Hágalos en Bsale (consumo en la sala de proceso y recepción en la tienda, referencia TR-pedido) y márquelos.">
+        {transfers.length === 0 ? <Empty>Todos los traslados están en Bsale.</Empty> : (
+          <ul className="divide-y divide-charcoal-100 card">
+            {transfers.map((o) => (
+              <li key={o.id} className="p-3 flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="text-sm"><span className="font-mono">{o.transferBsale?.ref ?? `TR-${o.id}`}</span> · <span className="text-charcoal-500">{new Date(o.transferBsale?.at ?? o.updatedAt).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}</span></p>
+                  <p className="text-xs text-charcoal-500">{o.lines.filter((l) => !l.sample && (l.packedQty ?? l.reservedQty) > 0).map((l) => `${formatQty(l.packedQty ?? l.reservedQty, l.unit)} ${l.productName}`).join(' · ')}</p>
+                </div>
+                {canAct && <Button size="sm" variant="secondary" disabled={busy != null} onClick={() => run(o.id, () => markTransferLoadedManually(o, uid))}>{busy === o.id ? '…' : 'Ya lo hice a mano'}</Button>}
               </li>
             ))}
           </ul>

@@ -46,6 +46,24 @@ export function useSamplesToRegister(): Order[] {
   return items;
 }
 
+// Traslados a tienda que quedaron solo en la app (escrituras apagadas).
+export function useTransfersToRegister(): Order[] {
+  const [items, setItems] = useState<Order[]>([]);
+  useEffect(() => onSnapshot(
+    query(collection(db, 'orders'), where('transferBsale.skipped', '==', true)),
+    (s) => setItems(s.docs.map((d) => d.data() as Order).filter((o) => o.status !== 'anulado').sort((a, b) => (a.transferBsale?.at ?? 0) - (b.transferBsale?.at ?? 0))),
+    () => setItems([]),
+  ), []);
+  return items;
+}
+
+export async function markTransferLoadedManually(order: Order, uid: string) {
+  await updateDoc(doc(db, 'orders', order.id), {
+    transferBsale: { at: Date.now(), by: uid, ref: order.transferBsale?.ref ?? `TR-${order.id}`, manual: true },
+    updatedAt: Date.now(),
+  });
+}
+
 // La oficina ya hizo el consumo interno a mano en Bsale.
 export async function markSamplesLoadedManually(order: Order, uid: string) {
   await updateDoc(doc(db, 'orders', order.id), {

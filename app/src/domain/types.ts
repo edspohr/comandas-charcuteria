@@ -198,6 +198,9 @@ export interface Order {
   opportunityId?: string;
   // Consumo interno de las muestras en Bsale (una vez por pedido).
   samplesConsumption?: { at: number; by: string; ref: string; dryRun?: boolean; skipped?: boolean; reason?: 'sin_muestras' | 'escrituras_apagadas'; manual?: boolean; logId?: string };
+  // Traslado a tienda que quedó solo en la app (escrituras a Bsale apagadas):
+  // la oficina lo hace a mano en Bsale y lo marca en Pendiente en Bsale.
+  transferBsale?: { at: number; by: string; ref: string; skipped?: boolean; manual?: boolean };
   invoicingComplete: boolean;
   createdAt: number;
   updatedAt: number;

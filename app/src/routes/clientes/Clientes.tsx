@@ -39,7 +39,7 @@ export default function Clientes() {
   const isAdmin = can(role, 'client.edit');
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'orders'), (snap) => { const l: Order[] = []; snap.forEach((d) => l.push(d.data() as Order)); setOrders(l); });
+    const unsub = onSnapshot(collection(db, 'orders'), (snap) => { const l: Order[] = []; snap.forEach((d) => { const o = d.data() as Order; if (!o.deleted) l.push(o); }); setOrders(l); });
     return unsub;
   }, []);
 

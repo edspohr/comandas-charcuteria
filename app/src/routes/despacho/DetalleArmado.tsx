@@ -7,6 +7,7 @@ import Stepper from '@/components/ui/Stepper';
 import StatusPill from '@/components/ui/StatusPill';
 import { useCurrentUser } from '@/data/auth';
 import { assignPacker, markArmado, useOrder } from '@/data/orders';
+import { ChangeNoticeBox, ChangesHistory } from '@/components/orders/OrderChanges';
 import { formatDateLong, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 import ErrorBanner from '@/components/ui/ErrorBanner';
@@ -136,6 +137,8 @@ export default function DetalleArmado() {
           {order.receivingHours ? `Recibe ${order.receivingHours}` : 'Sin horario de entrega'}
         </p>
       </header>
+
+      <ChangeNoticeBox order={order} role={current!.appUser.role} uid={uid} nameOf={nameOf} />
 
       {canTake && (
         <div className="card p-4 mb-4 bg-brass-50 border-brass-300">
@@ -321,6 +324,8 @@ export default function DetalleArmado() {
           </Button>
         </div>
       )}
+
+      <ChangesHistory order={order} nameOf={nameOf} />
 
       {isDone && (
         <div className="card p-4 mt-4">

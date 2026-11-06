@@ -18,6 +18,7 @@ import ErrorBanner from '@/components/ui/ErrorBanner';
 import SampleTag from '@/components/orders/SampleTag';
 import SampleFollowups from '@/components/orders/SampleFollowups';
 import PickingTotals from '@/components/orders/PickingTotals';
+import { ChangeItems, lastChange } from '@/components/orders/OrderChanges';
 import { lineKey, sampleLabel } from '@/domain/samples';
 import { ApprovalDialog, AnularDialog, DeliverDialog, DispatchDialog, TrasladoDialog, SalidaMuestrasDialog, VincularDocumentoDialog } from '@/components/orders/OrderDialogs';
 import { COLUMNS, actionForDrop, cardTone, columnFor, nextAction, type ActionKind, type ColumnId, type Tone } from '@/domain/kanban';
@@ -63,7 +64,7 @@ export default function Tablero() {
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'orders'), (snap) => {
       const list: Order[] = [];
-      snap.forEach((d) => list.push(d.data() as Order));
+      snap.forEach((d) => { const o = d.data() as Order; if (!o.deleted) list.push(o); });
       setOrders(list); setError(null); setLoading(false);
     }, (err) => { setError(describeFirestoreError(err)); setLoading(false); });
     return unsub;
@@ -504,7 +505,7 @@ function KanbanCard({ order, tone, action, onAction, onOpen, detailTo, draggable
       draggable={draggable}
       onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart?.(); }}
       onDragEnd={onDragEnd}
-      className={'card border-l-4 p-2.5 text-xs ' + TONE_STRIPE[tone.tone] + (draggable ? ' cursor-grab active:cursor-grabbing' : '')}
+      className={'card border-l-4 p-2.5 text-xs ' + TONE_STRIPE[tone.tone] + (order.changeNotice ? ' ring-2 ring-orange-400 bg-orange-50' : '') + (draggable ? ' cursor-grab active:cursor-grabbing' : '')}
       title={tone.reasons.join(' · ') || undefined}
     >
       <div className="flex items-center justify-between gap-2">
@@ -519,6 +520,13 @@ function KanbanCard({ order, tone, action, onAction, onOpen, detailTo, draggable
         <span className={'first-letter:uppercase ' + (late ? 'text-red-700 font-semibold' : '')}>{formatDateShort(order.requestedDate)}{windowTimes(order.deliveryWindow) ? ` ${windowTimes(order.deliveryWindow)}` : ''} · {order.deliveryMode === 'retiro' ? 'retiro' : 'despacho'}</span>
         <span className="font-semibold text-charcoal-700">{order.totalCLP ? formatCLP(order.totalCLP) : `${order.lines.length} lín.`}</span>
       </div>
+      {order.changeNotice && lastChange(order) && (
+        <div className="mt-1.5 rounded border border-orange-300 bg-white/70 px-1.5 py-1">
+          <p className="text-[10px] uppercase tracking-display font-semibold text-orange-800">{order.changeNotice.for === 'armado' ? 'Modificado por el vendedor' : 'Rebajado en armado'}</p>
+          <ChangeItems items={lastChange(order)!.items.slice(0, 3)} compact />
+          {lastChange(order)!.items.length > 3 && <p className="text-[10px] text-charcoal-400">+ {lastChange(order)!.items.length - 3} cambio(s) más</p>}
+        </div>
+      )}
       {!compact && (
         <ul className="mt-1.5 text-[11px] text-charcoal-500 space-y-0.5">
           {order.lines.slice(0, 2).map((l) => (

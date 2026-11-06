@@ -44,8 +44,8 @@ Fuente: notas y transcripción de la visita (Google Doc «20261105 La Charcuter�
 |---|---|---|
 | Urgente | Horario de entrega flexible: basta con una hora, un rango o una nota | Hecho y en producción (06-11) |
 | Urgente | Todas las escrituras a Bsale apagadas hasta la marcha blanca (ya lo estaban); traslados y edición de clientes funcionan sin Bsale y quedan en Pendiente en Bsale | Hecho y en producción (06-11) |
-| 1 | Producción incluye despacho (Yurij y Eduanis con el mismo acceso) · globo y aviso de oportunidades · fecha obligatoria al crear · «Total en armado» · muestras a nombre del vendedor sin cliente | Hecho 06-11, por desplegar |
-| 2 | Edición de pedidos hasta antes de facturar, tarjeta naranja con cambios (+ verde, − rojo) en ambos sentidos, eliminar pedidos (vendedor los propios, superAdmin cualquiera; invisible en la app, queda en la base) — ADR-0018 | Pendiente |
+| 1 | Producción incluye despacho (Yurij y Eduanis con el mismo acceso) · globo y aviso de oportunidades · fecha obligatoria al crear · «Total en armado» · muestras a nombre del vendedor sin cliente | Hecho y en producción (06-11) |
+| 2 | Edición de pedidos hasta antes de facturar, tarjeta naranja con cambios (+ verde, − rojo) en ambos sentidos, eliminar pedidos (vendedor los propios, superAdmin cualquiera; invisible en la app, queda en la base) — [ADR-0018](adr/0018-edicion-y-eliminacion-de-pedidos.md) | Hecho y en producción (06-11) |
 | 3 | Comanda impresa de 80 mm al tomar un pedido: tablet Android + térmica ESC/POS WiFi/Bluetooth + RawBT | Pendiente (comprar impresora) |
 | 4 | Compras (Gabriela, administración) separadas de la recepción en la fábrica: compra → por recibir → recepción contra la compra | Pendiente |
 | 5 | Oportunidades por dictado de voz para Ciro (Gemini) con vista de confirmación | Pendiente |

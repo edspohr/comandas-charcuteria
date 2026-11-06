@@ -163,6 +163,13 @@ export interface DeliveryProof {
 // factura, se registra como traslado fábrica → tienda en Bsale.
 export type OrderKind = 'venta' | 'reposicion' | 'muestras';
 
+// Cambios de un pedido después de creado (ADR-0018). venta = lo modificó el
+// vendedor; armado = quien arma rebajó (faltó o menos unidades).
+export interface OrderChangeItem { productName: string; formatLabel: string; unit: OrderLine['unit']; sample?: boolean; before: number; after: number }
+export interface OrderChange { at: number; by: string; side: 'venta' | 'armado'; items: OrderChangeItem[]; note?: string; seenBy?: string; seenAt?: number }
+// Aviso abierto: el otro lado todavía no lo ha visto.
+export interface ChangeNotice { for: 'venta' | 'armado'; at: number; by: string }
+
 export interface Order {
   id: string;
   kind?: OrderKind;
@@ -196,6 +203,11 @@ export interface Order {
   approval?: Approval;
   // Oportunidad comercial (domain/opportunities.ts). Al facturarse, la gana.
   opportunityId?: string;
+  // Historial de modificaciones y aviso pendiente (ADR-0018).
+  changes?: OrderChange[];
+  changeNotice?: ChangeNotice | null;
+  // Eliminado (borrado lógico, ADR-0018): anulado e invisible en la app.
+  deleted?: { at: number; by: string; reason: string };
   // Muestras pedidas a nombre del vendedor, sin cliente (06-11): las lleva
   // como en consignación y se cruzan después con su prospección.
   samplesHolderUid?: string;

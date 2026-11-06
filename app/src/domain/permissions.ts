@@ -12,6 +12,8 @@ export type Capability =
   | 'order.createTransfer'  // reposición de tienda (traslado fábrica → tienda)
   | 'order.cancelOwn'       // anular un pedido propio antes de facturar
   | 'order.cancelAny'
+  | 'order.editAny'         // modificar pedidos de otros antes de facturar (ADR-0018)
+  | 'order.delete'          // eliminar (borrado lógico) cualquier pedido; el creador elimina los suyos
   | 'order.pack'            // tomar, ingresar pesos reales, marcar armado
   | 'order.link'            // vincular / emitir documento Bsale
   | 'order.invoiceLate'     // despachar sin factura y facturar después de entregar
@@ -61,7 +63,7 @@ const ROLE_CAPS: Record<Role, Capability[]> = {
     'order.dispatch', 'order.deliver', 'transfer.receive', 'client.quickCreate', 'client.edit', 'stock.sync',
     'production.receive', 'catalog.map', 'bsale.explore', 'bsale.configure', 'panel.view', 'users.manage',
     'settings.edit', 'order.invoiceLate', 'order.approve', 'opportunity.manageOwn', 'opportunity.manageAll', 'opportunity.viewAll',
-    'purchase.receive',
+    'purchase.receive', 'order.editAny', 'order.delete',
   ],
   // Auditor: ve todo, no escribe nada.
   consultor: ['bsale.explore', 'panel.view', 'opportunity.viewAll'],

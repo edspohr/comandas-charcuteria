@@ -27,7 +27,7 @@ export default function SamplesPanel({ extraPurchases = [], costOf }: { extraPur
   useEffect(() => {
     // One year back plus the conversion window, so late purchases count.
     const since = Date.now() - (365 + SAMPLE_CONVERSION_DAYS) * DAY;
-    return onSnapshot(query(collection(db, 'orders'), where('createdAt', '>=', since)), (s) => { const l: Order[] = []; s.forEach((d) => l.push(d.data() as Order)); setOrders(l); });
+    return onSnapshot(query(collection(db, 'orders'), where('createdAt', '>=', since)), (s) => { const l: Order[] = []; s.forEach((d) => { const o = d.data() as Order; if (!o.deleted) l.push(o); }); setOrders(l); });
   }, []);
 
   // With Bsale sales available they are the source for anything invoiced;

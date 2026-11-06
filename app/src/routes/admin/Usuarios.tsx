@@ -47,7 +47,7 @@ export default function Usuarios() {
   const [showPlaceholders, setShowPlaceholders] = useState(false);
   const placeholderCount = users.filter((u) => u.placeholder && !u.mergedInto).length;
 
-  useEffect(() => onSnapshot(collection(db, 'orders'), (snap) => { const l: Order[] = []; snap.forEach((d) => l.push(d.data() as Order)); setOrders(l); }), []);
+  useEffect(() => onSnapshot(collection(db, 'orders'), (snap) => { const l: Order[] = []; snap.forEach((d) => { const o = d.data() as Order; if (!o.deleted) l.push(o); }); setOrders(l); }), []);
 
   const rows = useMemo<UserRow[]>(() => {
     const since = addDaysIso(todayInSantiago(), -30);

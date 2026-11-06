@@ -73,6 +73,29 @@ describe('pedidos', () => {
     await assertSucceeds(updateDoc(doc(alice, 'orders', 'PED-2'), { status: 'anulado' }));
   });
 
+  it('vendedor edits own order before invoicing (ADR-0018) but not the client or after facturado', async () => {
+    await seedOrder('PED-E1', 'u-alice', { status: 'armado', assignedPackerId: 'u-edu' });
+    await seedOrder('PED-E2', 'u-alice', { status: 'facturado', invoiceRef: 'FA-000001' });
+    const alice = as('u-alice', 'vendedor');
+    await assertSucceeds(updateDoc(doc(alice, 'orders', 'PED-E1'), { status: 'en_armado', lines: [{ productId: 'p', qty: 2 }], changeNotice: { for: 'armado', at: 1, by: 'u-alice' } }));
+    await assertFails(updateDoc(doc(alice, 'orders', 'PED-E1'), { clientId: 'c-otro' }));
+    await assertFails(updateDoc(doc(alice, 'orders', 'PED-E1'), { assignedPackerId: 'u-alice' }));
+    await assertFails(updateDoc(doc(alice, 'orders', 'PED-E2'), { lines: [{ productId: 'p', qty: 9 }] }));
+  });
+
+  it('vendedor deletes own armado order (soft delete); another vendedor cannot', async () => {
+    await seedOrder('PED-D1', 'u-alice', { status: 'armado' });
+    await assertFails(updateDoc(doc(as('u-bob', 'vendedor'), 'orders', 'PED-D1'), { status: 'anulado', deleted: { at: 1, by: 'u-bob', reason: 'x' } }));
+    await assertSucceeds(updateDoc(doc(as('u-alice', 'vendedor'), 'orders', 'PED-D1'), { status: 'anulado', deleted: { at: 1, by: 'u-alice', reason: 'duplicado' } }));
+  });
+
+  it('packer acknowledges a change notice but cannot touch anything else that way', async () => {
+    await seedOrder('PED-V1', 'u-alice', { changeNotice: { for: 'armado', at: 1, by: 'u-alice' } });
+    const edu = as('u-edu', 'despacho');
+    await assertFails(updateDoc(doc(edu, 'orders', 'PED-V1'), { changeNotice: null, lines: [{ productId: 'p', qty: 9 }] }));
+    await assertSucceeds(updateDoc(doc(edu, 'orders', 'PED-V1'), { changeNotice: null, updatedAt: 2 }));
+  });
+
   it('despacho cannot set invoiceRef, but can marcar armado', async () => {
     await seedOrder('PED-3', 'u-someone', { status: 'en_armado' });
     const edu = as('u-edu', 'despacho');

@@ -203,7 +203,7 @@ export function useClientOrders(clientId: string | null): { orders: Order[]; loa
     if (!clientId) { setOrders([]); setLoading(false); return; }
     const q = query(collection(db, 'orders'), where('clientId', '==', clientId));
     const unsub = onSnapshot(q, (snap) => {
-      const l: Order[] = []; snap.forEach((d) => l.push(d.data() as Order));
+      const l: Order[] = []; snap.forEach((d) => { const o = d.data() as Order; if (!o.deleted) l.push(o); });
       l.sort((a, b) => b.createdAt - a.createdAt);
       setOrders(l); setLoading(false);
     }, () => setLoading(false));

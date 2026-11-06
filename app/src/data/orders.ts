@@ -18,6 +18,7 @@ import { describeFirestoreError } from '@/lib/errors';
 import { computeLineSubtotal } from '@/lib/pricing';
 import { DOCUMENTS_PATH, isRealBsale } from '@/integrations/bsale/client';
 import { hasSamples, isSampleOnly, isSellerSamplesClientId, lineKey } from '@/domain/samples';
+import { isEditable, packingReductions, planLineEdit, type EditLine } from '@/domain/orderEdit';
 import { formatWindow, windowFilled, type DeliveryWindow } from '@/domain/delivery';
 import { autoReasons, EXCEPTION_KINDS, type Approval, type ExceptionKind } from '@/domain/exceptions';
 import type { DocumentReference, Transaction } from 'firebase/firestore';
@@ -316,7 +317,7 @@ export function useDespachoQueue(): { orders: Order[]; loading: boolean; error: 
       q,
       (snap) => {
         const list: Order[] = [];
-        snap.forEach((d) => list.push(d.data() as Order));
+        snap.forEach((d) => { const o = d.data() as Order; if (!o.deleted) list.push(o); });
         list.sort((a, b) => {
           if (a.requestedDate !== b.requestedDate) return a.requestedDate.localeCompare(b.requestedDate);
           return a.createdAt - b.createdAt;
@@ -463,9 +464,15 @@ export async function markArmado(
       return out;
     });
     const totalCLP = enrichedLines.reduce((s, l) => s + (l.subtotalCLP ?? 0), 0);
+    // Rebajas que el vendedor tiene que ver (ADR-0018).
+    const reduced = packingReductions(order.lines, enrichedLines);
 
     tx.update(orderRef, {
       lines: enrichedLines,
+      ...(reduced.length ? {
+        changes: [...(order.changes ?? []), { at: now, by: packerUid, side: 'armado', items: reduced }],
+        changeNotice: { for: 'venta', at: now, by: packerUid },
+      } : {}),
       status: 'armado',
       assignedPackerId: order.assignedPackerId ?? packerUid,
       updatedAt: now,
@@ -695,7 +702,7 @@ export function useMyOrders(vendedorUid: string): { orders: Order[]; loading: bo
       q,
       (snap) => {
         const list: Order[] = [];
-        snap.forEach((d) => list.push(d.data() as Order));
+        snap.forEach((d) => { const o = d.data() as Order; if (!o.deleted) list.push(o); });
         setOrders(list);
         setError(null);
         setLoading(false);
@@ -708,19 +715,87 @@ export function useMyOrders(vendedorUid: string): { orders: Order[]; loading: bo
   return { orders, loading, error };
 }
 
+// ---------- Cambios después de creado (ADR-0018) ----------
+
+// El vendedor (o superAdmin) cambia las líneas antes de facturar. Reajusta
+// reservas en la misma transacción, deja el cambio en el historial y abre el
+// aviso para armado. Un pedido armado vuelve a «en armado».
+export async function editOrderLines(orderId: string, next: EditLine[], by: string, note?: string): Promise<{ changed: number; anyPending: boolean }> {
+  if (!next.some((l) => l.qty > 0)) throw new Error('El pedido quedaría vacío. Para cancelarlo use Anular o Eliminar.');
+  const orderRef = doc(db, 'orders', orderId);
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(orderRef);
+    if (!snap.exists()) throw new Error('Pedido no encontrado');
+    const order = snap.data() as Order;
+    if (order.deleted || !isEditable(order.status)) throw new Error(`No se puede modificar un pedido ${ORDER_STATUS_TEXT[order.status] ?? order.status}.`);
+    if (isSellerSamplesClientId(order.clientId) && next.some((l) => l.qty > 0 && !l.sample)) throw new Error('Las muestras a su nombre solo llevan muestras.');
+    const reads = await readStocks(tx, [...order.lines, ...next]);
+    const available = new Map([...reads].map(([id, r]) => [id, r.prev ? Math.max(0, r.prev.onHand - r.prev.reserved) : 0]));
+    const plan = planLineEdit(order.lines, next, available);
+    if (plan.items.length === 0 && JSON.stringify(plan.lines) === JSON.stringify(order.lines)) return { changed: 0, anyPending: plan.anyPending };
+
+    const now = Date.now();
+    for (const [id, delta] of plan.reserveDelta) {
+      const r = reads.get(id);
+      if (r?.prev && delta !== 0) tx.update(r.ref, { reserved: Math.max(0, Math.round((r.prev.reserved + delta) * 1000) / 1000) });
+    }
+    for (const m of plan.movements) {
+      const mvRef = doc(collection(db, 'stockMovements'));
+      tx.set(mvRef, { id: mvRef.id, productId: m.productId, formatId: m.formatId, qty: Math.abs(m.qty), type: m.qty > 0 ? 'reserva' : 'liberacion', orderId, by, at: now, reason: 'modificación' });
+    }
+    // Before packing the status follows stock; once packing started it stays
+    // in (or goes back to) en_armado so the new quantities get packed.
+    const status: OrderStatus = order.status === 'en_armado' || order.status === 'armado'
+      ? 'en_armado'
+      : order.status === 'recibido' ? 'recibido' : plan.anyPending ? 'confirmado_parcial' : 'confirmado';
+    const totalCLP = plan.lines.reduce((s, l) => s + (l.subtotalCLP ?? 0), 0);
+    for (const l of plan.lines) for (const k of Object.keys(l) as Array<keyof OrderLine>) if (l[k] === undefined) delete l[k];
+    const historyNote = `Modificado: ${plan.items.map((i) => `${i.productName} ${i.before}→${i.after}`).join(', ')}`.slice(0, 300);
+    tx.update(orderRef, {
+      lines: plan.lines,
+      totalCLP,
+      status,
+      updatedAt: now,
+      changes: [...(order.changes ?? []), { at: now, by, side: 'venta', items: plan.items, ...(note?.trim() ? { note: note.trim().slice(0, 200) } : {}) }],
+      changeNotice: { for: 'armado', at: now, by },
+      statusHistory: [...order.statusHistory, { status, by, at: now, note: historyNote }],
+    });
+    return { changed: plan.items.length, anyPending: plan.anyPending };
+  });
+}
+
+// «Visto»: el lado al que iba el aviso lo cierra.
+export async function ackOrderChange(order: Order, by: string): Promise<void> {
+  if (!order.changeNotice) return;
+  const now = Date.now();
+  // Quién lo vio queda en el último cambio.
+  const changes = (order.changes ?? []).map((c, i, all) => (i === all.length - 1 ? { ...c, seenBy: by, seenAt: now } : c));
+  await updateDoc(doc(db, 'orders', order.id), { changeNotice: null, changes, updatedAt: now });
+}
+
+// Eliminar (borrado lógico): se anula —libera reservas— y queda marcado
+// `deleted`; desaparece de la app pero sigue en la base como historia.
+export async function deleteOrder(orderId: string, by: string, reason: string): Promise<void> {
+  const r = reason.trim();
+  if (!r) throw new Error('Indique el motivo para eliminar el pedido.');
+  await anularOrder(orderId, by, `Eliminado: ${r}`, { deleted: { at: Date.now(), by, reason: r.slice(0, 200) }, allowArmado: true });
+}
+
+const ORDER_STATUS_TEXT: Partial<Record<OrderStatus, string>> = { facturado: 'ya facturado', despachado: 'ya despachado', entregado: 'ya entregado', anulado: 'anulado' };
+
 // Anular pedido — releases any active reservations back to stock, writes
 // liberacion movements, and sets status=anulado. Only allowed while the
 // order is still in {recibido, confirmado, confirmado_parcial, en_armado}
 // and belongs to the caller (or admin). Once armado we don't allow anular
 // through this path (consumo already applied — needs admin refund flow,
 // out of scope).
-export async function anularOrder(orderId: string, by: string, reason: string): Promise<void> {
+export async function anularOrder(orderId: string, by: string, reason: string, opts: { deleted?: Order['deleted']; allowArmado?: boolean } = {}): Promise<void> {
   const orderRef = doc(db, 'orders', orderId);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(orderRef);
     if (!snap.exists()) throw new Error('Pedido no encontrado');
     const order = snap.data() as Order;
-    const cancellable: OrderStatus[] = ['recibido', 'confirmado', 'confirmado_parcial', 'en_armado'];
+    const cancellable: OrderStatus[] = ['recibido', 'confirmado', 'confirmado_parcial', 'en_armado', ...(opts.allowArmado ? ['armado' as const] : [])];
     if (!cancellable.includes(order.status)) {
       throw new Error(`No se puede anular un pedido en estado ${order.status}`);
     }
@@ -753,6 +828,7 @@ export async function anularOrder(orderId: string, by: string, reason: string): 
     const note = pendingTotal > 0 ? `${reason} · incluía ${pendingTotal} pendiente(s) de producción` : reason;
     tx.update(orderRef, {
       status: 'anulado',
+      ...(opts.deleted ? { deleted: opts.deleted, changeNotice: null } : {}),
       updatedAt: now,
       lines: order.lines.map((l) => ({ ...l, pendingProductionQty: 0 })),
       statusHistory: [...order.statusHistory, { status: 'anulado', by, at: now, note }],
@@ -773,7 +849,7 @@ export function useOrdersByStatuses(statuses: OrderStatus[]): { orders: Order[];
       q,
       (snap) => {
         const list: Order[] = [];
-        snap.forEach((d) => list.push(d.data() as Order));
+        snap.forEach((d) => { const o = d.data() as Order; if (!o.deleted) list.push(o); });
         list.sort((a, b) => a.requestedDate.localeCompare(b.requestedDate) || a.createdAt - b.createdAt);
         setOrders(list);
         setError(null);
@@ -804,7 +880,8 @@ export function useLastOrderForClient(vendedorUid: string, clientId: string | nu
       q,
       (snap) => {
         const first = snap.docs[0];
-        setOrder(first ? (first.data() as Order) : null);
+        const o = first ? (first.data() as Order) : null;
+        setOrder(o && !o.deleted ? o : null);
       },
       (err) => {
         // Non-fatal for the wizard — just skip the "Repetir último" suggestion.

@@ -31,7 +31,9 @@ const GUIDES: Record<Role, Guide> = {
     ]],
     ['Seguir sus pedidos', [
       '«Pedidos» muestra solo los suyos, por etapa: Pendiente → En armado → Por facturar → Por despachar → Cerrado. Rojo = atrasado o con problema.',
-      'Puede anular un pedido suyo mientras no esté facturado (pide su PIN).',
+      'Si el cliente pide más o menos, abra el pedido y toque «Modificar pedido» (hasta que se facture, con PIN): cambie cantidades, quite o agregue productos. El stock se reajusta solo y armado ve la tarjeta en naranja con el cambio.',
+      'Si armado tuvo que rebajar algo (faltó o vino menos), su pedido aparece en naranja con lo que bajó en rojo: avísele al cliente y toque «Visto».',
+      'Puede anular un pedido suyo mientras no esté armado, o «Eliminar pedido» (duplicado, prueba, cancelado) hasta que se facture: desaparece de la app y libera el stock. Ambos piden su PIN.',
       'Siete días después de entregar una muestra aparece «¿Qué le pareció…?»: responda en un toque.',
     ]],
     ['Oportunidades', [
@@ -62,6 +64,8 @@ const GUIDES: Record<Role, Guide> = {
       'Si una línea dice «Sin stock en Bsale», arme con lo que haya en cámara y registre lo empacado.',
       'Las muestras vienen marcadas «MUESTRA»: rotúlelas con el nombre del cliente.',
       'Un pedido «por aprobar» todavía no se arma.',
+      'Tarjeta en naranja = el vendedor modificó el pedido (en verde lo que subió, en rojo lo que bajó). Ábralo, arme con las cantidades nuevas y toque «Visto». Si estaba armado, vuelve a «En armado».',
+      'Si usted rebaja algo (faltó o empacó menos unidades), el vendedor lo ve destacado para avisarle al cliente.',
     ]],
     ['Despachar', ['Cuando el pedido tiene su documento aparece «Despachar». Un pedido solo de muestras se cierra con «Registrar salida».']],
   ] },

@@ -247,12 +247,27 @@ service cloud.firestore {
       allow update: if hasRole() && (
         isSupervisor()
         || (
-          // Quien lo creó puede anularlo antes de facturar.
+          // Quien lo creó puede modificarlo, anularlo o eliminarlo (borrado
+          // lógico) antes de facturar (ADR-0018). Un pedido armado que se
+          // modifica vuelve a «en armado».
           canCreateOrder()
           && resource.data.createdBy == request.auth.uid
-          && resource.data.status in ['recibido', 'confirmado', 'confirmado_parcial', 'en_armado']
-          && request.resource.data.status == 'anulado'
-          && unchanged('createdBy') && unchanged('invoiceRef')
+          && resource.data.status in ['recibido', 'confirmado', 'confirmado_parcial', 'en_armado', 'armado']
+          && (
+            request.resource.data.status == resource.data.status
+            || request.resource.data.status == 'anulado'
+            || (resource.data.status in ['confirmado', 'confirmado_parcial'] && request.resource.data.status in ['confirmado', 'confirmado_parcial'])
+            || (resource.data.status == 'armado' && request.resource.data.status == 'en_armado')
+          )
+          && unchanged('createdBy') && unchanged('invoiceRef') && unchanged('clientId') && unchanged('kind')
+          && unchanged('assignedPackerId') && unchanged('approval') && unchanged('samplesHolderUid') && unchanged('bsaleDocumentId')
+        )
+        || (
+          // «Visto» del aviso de cambio: armado o el vendedor lo cierran.
+          (canPack() || resource.data.createdBy == request.auth.uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['changeNotice', 'changes', 'updatedAt'])
+          && request.resource.data.get('changeNotice', null) == null
+          && resource.data.get('changeNotice', null) != null
         )
         || (
           canPack()

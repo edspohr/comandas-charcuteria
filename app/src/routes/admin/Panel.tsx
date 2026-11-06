@@ -52,7 +52,7 @@ export default function Panel({ embedded = false }: { embedded?: boolean } = {})
     const since = Date.now() - 365 * 24 * 60 * 60 * 1000;
     const q = query(collection(db, 'orders'), where('createdAt', '>=', since));
     const unsub = onSnapshot(q, (snap) => {
-      const list: Order[] = []; snap.forEach((d) => list.push(d.data() as Order)); setOrders(list);
+      const list: Order[] = []; snap.forEach((d) => { const o = d.data() as Order; if (!o.deleted) list.push(o); }); setOrders(list);
     });
     return unsub;
   }, []);

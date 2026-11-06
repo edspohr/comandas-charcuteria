@@ -7,6 +7,10 @@ import StatusPill from '@/components/ui/StatusPill';
 import { useCurrentUser } from '@/data/auth';
 import { useOrder } from '@/data/orders';
 import { AnularDialog } from '@/components/orders/OrderDialogs';
+import { DeleteOrderDialog, EditOrderDialog } from '@/components/orders/EditOrderDialog';
+import { ChangeNoticeBox, ChangesHistory } from '@/components/orders/OrderChanges';
+import { isEditable } from '@/domain/orderEdit';
+import { can, canAny } from '@/domain/permissions';
 import { useUsers } from '@/data/users';
 import { formatDateLong, formatQty } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
@@ -23,12 +27,19 @@ export default function DetallePedido() {
   const uid = current!.appUser.uid;
   const { order, loading, error } = useOrder(orderId ?? null);
   const [anularOpen, setAnularOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const role = current!.appUser.role;
 
   if (error) return <div className="max-w-2xl mx-auto"><ErrorBannerLazy message={error} /></div>;
   if (loading || !order) return <p className="text-sm text-charcoal-300">Cargando…</p>;
 
   const isMine = order.createdBy === uid;
-  const canAnular = isMine && CANCELLABLE.includes(order.status);
+  const canAnular = isMine && CANCELLABLE.includes(order.status) && !order.deleted;
+  // ADR-0018: el creador (o superAdmin) modifica y elimina antes de facturar.
+  const editableNow = isEditable(order.status) && !order.deleted;
+  const canEdit = editableNow && ((isMine && canAny(role, ['order.create', 'order.createTransfer'])) || can(role, 'order.editAny'));
+  const canDelete = editableNow && ((isMine && canAny(role, ['order.create', 'order.createTransfer'])) || can(role, 'order.delete'));
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -59,6 +70,11 @@ export default function DetallePedido() {
           <p className="text-xs text-charcoal-300">Horario · {order.receivingHours}</p>
         )}
       </header>
+
+      {order.deleted && (
+        <p className="card p-3 mb-4 text-sm border-red-200 bg-red-50 text-red-800">Pedido eliminado por {nameOf(order.deleted.by)} el {new Date(order.deleted.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}: {order.deleted.reason}</p>
+      )}
+      <ChangeNoticeBox order={order} role={role} uid={uid} nameOf={nameOf} />
 
       <div className="card mb-4">
         <div className="p-4">
@@ -110,6 +126,8 @@ export default function DetallePedido() {
         )}
       </div>
 
+      <ChangesHistory order={order} nameOf={nameOf} />
+
       <div className="card p-4 mb-4">
         <p className="eyebrow mb-2">Historial</p>
         <ol className="space-y-1.5">
@@ -127,6 +145,10 @@ export default function DetallePedido() {
         </ol>
       </div>
 
+      {canEdit && (
+        <Button onClick={() => setEditOpen(true)} className="w-full mb-2">Modificar pedido</Button>
+      )}
+      {editOpen && <EditOrderDialog order={order} uid={uid} onClose={() => setEditOpen(false)} />}
       {canAnular && (
         <>
           <Button variant="danger" onClick={() => setAnularOpen(true)} className="w-full">
@@ -142,6 +164,10 @@ export default function DetallePedido() {
           )}
         </>
       )}
+      {canDelete && (
+        <button type="button" onClick={() => setDeleteOpen(true)} className="w-full mt-3 text-xs underline text-red-700">Eliminar pedido</button>
+      )}
+      {deleteOpen && <DeleteOrderDialog order={order} uid={uid} onClose={() => setDeleteOpen(false)} onDone={() => navigate('/tablero')} />}
     </div>
   );
 }

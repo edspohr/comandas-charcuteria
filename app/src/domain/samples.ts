@@ -1,4 +1,4 @@
-import type { Order, OrderLine, Product, ProductFormat } from './types';
+import type { Client, Order, OrderLine, Product, ProductFormat } from './types';
 
 // Muestras: líneas a $0 dentro de un pedido (o un pedido solo de muestras).
 // Salen del formato a granel del producto (80 g reservan 0,08 kg del
@@ -40,6 +40,16 @@ export function sampleLine(p: Product, grams = SAMPLE_DEFAULT_GRAMS, notes?: str
 // A line's identity inside an order: a sample of Coppa comes out of the same
 // bulk format as a regular Coppa line, so product+format alone collide.
 export const lineKey = (l: Pick<OrderLine, 'productId' | 'formatId' | 'sample'>) => `${l.productId}::${l.formatId}${l.sample ? '::muestra' : ''}`;
+
+// Muestras a nombre del vendedor, sin cliente (06-11, Edmundo): el pedido
+// lleva un «cliente» virtual por vendedor que no existe en clients/* ni en
+// Bsale. Sale del stock como consumo interno igual que cualquier muestra.
+export const SELLER_SAMPLES_PREFIX = 'muestras-vendedor-';
+export const isSellerSamplesClientId = (id: string | null | undefined) => !!id && id.startsWith(SELLER_SAMPLES_PREFIX);
+export const isSellerSamples = (o: Pick<Order, 'samplesHolderUid'>) => !!o.samplesHolderUid;
+export function sellerSamplesClient(uid: string, displayName: string): Client {
+  return { id: `${SELLER_SAMPLES_PREFIX}${uid}`, name: `Muestras de ${displayName}`, deliveryMode: 'retiro', invoicingComplete: true };
+}
 
 export const isSampleLine = (l: Pick<OrderLine, 'sample'>) => !!l.sample;
 export const hasSamples = (o: Pick<Order, 'lines'>) => o.lines.some(isSampleLine);
@@ -102,6 +112,8 @@ export function sampleRows(orders: Order[], feedback: SampleFeedback[], purchase
   const rows: SampleRow[] = [];
   for (const o of orders) {
     if (o.status === 'anulado') continue;
+    // Las del vendedor no tienen cliente al que hacerle seguimiento.
+    if (isSellerSamples(o)) continue;
     for (const l of o.lines) {
       if (!l.sample || l.shortReason) continue;
       const deliveredAt = deliveredAtOf(o);

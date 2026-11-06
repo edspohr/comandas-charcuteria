@@ -106,6 +106,28 @@ export function agendaFor(list: Opportunity[], today: string): Opportunity[] {
 
 export const isOverdue = (o: Opportunity, today: string) => { const d = dueDate(o); return !!d && d < today; };
 
+// Avisos para el ejecutivo (globo en el menú y recordatorio al entrar):
+// nuevas = asignadas y todavía sin gestión; vencidas, hoy y mañana por fecha.
+// El globo cuenta lo que pide acción ya (nuevas, vencidas y de hoy, sin
+// repetir); mañana solo se recuerda.
+export interface OpportunityAlerts { nuevas: number; vencidas: number; hoy: number; manana: number; badge: number }
+export function opportunityAlerts(list: Opportunity[], today: string, tomorrow: string): OpportunityAlerts {
+  const r: OpportunityAlerts = { nuevas: 0, vencidas: 0, hoy: 0, manana: 0, badge: 0 };
+  for (const o of list) {
+    if (!isOpen(o)) continue;
+    const d = dueDate(o);
+    const nueva = o.status === 'abierta';
+    const late = !!d && d < today;
+    const isToday = d === today;
+    if (nueva) r.nuevas++;
+    if (late) r.vencidas++;
+    if (isToday) r.hoy++;
+    if (d === tomorrow) r.manana++;
+    if (nueva || late || isToday) r.badge++;
+  }
+  return r;
+}
+
 export interface TeamRow { uid: string; open: number; overdue: number; postponed: number; won: number; lost: number; samples: number; conversion: number | null }
 
 // Resumen por ejecutivo. Ganadas y perdidas: cerradas desde `sinceMs`.

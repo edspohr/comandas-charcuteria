@@ -421,7 +421,7 @@ function NewOpportunityDialog({ uid, manageAll, executives, onClose, onCreated }
             </select>
           </div>
         )}
-        <NextFields type={nextType} date={nextDate} onType={setNextType} onDate={setNextDate} label="Primera acción" />
+        <NextFields type={nextType} date={nextDate} onType={setNextType} onDate={setNextDate} label="Fecha y primera acción *" />
         {error && <ErrorBanner message={error} />}
         <Button className="w-full" disabled={busy || !client || !nextDate} onClick={save}>{busy ? 'Guardando…' : 'Crear oportunidad'}</Button>
       </div>

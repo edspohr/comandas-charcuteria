@@ -296,7 +296,7 @@ const AREAS: Array<{ title: string; intro: string; features: Feature[] }> = [
       { icon: <IconPhone />, title: 'Pedido en 4 pasos', text: 'Cliente, productos, entrega y confirmar, con una mano desde el teléfono. Horario de recepción obligatorio (una hora, un rango o una nota), «Repetir último pedido» para los habituales y condiciones especiales (precio, plazo, despacho) que Ciro aprueba antes de armar.' },
       { icon: <IconSpark />, title: 'Pedido IA', text: 'Pegue el mensaje de WhatsApp del cliente y la app lo convierte en pedido: productos, formatos, cantidades, muestras y datos del cliente. Usted revisa y confirma.' },
       { icon: <IconGift />, title: 'Muestras con seguimiento', text: 'Se agregan al pedido o salen solas, como consumo interno en Bsale. A los 7 días la app pide la opinión del cliente y mide cuántas terminan en venta a 60 días.' },
-      { icon: <IconTarget />, title: 'Oportunidades', text: 'Ciro asigna visitas o las carga desde el informe de venta cruzada. Cada ejecutivo tiene su agenda del día: registra visitas, crea muestras y pedidos ligados, posterga con fecha o pierde con motivo. Se gana sola cuando el pedido se factura.' },
+      { icon: <IconTarget />, title: 'Oportunidades', text: 'Ciro asigna visitas o las carga desde el informe de venta cruzada. Cada ejecutivo tiene su agenda del día: registra visitas, crea muestras y pedidos ligados, posterga con fecha o pierde con motivo. Un globo en el menú y un aviso al entrar le recuerdan lo nuevo, lo vencido y lo que vence hoy o mañana. Se gana sola cuando el pedido se factura.' },
       { icon: <IconUsers />, title: 'Clientes y cartera', text: 'Ficha con historial, ritmo de compra y salud del cliente (activo, en riesgo, perdido). Un cliente nuevo se crea desde el pedido y se registra en Bsale con sus datos tributarios.' },
     ],
   },
@@ -306,7 +306,7 @@ const AREAS: Array<{ title: string; intro: string; features: Feature[] }> = [
     features: [
       { icon: <IconBoard />, title: 'Tablero de pedidos', text: 'Resumen por etapa con montos y kilos, vista en tarjetas, compacta o lista, filtros y el detalle a un toque. En rojo lo que se atrasa.' },
       { icon: <IconFactory />, title: 'Producción', text: 'Lo que falta producir según los pedidos, por día. La carga se hace con una foto de la planilla o a mano, entra a Bsale como recepción y reasigna el stock a los pedidos que esperaban.' },
-      { icon: <IconScale />, title: 'Armado con peso real', text: 'Despacho registra lo que realmente se empacó: el pedido se factura con esos pesos y la diferencia queda medida.' },
+      { icon: <IconScale />, title: 'Armado con peso real', text: 'Despacho y producción registran lo que realmente se empacó: el pedido se factura con esos pesos y la diferencia queda medida. «Total en armado» suma los productos de los pedidos tomados para ir a buscar todo de una vez.' },
       { icon: <IconStore />, title: 'Reposición de tienda', text: 'La tienda pide por el mismo canal, despacho registra el traslado en Bsale y la tienda confirma lo que llegó.' },
       { icon: <IconScan />, title: 'Compras e insumos', tag: 'Piloto', text: 'Al recibir una compra se escanean las etiquetas de cada caja: peso, lote y vencimiento. Con factura o guía, la foto o el PDF queda guardado, la app lee el timbre y las líneas y, si quiere, cuadra los kilos y el costo por kilo; también se puede registrar sin documento. Arma el stock de insumos por lote.' },
     ],

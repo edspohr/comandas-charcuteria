@@ -9,6 +9,8 @@ import InstallButton from '@/components/InstallButton';
 import AppLock from '@/components/AppLock';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { useScrollLock } from '@/lib/scrollLock';
+import { useMyOpportunityAlerts } from '@/data/opportunities';
+import OpportunityReminder from '@/components/OpportunityReminder';
 
 // Navegación con grupos y orden fijos (cada perfil ve solo lo suyo):
 //   Pedidos · Clientes · Producción · Gestión · Administración · Mi cuenta
@@ -58,6 +60,9 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
   const inMore = visible.filter((n) => !bottom.includes(n));
   const moreActive = inMore.some((n) => isActive(pathname, n.to));
   const name = current.appUser.displayName;
+  // Globo en Oportunidades: lo que el ejecutivo tiene que atender ya.
+  const alerts = useMyOpportunityAlerts(current.appUser.uid, can(role, 'opportunity.manageOwn'));
+  const badgeFor = (to: string) => (to === '/oportunidades' ? alerts?.badge ?? 0 : 0);
 
   return (
     <div className="min-h-screen bg-cream-50 lg:flex">
@@ -88,6 +93,7 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
                         {active && <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-brass-500" />}
                         <Icon name={item.icon} size={16} className={active ? 'text-brass-300' : 'text-cream-100/50'} />
                         {item.label}
+                        <Badge n={badgeFor(item.to)} className="ml-auto" />
                       </Link>
                     </li>
                   );
@@ -130,6 +136,7 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
 
         <main className="flex-1 w-full mx-auto px-4 pt-4 pb-28 sm:px-6 sm:pt-6 lg:pb-6 max-w-5xl lg:max-w-7xl">
           {canAny(role, ['stock.sync', 'order.link', 'bsale.configure']) && <IntegrationHealth canFix={can(role, 'bsale.configure')} />}
+          {alerts && <OpportunityReminder uid={current.appUser.uid} alerts={alerts} hidden={isActive(pathname, '/oportunidades')} />}
           {children}
         </main>
         <footer className="hidden lg:block text-center py-6 text-[10px] uppercase tracking-display text-charcoal-300">
@@ -139,7 +146,7 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
         {/* ---------- Barra inferior (teléfono) ---------- */}
         <nav className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-charcoal-900 text-cream-50 border-t border-cream-100/10 pb-[env(safe-area-inset-bottom)]" aria-label="Principal">
           <ul className="flex items-stretch justify-around h-16">
-            {bottom.slice(0, 1).map((n) => <BottomItem key={n.to} item={n} active={isActive(pathname, n.to)} />)}
+            {bottom.slice(0, 1).map((n) => <BottomItem key={n.to} item={n} active={isActive(pathname, n.to)} badge={badgeFor(n.to)} />)}
             {canCreate && (
               <li className="flex-1 flex items-center justify-center">
                 <Link to={NEW_ORDER} aria-label="Nuevo pedido" className={'-mt-6 w-14 h-14 rounded-full flex items-center justify-center shadow-lift ring-4 ring-cream-50 transition ' + (isNewOrder(pathname) ? 'bg-brass-300 text-charcoal-900' : 'bg-brass-500 text-charcoal-900')}>
@@ -147,10 +154,10 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
                 </Link>
               </li>
             )}
-            {bottom.slice(1).map((n) => <BottomItem key={n.to} item={n} active={isActive(pathname, n.to)} />)}
+            {bottom.slice(1).map((n) => <BottomItem key={n.to} item={n} active={isActive(pathname, n.to)} badge={badgeFor(n.to)} />)}
             <li className="flex-1">
               <button onClick={() => setMore(true)} className={'w-full h-full flex flex-col items-center justify-center gap-0.5 text-[10px] uppercase tracking-display ' + (moreActive ? 'text-brass-300' : 'text-cream-100/70')}>
-                <Icon name="more" size={20} /> Más
+                <span className="relative"><Icon name="more" size={20} />{inMore.some((n) => badgeFor(n.to) > 0) && <span aria-hidden className="absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full bg-red-600 ring-2 ring-charcoal-900" />}</span> Más
               </button>
             </li>
           </ul>
@@ -170,7 +177,7 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
                       {items.map((n) => (
                         <li key={n.to}>
                           <Link to={n.to} className={'flex items-center gap-3 px-3 py-3 text-sm ' + (isActive(pathname, n.to) ? 'text-charcoal-900 font-semibold' : 'text-charcoal-700')}>
-                            <Icon name={n.icon} size={18} className="text-brass-600" /> {n.label}
+                            <Icon name={n.icon} size={18} className="text-brass-600" /> {n.label}<Badge n={badgeFor(n.to)} className="ml-auto" />
                           </Link>
                         </li>
                       ))}
@@ -191,11 +198,17 @@ export default function AppShell({ current, children }: { current: CurrentUser; 
   );
 }
 
-function BottomItem({ item, active }: { item: NavItem; active: boolean }) {
+// Globo rojo con el número de pendientes (nada si es 0).
+function Badge({ n, className = '' }: { n: number; className?: string }) {
+  if (n <= 0) return null;
+  return <span aria-label={`${n} pendiente${n === 1 ? '' : 's'}`} className={'min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold leading-[18px] text-center ' + className}>{n > 99 ? '99+' : n}</span>;
+}
+
+function BottomItem({ item, active, badge = 0 }: { item: NavItem; active: boolean; badge?: number }) {
   return (
     <li className="flex-1">
       <Link to={item.to} aria-current={active ? 'page' : undefined} className={'h-full flex flex-col items-center justify-center gap-0.5 text-[10px] uppercase tracking-display ' + (active ? 'text-brass-300' : 'text-cream-100/70')}>
-        <Icon name={item.icon} size={20} /> {item.short ?? item.label}
+        <span className="relative"><Icon name={item.icon} size={20} /><Badge n={badge} className="absolute -top-2 -right-3 ring-2 ring-charcoal-900" /></span> {item.short ?? item.label}
       </Link>
     </li>
   );

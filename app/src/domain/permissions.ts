@@ -48,7 +48,9 @@ const ROLE_CAPS: Record<Role, Capability[]> = {
   tienda: ['order.create', 'order.createTransfer', 'order.cancelOwn', 'transfer.receive', 'client.quickCreate', 'opportunity.manageOwn'],
   despacho: ['order.pack', 'order.dispatch', 'stock.sync'],
   reparto: ['order.dispatch', 'order.deliver'],
-  produccion: ['production.receive', 'stock.sync'],
+  // Desde el 06-11 producción también arma y despacha (Yurij y Eduanis tienen
+  // el mismo acceso: cargan producción y arman pedidos).
+  produccion: ['production.receive', 'stock.sync', 'order.pack', 'order.dispatch'],
   admin: [
     'order.create', 'order.createTransfer', 'order.cancelOwn', 'order.cancelAny', 'order.pack', 'order.link',
     'order.dispatch', 'order.deliver', 'transfer.receive', 'client.quickCreate', 'client.edit', 'stock.sync',
@@ -100,7 +102,7 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
   tienda: 'Toma pedidos de clientes de la tienda, pide reposición y confirma lo que llega.',
   despacho: 'Arma los pedidos con pesos reales y los deja listos para salir.',
   reparto: 'Marca la salida y la entrega de los pedidos en ruta.',
-  produccion: 'Ve la demanda pendiente y registra la producción terminada en Bsale.',
+  produccion: 'Registra la producción terminada y, como despacho, arma los pedidos y los deja listos para salir.',
   admin: 'Opera todo el flujo: facturación, despacho, clientes, catálogo y panel.',
   superAdmin: 'Todo lo de administración más usuarios y configuración.',
   consultor: 'Auditoría: ve todos los datos (app y Bsale) sin poder modificar nada.',

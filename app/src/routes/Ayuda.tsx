@@ -26,6 +26,7 @@ const GUIDES: Record<Role, Guide> = {
       'Horario de entrega obligatorio, pero flexible: basta con una hora, un rango o una nota («en la mañana»). Un rango completo queda como habitual en su ficha. El nombre de fantasía es opcional.',
       'Al enviar el pedido se pide su PIN: el pedido queda a su nombre.',
       'Muestras: en Productos toque «+ Muestra» (80 g por defecto, sin cargo).',
+      'Muestras para prospectar, sin cliente: en el paso Cliente toque «Muestras a mi nombre». Salen del stock y quedan a su cargo; después las cruza con sus clientes.',
       'Condición especial (precio, corte, pago o entrega fuera de lo normal): márquela en Confirmar con una nota. El pedido queda «por aprobar» hasta que Ciro lo aprueba: no lo confirme al cliente antes.',
     ]],
     ['Seguir sus pedidos', [
@@ -34,6 +35,7 @@ const GUIDES: Record<Role, Guide> = {
       'Siete días después de entregar una muestra aparece «¿Qué le pareció…?»: responda en un toque.',
     ]],
     ['Oportunidades', [
+      'El globo rojo en «Oportunidades» cuenta lo que tiene que atender ya: nuevas sin gestionar, vencidas y las de hoy. Al entrar, un aviso le recuerda también las que vencen mañana.',
       '«Oportunidades» → «Agenda»: lo que toca hoy o está atrasado (franja roja). Ahí aparecen las visitas que le asigna Ciro y las suyas.',
       'Abra una oportunidad y toque «Registrar visita o llamada»: anote qué pasó y el siguiente paso con fecha.',
       '«Muestras o pedido» abre Nuevo pedido con el cliente listo y ligado a la oportunidad. Las muestras se agregan con «+ Muestra».',
@@ -55,6 +57,7 @@ const GUIDES: Record<Role, Guide> = {
     ACCESS,
     ['Armar', [
       '«Pedidos» ordena cada columna por fecha y hora de entrega. Toque «Tomar» y luego «Armar».',
+      'Tome varios pedidos y toque «Total en armado»: suma los productos de los pedidos que tomó para ir a buscar todo de una vez. Marque lo que ya sacó.',
       'Registre lo que realmente empacó (peso real en granel y piezas). Si algo faltó, márquelo con el motivo.',
       'Si una línea dice «Sin stock en Bsale», arme con lo que haya en cámara y registre lo empacado.',
       'Las muestras vienen marcadas «MUESTRA»: rotúlelas con el nombre del cliente.',
@@ -76,7 +79,11 @@ const GUIDES: Record<Role, Guide> = {
     ['Cargar lo producido', [
       '«Fotografiar planilla»: tome la foto, toque «Leer la foto», revise las cantidades (lo dudoso aparece en dorado) y toque «Cargar».',
       '«Registrar a mano»: busque el producto, elija el formato y escriba la cantidad. Los productos que esperan los pedidos aparecen arriba para agregarlos con un toque. El botón «Registrar» de cada tarjeta deja la cantidad lista.',
-      'Toda carga se confirma con su PIN, entra a Bsale como recepción en la sala de proceso y queda en «Cargado hoy» a su nombre. Si Bsale la rechaza, la app se lo dice: avise a la oficina.',
+      'Toda carga se confirma con su PIN y queda en «Cargado hoy» a su nombre. Con las escrituras a Bsale encendidas entra a Bsale como recepción en la sala de proceso; mientras estén apagadas, la oficina la carga desde «Pendiente en Bsale».',
+    ]],
+    ['Armar y despachar', [
+      'Producción también arma pedidos, igual que despacho: en «Pedidos» toque «Tomar» y luego «Armar», y use «Total en armado» para sumar lo que hay que ir a buscar.',
+      'Cuando el pedido tiene su documento aparece «Despachar». Un pedido solo de muestras se cierra con «Registrar salida».',
     ]],
   ] },
   admin: { title: 'Administración', sections: [

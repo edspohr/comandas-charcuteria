@@ -17,7 +17,7 @@ import { stockDocId } from '@/domain/types';
 import { describeFirestoreError } from '@/lib/errors';
 import { computeLineSubtotal } from '@/lib/pricing';
 import { DOCUMENTS_PATH, isRealBsale } from '@/integrations/bsale/client';
-import { hasSamples, isSampleOnly, lineKey } from '@/domain/samples';
+import { hasSamples, isSampleOnly, isSellerSamplesClientId, lineKey } from '@/domain/samples';
 import { formatWindow, windowFilled, type DeliveryWindow } from '@/domain/delivery';
 import { autoReasons, EXCEPTION_KINDS, type Approval, type ExceptionKind } from '@/domain/exceptions';
 import type { DocumentReference, Transaction } from 'firebase/firestore';
@@ -100,6 +100,10 @@ export async function createOrder(
 ): Promise<CreateOrderResult> {
   const year = new Date().getFullYear();
   const counterRef = doc(db, 'counters', `orders-${year}`);
+  const sellerSamples = isSellerSamplesClientId(input.client.id);
+  if (sellerSamples && (input.lines.length === 0 || input.lines.some((l) => !l.sample))) {
+    throw new Error('Las muestras a su nombre solo pueden llevar muestras. Para vender, elija un cliente.');
+  }
 
   const result = await runTransaction(db, async (tx) => {
     // ---- Reads
@@ -170,6 +174,7 @@ export async function createOrder(
       id: orderId,
       kind: input.client.isInternalShop ? 'reposicion' : enriched.every((l) => l.sample) ? 'muestras' : 'venta',
       createdBy: createdByUid,
+      ...(sellerSamples ? { samplesHolderUid: createdByUid } : {}),
       clientId: input.client.id,
       clientSnapshot: {
         name: input.client.name,
@@ -229,7 +234,7 @@ export async function createOrder(
 
     return { orderId, status, parcialLines, awaitingApproval: !!order.approval };
   });
-  await rememberClientHabits(input);
+  if (!sellerSamples) await rememberClientHabits(input);
   return result;
 }
 

@@ -196,6 +196,9 @@ export interface Order {
   approval?: Approval;
   // Oportunidad comercial (domain/opportunities.ts). Al facturarse, la gana.
   opportunityId?: string;
+  // Muestras pedidas a nombre del vendedor, sin cliente (06-11): las lleva
+  // como en consignación y se cruzan después con su prospección.
+  samplesHolderUid?: string;
   // Consumo interno de las muestras en Bsale (una vez por pedido).
   samplesConsumption?: { at: number; by: string; ref: string; dryRun?: boolean; skipped?: boolean; reason?: 'sin_muestras' | 'escrituras_apagadas'; manual?: boolean; logId?: string };
   // Traslado a tienda que quedó solo en la app (escrituras a Bsale apagadas):

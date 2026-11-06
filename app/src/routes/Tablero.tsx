@@ -17,6 +17,7 @@ import Button from '@/components/ui/Button';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import SampleTag from '@/components/orders/SampleTag';
 import SampleFollowups from '@/components/orders/SampleFollowups';
+import PickingTotals from '@/components/orders/PickingTotals';
 import { lineKey, sampleLabel } from '@/domain/samples';
 import { ApprovalDialog, AnularDialog, DeliverDialog, DispatchDialog, TrasladoDialog, SalidaMuestrasDialog, VincularDocumentoDialog } from '@/components/orders/OrderDialogs';
 import { COLUMNS, actionForDrop, cardTone, columnFor, nextAction, type ActionKind, type ColumnId, type Tone } from '@/domain/kanban';
@@ -115,7 +116,7 @@ export default function Tablero() {
       if (o.status === 'anulado') return showAnulados && (!mine || o.createdBy === uid);
       if (o.status === 'entregado' && o.updatedAt < closedSince) return false;
       if (mine) {
-        const isMine = (role === 'vendedor' || role === 'tienda') ? o.createdBy === uid : role === 'despacho' ? o.assignedPackerId === uid : (o.createdBy === uid || o.assignedPackerId === uid);
+        const isMine = (role === 'vendedor' || role === 'tienda') ? o.createdBy === uid : (role === 'despacho' || role === 'produccion') ? o.assignedPackerId === uid : (o.createdBy === uid || o.assignedPackerId === uid);
         if (!isMine) return false;
       }
       if (vendedor && o.createdBy !== vendedor) return false;
@@ -156,6 +157,7 @@ export default function Tablero() {
 
   // Dialogs
   const [dialog, setDialog] = useState<{ kind: ActionKind; order: Order; defer?: boolean } | null>(null);
+  const [picking, setPicking] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   async function run(kind: ActionKind, order: Order) {
@@ -243,11 +245,18 @@ export default function Tablero() {
             {sync?.compromised?.length ? <span className="text-red-700"> · {sync.compromised.length} formato{sync.compromised.length === 1 ? '' : 's'} con stock comprometido</span> : null}
           </p>
         </div>
+        <div className="shrink-0 flex items-center gap-2">
+        {can(role, 'order.pack') && (
+          <button onClick={() => setPicking(true)} title="Suma de los productos de los pedidos en armado" className="inline-flex items-center gap-1.5 rounded-md border border-charcoal-200 bg-white px-2.5 py-1.5 text-[11px] uppercase tracking-display text-charcoal-600 hover:border-charcoal-300">
+            <Icon name="box" size={14} /> <span className="hidden sm:inline">Total en&nbsp;</span>armado
+          </button>
+        )}
         {canSync && (
           <button onClick={doSync} disabled={syncing} title="Sincronizar stock y documentos con Bsale" className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-charcoal-200 bg-white px-2.5 py-1.5 text-[11px] uppercase tracking-display text-charcoal-600 hover:border-charcoal-300 disabled:opacity-60">
             <Icon name="sync" size={14} className={syncing ? 'animate-spin' : ''} /> {syncing ? <span className="hidden sm:inline">Sincronizando</span> : 'Bsale'}
           </button>
         )}
+        </div>
       </header>
 
       {isSeller(role) && <div className="px-4 sm:px-6"><SampleFollowups uid={uid} /></div>}
@@ -451,12 +460,13 @@ export default function Tablero() {
       {dialog?.kind === 'dispatch' && <DispatchDialog order={dialog.order} uid={uid} defer={dialog.defer} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'deliver' && <DeliverDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'anular' && <AnularDialog order={dialog.order} uid={uid} onClose={() => setDialog(null)} />}
+      {picking && <PickingTotals orders={orders} uid={uid} onClose={() => setPicking(false)} />}
     </div>
   );
 }
 
 function detailPath(o: Order, role: Role, uid: string): string {
-  if (role === 'despacho') return `/despacho/cola/${o.id}`;
+  if (role === 'despacho' || role === 'produccion') return `/despacho/cola/${o.id}`;
   if (!can(role, 'order.pack')) return `/vendedor/mis/${o.id}`;
   // admin: armado detail is the richest view while the order is being packed.
   if (['confirmado', 'confirmado_parcial', 'en_armado', 'armado'].includes(o.status) && o.assignedPackerId === uid) return `/despacho/cola/${o.id}`;

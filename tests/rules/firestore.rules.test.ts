@@ -80,6 +80,13 @@ describe('pedidos', () => {
     await assertFails(updateDoc(doc(edu, 'orders', 'PED-3'), { invoiceRef: 'FA-999999' }));
   });
 
+  it('produccion also packs (06-11) but cannot link a document', async () => {
+    await seedOrder('PED-3P', 'u-someone', { status: 'en_armado' });
+    const yuri = as('u-yuri', 'produccion');
+    await assertSucceeds(updateDoc(doc(yuri, 'orders', 'PED-3P'), { status: 'armado' }));
+    await assertFails(updateDoc(doc(yuri, 'orders', 'PED-3P'), { invoiceRef: 'FA-999999' }));
+  });
+
   it('reparto delivers a dispatched order but cannot link a document', async () => {
     await seedOrder('PED-4', 'u-someone', { status: 'despachado' });
     await seedOrder('PED-5', 'u-someone', { status: 'armado' });

@@ -37,6 +37,22 @@ El plan original era encenderlas una a la vez y con simulacro. El 03-11 Edmundo 
 - Notificar al vendedor cuando su pedido se aprueba o rechaza, y a Ciro cuando hay pedidos por aprobar. Hoy solo se ve en el Tablero.
 - Producción: plan del día imprimible y meta de producción por producto.
 
+### Visita del 05-11: plan acordado el 06-11
+Fuente: notas y transcripción de la visita (Google Doc «20261105 La Charcutería»). Decisiones de Edmundo el 06-11:
+
+| Fase | Contenido | Estado |
+|---|---|---|
+| Urgente | Horario de entrega flexible: basta con una hora, un rango o una nota | Hecho y en producción (06-11) |
+| Urgente | Todas las escrituras a Bsale apagadas hasta la marcha blanca (ya lo estaban); traslados y edición de clientes funcionan sin Bsale y quedan en Pendiente en Bsale | Hecho y en producción (06-11) |
+| 1 | Producción incluye despacho (Yurij y Eduanis con el mismo acceso) · globo y aviso de oportunidades · fecha obligatoria al crear · «Total en armado» · muestras a nombre del vendedor sin cliente | Hecho 06-11, por desplegar |
+| 2 | Edición de pedidos hasta antes de facturar, tarjeta naranja con cambios (+ verde, − rojo) en ambos sentidos, eliminar pedidos (vendedor los propios, superAdmin cualquiera; invisible en la app, queda en la base) — ADR-0018 | Pendiente |
+| 3 | Comanda impresa de 80 mm al tomar un pedido: tablet Android + térmica ESC/POS WiFi/Bluetooth + RawBT | Pendiente (comprar impresora) |
+| 4 | Compras (Gabriela, administración) separadas de la recepción en la fábrica: compra → por recibir → recepción contra la compra | Pendiente |
+| 5 | Oportunidades por dictado de voz para Ciro (Gemini) con vista de confirmación | Pendiente |
+| 6 | Consumo de insumos en producción (FIFO por lote) | Etapa dic → ene |
+
+Pendiente de la fase 1: un informe en el Panel con las muestras que tiene cada vendedor.
+
 ## 2. Plan del contrato (a 30-11-2026)
 
 Según el plan del 08-10, reajustado por el atraso del token de Bsale (llegó el 19-10):

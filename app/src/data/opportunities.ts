@@ -3,7 +3,8 @@ import { arrayUnion, collection, doc, onSnapshot, query, updateDoc, where, write
 import { db } from './firebase';
 import { describeFirestoreError } from '@/lib/errors';
 import type { Client } from '@/domain/types';
-import type { ActivityType, LostReason, NextActionType, Opportunity, OpportunityCandidate, OpportunityOrigin } from '@/domain/opportunities';
+import { opportunityAlerts, type ActivityType, type LostReason, type NextActionType, type Opportunity, type OpportunityAlerts, type OpportunityCandidate, type OpportunityOrigin } from '@/domain/opportunities';
+import { addDaysIso, todayInSantiago } from '@/lib/format';
 
 // Oportunidades comerciales (opportunities/{id}). Ver domain/opportunities.ts.
 
@@ -17,6 +18,17 @@ export function useOpportunities(scope: { all: true } | { ownerUid: string }): {
     (s) => setState({ opportunities: s.docs.map((d) => d.data() as Opportunity).sort((a, b) => b.updatedAt - a.updatedAt), loading: false, error: null }),
     (e) => setState({ opportunities: [], loading: false, error: describeFirestoreError(e) })), [owner]);
   return state;
+}
+
+// Avisos de las oportunidades propias (globo del menú y recordatorio).
+export function useMyOpportunityAlerts(uid: string, enabled: boolean): OpportunityAlerts | null {
+  const [list, setList] = useState<Opportunity[] | null>(null);
+  useEffect(() => {
+    if (!enabled) { setList(null); return; }
+    return onSnapshot(query(col, where('ownerUid', '==', uid)), (s) => setList(s.docs.map((d) => d.data() as Opportunity)), () => setList(null));
+  }, [uid, enabled]);
+  const today = todayInSantiago();
+  return list ? opportunityAlerts(list, today, addDaysIso(today, 1)) : null;
 }
 
 export function useClientOpportunities(clientId: string | null, scope: { all: true } | { ownerUid: string }) {

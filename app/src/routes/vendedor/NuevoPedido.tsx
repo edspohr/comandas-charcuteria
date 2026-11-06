@@ -28,7 +28,7 @@ import { categoryLabel, categoryOrder } from '@/domain/categories';
 import { computeLineSubtotal, formatCLP, unitPriceLabel } from '@/lib/pricing';
 import { formatWindow, parseWindow, windowFilled } from '@/domain/delivery';
 import { autoReasons, EXCEPTION_KINDS, type ExceptionKind } from '@/domain/exceptions';
-import { SAMPLE_DEFAULT_GRAMS, SAMPLE_GRAM_OPTIONS, lineKey, sampleLabel, sampleLine, sampleSourceFor } from '@/domain/samples';
+import { SAMPLE_DEFAULT_GRAMS, SAMPLE_GRAM_OPTIONS, lineKey, sampleLabel, sampleLine, sampleSourceFor, sellerSamplesClient } from '@/domain/samples';
 import { isSellable, type Client, type Product, type ProductFormat, type StockDoc } from '@/domain/types';
 
 interface Draft {
@@ -95,9 +95,13 @@ export default function NuevoPedido() {
   }, [isTienda, clients, draft.clientId]);
   const { products } = useProducts();
   const { stock } = useAllStock();
+  // Muestras a nombre del vendedor (sin cliente): un cliente virtual propio.
+  const canSelfSamples = can(current!.appUser.role, 'order.create') && !isTienda;
+  const selfClient = useMemo(() => sellerSamplesClient(uid, current!.appUser.displayName), [uid, current]);
+  const isSelfSamples = draft.clientId === selfClient.id;
   const client = useMemo(
-    () => clients.find((c) => c.id === draft.clientId) ?? null,
-    [clients, draft.clientId],
+    () => (isSelfSamples ? selfClient : clients.find((c) => c.id === draft.clientId) ?? null),
+    [clients, draft.clientId, isSelfSamples, selfClient],
   );
   const lastOrder = useLastOrderForClient(uid, draft.clientId);
 
@@ -126,6 +130,7 @@ export default function NuevoPedido() {
     if (!client) return;
     const window = { from: draft.deliveryFrom ?? '', to: draft.deliveryTo ?? '', note: draft.deliveryNote };
     if (!windowFilled(window)) { setError('Indique el horario de entrega: una hora o una nota (por ejemplo «en la mañana»).'); goto(3); return; }
+    if (isSelfSamples && (draft.lines.length === 0 || draft.lines.some((l) => !l.sample))) { setError('Las muestras a su nombre solo llevan muestras: agréguelas con «+ Muestra» y quite los productos para vender.'); goto(2); return; }
     if (draft.exceptionOn && !draft.exceptionNote?.trim()) { setError('Describa la condición especial para que Ciro pueda aprobarla.'); return; }
     setSubmitting(true);
     setError(null);
@@ -207,7 +212,17 @@ export default function NuevoPedido() {
             goto(2);
           }}
           canRepeat={!!lastOrder}
+          onSelfSamples={canSelfSamples ? () => {
+            if (draft.clientId !== selfClient.id) setDraft((d) => ({ ...d, lines: d.lines.filter((l) => l.sample), deliveryFrom: undefined, deliveryTo: undefined, deliveryNote: undefined, fantasyName: undefined, opportunityId: undefined }));
+            update('clientId', selfClient.id); update('deliveryMode', 'retiro'); goto(2);
+          } : undefined}
         />
+      )}
+
+      {draft.step === 2 && isSelfSamples && (
+        <p className="card p-3 mb-3 text-xs text-charcoal-700 border-brass-300 bg-brass-50">
+          <strong>Muestras a su nombre.</strong> Agréguelas con «+ Muestra». Salen del stock como consumo interno y quedan a su cargo; después las cruza con sus clientes y oportunidades.
+        </p>
       )}
 
       {draft.step === 2 && client && (
@@ -307,7 +322,7 @@ function Steps({ current, onGo }: { current: number; onGo: (n: number) => void }
 // ---------- Step 1: Cliente ----------
 
 function StepCliente({
-  clients, uid, selectedId, onSelect, onRepeat, canRepeat,
+  clients, uid, selectedId, onSelect, onRepeat, canRepeat, onSelfSamples,
 }: {
   clients: Client[];
   uid: string;
@@ -315,6 +330,7 @@ function StepCliente({
   onSelect: (c: Client) => void;
   onRepeat: () => void;
   canRepeat: boolean;
+  onSelfSamples?: () => void;
 }) {
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(false);
@@ -336,6 +352,13 @@ function StepCliente({
           className="field h-12 text-base"
         />
       </div>
+
+      {onSelfSamples && !q.trim() && (
+        <button type="button" onClick={onSelfSamples} className="w-full card px-3.5 py-3 text-left border-brass-300 hover:border-brass-500">
+          <span className="block text-sm font-semibold text-charcoal-900">Muestras a mi nombre <SampleTag /></span>
+          <span className="block text-xs text-charcoal-500 mt-0.5">Sin cliente: para llevarlas a prospección. Quedan a su cargo y se cruzan después con sus clientes.</span>
+        </button>
+      )}
 
       {canRepeat && selectedId && (
         <Button variant="secondary" size="md" onClick={onRepeat} className="w-full">

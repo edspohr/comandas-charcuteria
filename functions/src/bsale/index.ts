@@ -125,7 +125,7 @@ export const bsaleReceiveProduction = onCall({ region: REGION, secrets, timeoutS
 });
 
 export const bsaleTransferToStore = onCall({ region: REGION, secrets, timeoutSeconds: 120 }, async (req) => {
-  const { uid } = requireRole(req, ['despacho', 'admin', 'superAdmin'], 'registrar traslados');
+  const { uid } = requireRole(req, ['despacho', 'produccion', 'admin', 'superAdmin'], 'registrar traslados');
   const s = await loadSettings();
   requireEnabled(s);
   const orderId = String(req.data?.orderId ?? '');
@@ -222,7 +222,7 @@ export const bsaleDailyCosts = onSchedule({ region: REGION, secrets, schedule: '
 
 // Consumo interno de las muestras de un pedido (una vez por pedido).
 export const bsaleConsumeSamples = onCall({ region: REGION, secrets, timeoutSeconds: 60 }, async (req) => {
-  const { uid } = requireRole(req, ['despacho', 'admin', 'superAdmin'], 'registrar muestras');
+  const { uid } = requireRole(req, ['despacho', 'produccion', 'admin', 'superAdmin'], 'registrar muestras');
   const orderId = String(req.data?.orderId ?? '');
   if (!orderId) throw new HttpsError('invalid-argument', 'Falta el pedido.');
   const s = await loadSettings();

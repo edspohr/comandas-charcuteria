@@ -14,8 +14,8 @@ service cloud.firestore {
     function isSuperAdmin()   { return role() == 'superAdmin'; }
     function isSupervisor()   { return roleIn(['admin', 'superAdmin']); }
     function canCreateOrder() { return roleIn(['vendedor', 'tienda', 'admin', 'superAdmin']); }
-    function canPack()        { return roleIn(['despacho', 'admin', 'superAdmin']); }
-    function canDispatch()    { return roleIn(['despacho', 'reparto', 'admin', 'superAdmin']); }
+    function canPack()        { return roleIn(['despacho', 'produccion', 'admin', 'superAdmin']); }
+    function canDispatch()    { return roleIn(['despacho', 'produccion', 'reparto', 'admin', 'superAdmin']); }
     function canDeliver()     { return roleIn(['reparto', 'admin', 'superAdmin']); }
     function canSync()        { return roleIn(['despacho', 'produccion', 'admin', 'superAdmin']); }
     function canReceiveProd() { return roleIn(['produccion', 'admin', 'superAdmin']); }

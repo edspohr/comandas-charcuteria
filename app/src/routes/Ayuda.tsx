@@ -23,7 +23,7 @@ const GUIDES: Record<Role, Guide> = {
     ['Tomar un pedido', [
       'Toque el botón «＋» (abajo al centro). Elija «Paso a paso» o «Pegar mensaje (IA)» si el cliente le escribió por WhatsApp.',
       'Cliente → productos → entrega → confirmar. El stock que ve es el real de Bsale; si falta, el pedido igual se envía y despacho decide.',
-      'Horario de entrega obligatorio: desde y hasta qué hora recibe el cliente. Queda como habitual en su ficha. El nombre de fantasía es opcional.',
+      'Horario de entrega obligatorio, pero flexible: basta con una hora, un rango o una nota («en la mañana»). Un rango completo queda como habitual en su ficha. El nombre de fantasía es opcional.',
       'Al enviar el pedido se pide su PIN: el pedido queda a su nombre.',
       'Muestras: en Productos toque «+ Muestra» (80 g por defecto, sin cargo).',
       'Condición especial (precio, corte, pago o entrega fuera de lo normal): márquela en Confirmar con una nota. El pedido queda «por aprobar» hasta que Ciro lo aprueba: no lo confirme al cliente antes.',

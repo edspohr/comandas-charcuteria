@@ -26,7 +26,7 @@ import { formatDateLong, formatDateShort, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 import { categoryLabel, categoryOrder } from '@/domain/categories';
 import { computeLineSubtotal, formatCLP, unitPriceLabel } from '@/lib/pricing';
-import { formatWindow, parseWindow, windowValid } from '@/domain/delivery';
+import { formatWindow, parseWindow, windowFilled } from '@/domain/delivery';
 import { autoReasons, EXCEPTION_KINDS, type ExceptionKind } from '@/domain/exceptions';
 import { SAMPLE_DEFAULT_GRAMS, SAMPLE_GRAM_OPTIONS, lineKey, sampleLabel, sampleLine, sampleSourceFor } from '@/domain/samples';
 import { isSellable, type Client, type Product, type ProductFormat, type StockDoc } from '@/domain/types';
@@ -125,7 +125,7 @@ export default function NuevoPedido() {
   async function submit() {
     if (!client) return;
     const window = { from: draft.deliveryFrom ?? '', to: draft.deliveryTo ?? '', note: draft.deliveryNote };
-    if (!windowValid(window)) { setError('Indique el horario de entrega: desde y hasta (el primero antes que el segundo).'); goto(3); return; }
+    if (!windowFilled(window)) { setError('Indique el horario de entrega: una hora o una nota (por ejemplo «en la mañana»).'); goto(3); return; }
     if (draft.exceptionOn && !draft.exceptionNote?.trim()) { setError('Describa la condición especial para que Ciro pueda aprobarla.'); return; }
     setSubmitting(true);
     setError(null);
@@ -745,7 +745,7 @@ function StepEntrega({
   onBack: () => void;
 }) {
   const [touched, setTouched] = useState(false);
-  const valid = windowValid({ from: draft.deliveryFrom ?? '', to: draft.deliveryTo ?? '' });
+  const valid = windowFilled({ from: draft.deliveryFrom, to: draft.deliveryTo, note: draft.deliveryNote });
   // Prefill: the client's usual window (or what the message/ficha says) and
   // its fantasy name. Only once, when the draft has nothing yet.
   useEffect(() => {
@@ -805,9 +805,9 @@ function StepEntrega({
       <div>
         <label className="eyebrow block mb-1.5">Horario de entrega *</label>
         <div className="flex items-center gap-2">
-          <input type="time" aria-label="Desde" value={draft.deliveryFrom ?? ''} onChange={(e) => onUpdate('deliveryFrom', e.target.value)} className={'field ' + (touched && !draft.deliveryFrom ? 'border-red-400' : '')} />
+          <input type="time" aria-label="Desde" value={draft.deliveryFrom ?? ''} onChange={(e) => onUpdate('deliveryFrom', e.target.value)} className={'field ' + (touched && !valid ? 'border-red-400' : '')} />
           <span className="text-sm text-charcoal-500">a</span>
-          <input type="time" aria-label="Hasta" value={draft.deliveryTo ?? ''} onChange={(e) => onUpdate('deliveryTo', e.target.value)} className={'field ' + (touched && !draft.deliveryTo ? 'border-red-400' : '')} />
+          <input type="time" aria-label="Hasta" value={draft.deliveryTo ?? ''} onChange={(e) => onUpdate('deliveryTo', e.target.value)} className={'field ' + (touched && !valid ? 'border-red-400' : '')} />
         </div>
         <div className="flex flex-wrap gap-1.5 mt-2">
           {QUICK_WINDOWS.map(([f, t, label]) => (
@@ -815,9 +815,9 @@ function StepEntrega({
               className={'rounded-md border px-2.5 py-1 text-xs ' + (draft.deliveryFrom === f && draft.deliveryTo === t ? 'bg-charcoal-900 border-charcoal-900 text-cream-50' : 'bg-white border-charcoal-200 text-charcoal-600')}>{label}</button>
           ))}
         </div>
-        <input value={draft.deliveryNote ?? ''} onChange={(e) => onUpdate('deliveryNote', e.target.value)} placeholder="Nota opcional — no antes de las 10, tocar timbre, preguntar por el chef…" className="field mt-2 h-10 text-sm" />
-        {touched && !valid && <p className="text-xs text-red-700 mt-1">Indique desde y hasta qué hora puede recibir el cliente.</p>}
-        <p className="text-[11px] text-charcoal-300 mt-1">Horario preferido por el cliente para recibir. Queda como habitual en su ficha.</p>
+        <input value={draft.deliveryNote ?? ''} onChange={(e) => onUpdate('deliveryNote', e.target.value)} placeholder="O escríbalo: en la mañana, no antes de las 10, tocar timbre…" className="field mt-2 h-10 text-sm" />
+        {touched && !valid && <p className="text-xs text-red-700 mt-1">Registre algo del horario: una hora, un rango o una nota.</p>}
+        <p className="text-[11px] text-charcoal-300 mt-1">Basta con una hora, un rango o una nota. Un rango completo queda como habitual en la ficha del cliente.</p>
       </div>
 
       <div>
@@ -881,7 +881,7 @@ function StepConfirmar({
               ? 'Retiro en tienda'
               : `Despacho · ${draft.deliveryAddress || client.address || 'sin dirección'}`}
           </p>
-          {windowValid({ from: draft.deliveryFrom ?? '', to: draft.deliveryTo ?? '' }) ? (
+          {windowFilled({ from: draft.deliveryFrom, to: draft.deliveryTo, note: draft.deliveryNote }) ? (
             <p className="text-xs text-charcoal-700 mt-0.5 font-medium">
               Horario · {formatWindow({ from: draft.deliveryFrom, to: draft.deliveryTo, note: draft.deliveryNote })}
             </p>

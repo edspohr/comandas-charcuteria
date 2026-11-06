@@ -1,5 +1,5 @@
 import { Icon } from '@/components/ui/Icon';
-import { windowKey } from '@/domain/delivery';
+import { windowKey, windowTimes } from '@/domain/delivery';
 import { isStrictStock } from '@/domain/types';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -506,7 +506,7 @@ function KanbanCard({ order, tone, action, onAction, onOpen, detailTo, draggable
       </div>
       <Link to={detailTo} onClick={(e) => { if (onOpen) { e.preventDefault(); onOpen(); } }} className="block font-semibold text-charcoal-900 text-sm leading-tight mt-0.5 truncate">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</Link>
       <div className="flex items-center justify-between gap-2 mt-1 text-[11px] text-charcoal-500">
-        <span className={'first-letter:uppercase ' + (late ? 'text-red-700 font-semibold' : '')}>{formatDateShort(order.requestedDate)}{order.deliveryWindow ? ` ${order.deliveryWindow.from}–${order.deliveryWindow.to}` : ''} · {order.deliveryMode === 'retiro' ? 'retiro' : 'despacho'}</span>
+        <span className={'first-letter:uppercase ' + (late ? 'text-red-700 font-semibold' : '')}>{formatDateShort(order.requestedDate)}{windowTimes(order.deliveryWindow) ? ` ${windowTimes(order.deliveryWindow)}` : ''} · {order.deliveryMode === 'retiro' ? 'retiro' : 'despacho'}</span>
         <span className="font-semibold text-charcoal-700">{order.totalCLP ? formatCLP(order.totalCLP) : `${order.lines.length} lín.`}</span>
       </div>
       {!compact && (

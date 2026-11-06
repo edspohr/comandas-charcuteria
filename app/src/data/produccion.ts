@@ -10,6 +10,7 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { windowTimes } from '@/domain/delivery';
 import type { Order, OrderStatus, StockDoc, StockMovement } from '@/domain/types';
 import { stockDocId } from '@/domain/types';
 import { useProducts } from './products';
@@ -112,7 +113,7 @@ export function useProduccionData(): {
             orderId: o.id,
             clientName: o.clientSnapshot.fantasyName ?? o.clientSnapshot.name,
             requestedDate: o.requestedDate,
-            window: o.deliveryWindow?.from && o.deliveryWindow?.to ? `${o.deliveryWindow.from}–${o.deliveryWindow.to}` : undefined,
+            window: windowTimes(o.deliveryWindow) || undefined,
             reservedQty: l.reservedQty,
             pendingProductionQty: l.pendingProductionQty,
           });

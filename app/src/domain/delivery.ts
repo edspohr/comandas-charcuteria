@@ -1,8 +1,18 @@
-// Horario de entrega del pedido: rango desde–hasta obligatorio (lo que el
-// cliente prefiere para recibir) más una nota. El cliente guarda el suyo
-// habitual y el pedido viene prellenado; despacho y reparto ordenan por hora.
+// Horario de entrega del pedido: lo que el cliente prefiere para recibir.
+// Obligatorio que se registre ALGO (06-11, Edmundo): un rango desde–hasta,
+// una sola hora o solo texto en la nota («en la mañana», «antes de las 10»).
+// El cliente guarda el rango habitual y el pedido viene prellenado; despacho
+// y reparto ordenan por hora (los que no tienen hora van al final).
 
-export interface DeliveryWindow { from: string; to: string; note?: string }
+export interface DeliveryWindow { from?: string; to?: string; note?: string }
+
+// Lo único exigido: que haya una hora o una nota.
+export const windowFilled = (w: Partial<DeliveryWindow> | null | undefined): boolean =>
+  !!(w?.from?.trim() || w?.to?.trim() || w?.note?.trim());
+
+// Solo la parte de horas: "09:00–13:00", "desde 09:00", "hasta 13:00" o ''.
+export const windowTimes = (w?: Partial<DeliveryWindow> | null): string =>
+  w?.from && w?.to ? `${w.from}–${w.to}` : w?.from ? `desde ${w.from}` : w?.to ? `hasta ${w.to}` : '';
 
 const hhmm = (h: string, m?: string) => `${String(Math.min(23, Number(h))).padStart(2, '0')}:${String(Math.min(59, Number(m ?? 0))).padStart(2, '0')}`;
 
@@ -19,7 +29,7 @@ export const windowValid = (w: Partial<DeliveryWindow> | null | undefined): w is
   !!w?.from && !!w?.to && /^\d{2}:\d{2}$/.test(w.from) && /^\d{2}:\d{2}$/.test(w.to) && w.from < w.to;
 
 export const formatWindow = (w?: Partial<DeliveryWindow> | null) =>
-  w?.from && w?.to ? `${w.from}–${w.to}${w.note ? ` · ${w.note}` : ''}` : '';
+  [windowTimes(w), w?.note?.trim() ?? ''].filter(Boolean).join(' · ');
 
 // Sort key: orders without a window go last.
 export const windowKey = (w?: Partial<DeliveryWindow> | null) => w?.from ?? '99:99';

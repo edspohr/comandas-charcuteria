@@ -18,7 +18,7 @@ import { describeFirestoreError } from '@/lib/errors';
 import { computeLineSubtotal } from '@/lib/pricing';
 import { DOCUMENTS_PATH, isRealBsale } from '@/integrations/bsale/client';
 import { hasSamples, isSampleOnly, lineKey } from '@/domain/samples';
-import { formatWindow, type DeliveryWindow } from '@/domain/delivery';
+import { formatWindow, windowFilled, type DeliveryWindow } from '@/domain/delivery';
 import { autoReasons, EXCEPTION_KINDS, type Approval, type ExceptionKind } from '@/domain/exceptions';
 import type { DocumentReference, Transaction } from 'firebase/firestore';
 import { opportunityOrderPatch } from './opportunities';
@@ -181,8 +181,8 @@ export async function createOrder(
       requestedDate: input.requestedDate,
       deliveryMode: input.deliveryMode,
       deliveryAddress: input.deliveryAddress ?? input.client.address,
-      receivingHours: input.deliveryWindow ? formatWindow(input.deliveryWindow) : input.receivingHours ?? input.client.receivingHours,
-      ...(input.deliveryWindow ? { deliveryWindow: stripEmpty(input.deliveryWindow) } : {}),
+      receivingHours: input.deliveryWindow && windowFilled(input.deliveryWindow) ? formatWindow(input.deliveryWindow) : input.receivingHours ?? input.client.receivingHours,
+      ...(input.deliveryWindow && windowFilled(input.deliveryWindow) ? { deliveryWindow: stripEmpty(input.deliveryWindow) } : {}),
       ...approvalFor(input, createdByUid, now),
       status,
       statusHistory: [
@@ -269,14 +269,21 @@ export async function rejectOrder(orderId: string, by: string, note: string): Pr
   if (o?.approval) await updateDoc(ref, { approval: { ...o.approval, status: 'rechazado', decidedBy: by, decidedAt: now, decisionNote: note.trim() } });
 }
 
-const stripEmpty = (w: DeliveryWindow): DeliveryWindow => (w.note?.trim() ? { from: w.from, to: w.to, note: w.note.trim() } : { from: w.from, to: w.to });
+const stripEmpty = (w: DeliveryWindow): DeliveryWindow => {
+  const out: DeliveryWindow = {};
+  if (w.from?.trim()) out.from = w.from.trim();
+  if (w.to?.trim()) out.to = w.to.trim();
+  if (w.note?.trim()) out.note = w.note.trim();
+  return out;
+};
 
 // The client's usual window (and fantasy name, when it had none) prefill the
 // next order. Best effort: the order is already saved.
 async function rememberClientHabits(input: DraftOrderInput) {
   const patch: Record<string, unknown> = {};
   const w = input.deliveryWindow;
-  if (w && (input.client.deliveryWindow?.from !== w.from || input.client.deliveryWindow?.to !== w.to)) {
+  // Solo un rango completo pasa a ser el habitual del cliente.
+  if (w?.from && w?.to && w.from < w.to && (input.client.deliveryWindow?.from !== w.from || input.client.deliveryWindow?.to !== w.to)) {
     patch.deliveryWindow = { from: w.from, to: w.to };
     patch.receivingHours = `${w.from}–${w.to}`;
   }

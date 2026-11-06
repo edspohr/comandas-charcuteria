@@ -42,7 +42,7 @@ const GUIDES: Record<Role, Guide> = {
       'Abra una oportunidad y toque «Registrar visita o llamada»: anote qué pasó y el siguiente paso con fecha.',
       '«Muestras o pedido» abre Nuevo pedido con el cliente listo y ligado a la oportunidad. Las muestras se agregan con «+ Muestra».',
       'Si el cliente pide esperar, «Postergar» con la fecha en que vuelve a su agenda. Si no resultó, «Perdida» con el motivo.',
-      'Se gana sola cuando el pedido se factura. Para crear una propia: «+ Oportunidad».',
+      'Se gana sola cuando el pedido se factura. Para crear una propia: «+ Oportunidad», o «🎤 Dictar»: diga el cliente, qué se busca y cuándo, y confirme lo que la app ordenó.',
     ]],
     ['Clientes', ['«Clientes» → «Mi cartera»: quién está en riesgo o dejó de comprar. Toque un cliente para ver su historial y lo que compra.']],
   ] },
@@ -116,6 +116,7 @@ const GUIDES: Record<Role, Guide> = {
     ACCESS,
     ['Aprobar excepciones', ['Arriba del Tablero aparece «Pedidos por aprobar». Revise y apruebe o rechace con su PIN (rechazar anula el pedido con el motivo).']],
     ['Oportunidades', [
+      '«🎤 Dictar»: grabe (o escriba) la oportunidad como la diría por WhatsApp: «Que Rafael visite al Bistró Ñuñoa el jueves por el guanciale». La app la ordena (ejecutivo, cliente, productos, acción y fecha) y le muestra la pantalla para confirmar; lo que no calza aparece marcado para revisar.',
       '«+ Oportunidad»: elija el cliente, qué se busca, el ejecutivo y la primera acción con fecha. Sin ejecutivo queda en «Sin asignar».',
       '«Del informe»: marque los clientes del informe de oportunidades que quiere trabajar, elija el ejecutivo de cada uno y «Cargar».',
       '«Equipo»: abiertas, vencidas, postergadas, ganadas, perdidas, conversión y muestras por ejecutivo (90 días). Toque a alguien para ver sus abiertas.',

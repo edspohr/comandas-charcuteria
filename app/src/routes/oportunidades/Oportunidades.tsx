@@ -6,6 +6,10 @@ import { Icon } from '@/components/ui/Icon';
 import { Pill } from '@/components/ui/DataTable';
 import { ModalShell } from '@/components/orders/OrderDialogs';
 import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
+import VoiceOpportunity from '@/components/opportunities/VoiceOpportunity';
+import { useProducts } from '@/data/products';
+import { matchClients, matchExecutive } from '@/domain/oppMatch';
+import type { DictatedOpportunity } from '@/domain/parse/opportunity';
 import { useCurrentUser } from '@/data/auth';
 import { searchClients, useClients } from '@/data/clients';
 import { useUsers } from '@/data/users';
@@ -49,6 +53,9 @@ export default function Oportunidades() {
   const [owner, setOwner] = useState<string>(manageAll ? 'todos' : uid);
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [dictating, setDictating] = useState(false);
+  const [dictated, setDictated] = useState<DictatedOpportunity | null>(null);
+  const { products: catalog } = useProducts();
   const today = todayInSantiago();
 
   const executives = useMemo(() => sellers.filter((u) => !u.placeholder).concat(users.filter((u) => u.role === 'superAdmin' && u.active !== false && !u.placeholder)), [sellers, users]);
@@ -74,7 +81,12 @@ export default function Oportunidades() {
           <h1 className="text-xl sm:text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Oportunidades</h1>
           <p className="text-xs text-charcoal-300 mt-1">{viewAll ? 'Todo el equipo' : 'Sus oportunidades'} · {opportunities.filter(isOpen).length} abiertas</p>
         </div>
-        {canCreate && <Button size="sm" onClick={() => setCreating(true)} className="shrink-0"><Icon name="plus" size={14} /> Oportunidad</Button>}
+        {canCreate && (
+          <div className="shrink-0 flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setDictating(true)} title="Grabar o escribir la oportunidad y ordenarla con IA">🎤 Dictar</Button>
+            <Button size="sm" onClick={() => { setDictated(null); setCreating(true); }}><Icon name="plus" size={14} /> Oportunidad</Button>
+          </div>
+        )}
       </header>
 
       <div className="mb-3 space-y-2">
@@ -102,7 +114,15 @@ export default function Oportunidades() {
       {tab === 'informe' && manageAll && <CandidatesView uid={uid} executives={executives} />}
 
       {selected && <OpportunityDetail o={selected} uid={uid} canManage={manageAll || (canCreate && selected.ownerUid === uid)} manageAll={manageAll} executives={executives} nameOf={nameOf} onClose={() => setOpenId(null)} />}
-      {creating && <NewOpportunityDialog uid={uid} manageAll={manageAll} executives={executives} onClose={() => setCreating(false)} onCreated={(id) => { setCreating(false); setOpenId(id); }} />}
+      {dictating && (
+        <VoiceOpportunity
+          executives={(manageAll ? executives : executives.filter((u) => u.uid === uid)).map((u) => u.displayName)}
+          products={catalog.filter((p) => p.active && !p.discontinued).map((p) => p.name)}
+          onClose={() => setDictating(false)}
+          onRead={(d) => { setDictating(false); setDictated(d); setCreating(true); }}
+        />
+      )}
+      {creating && <NewOpportunityDialog uid={uid} manageAll={manageAll} executives={executives} dictated={dictated} onClose={() => { setCreating(false); setDictated(null); }} onCreated={(id) => { setCreating(false); setDictated(null); setOpenId(id); }} />}
     </div>
   );
 }
@@ -353,17 +373,25 @@ function LostForm({ busy, onCancel, onSave }: { busy: boolean; onCancel: () => v
 
 // ---------- Nueva oportunidad ----------
 
-function NewOpportunityDialog({ uid, manageAll, executives, onClose, onCreated }: { uid: string; manageAll: boolean; executives: AppUser[]; onClose: () => void; onCreated: (id: string) => void }) {
+function NewOpportunityDialog({ uid, manageAll, executives, dictated, onClose, onCreated }: { uid: string; manageAll: boolean; executives: AppUser[]; dictated?: DictatedOpportunity | null; onClose: () => void; onCreated: (id: string) => void }) {
   const { clients } = useClients();
-  const [q, setQ] = useState('');
+  // Dictado (Fase 5): todo viene prellenado y se confirma aquí.
+  const dictOwner = dictated && manageAll ? matchExecutive(dictated.ownerName, executives) : null;
+  const [q, setQ] = useState(dictated?.clientName ?? '');
   const [client, setClient] = useState<Client | null>(null);
   const [newClient, setNewClient] = useState(false);
-  const [title, setTitle] = useState('');
-  const [products, setProducts] = useState('');
-  const [notes, setNotes] = useState('');
-  const [owner, setOwner] = useState<string>(manageAll ? '' : uid);
-  const [nextType, setNextType] = useState<NextActionType>('visita');
-  const [nextDate, setNextDate] = useState(addDaysIso(todayInSantiago(), 2));
+  const [title, setTitle] = useState(dictated?.title ?? '');
+  const [products, setProducts] = useState(dictated?.products.join(', ') ?? '');
+  const [notes, setNotes] = useState(dictated?.notes ?? '');
+  const [owner, setOwner] = useState<string>(manageAll ? dictOwner ?? '' : uid);
+  const [nextType, setNextType] = useState<NextActionType>(dictated?.actionType ?? 'visita');
+  const [nextDate, setNextDate] = useState(dictated?.date && dictated.date >= todayInSantiago() ? dictated.date : addDaysIso(todayInSantiago(), 2));
+  const dictClients = useMemo(() => (dictated ? matchClients(dictated.clientName, dictated.clientRut, clients.filter((c) => !c.isInternalShop)) : []), [dictated, clients]);
+  const review = dictated ? [
+    !client && 'cliente',
+    manageAll && !owner && (dictated.ownerName ? `ejecutivo («${dictated.ownerName}» no calza)` : 'ejecutivo'),
+    !dictated.date && 'fecha',
+  ].filter(Boolean) as string[] : [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const results = useMemo(() => (q.trim() ? searchClients(clients.filter((c) => !c.isInternalShop), q).slice(0, 8) : []), [clients, q]);
@@ -384,8 +412,23 @@ function NewOpportunityDialog({ uid, manageAll, executives, onClose, onCreated }
   }
 
   return (
-    <ModalShell title="Nueva oportunidad" eyebrow="Oportunidades" onClose={onClose}>
+    <ModalShell title={dictated ? 'Confirmar oportunidad dictada' : 'Nueva oportunidad'} eyebrow="Oportunidades" onClose={onClose}>
       <div className="space-y-3">
+        {dictated && (
+          <div className="card p-3 bg-cream-100/60">
+            <p className="eyebrow mb-1">Lo que se dictó</p>
+            <p className="text-xs text-charcoal-700 italic">«{dictated.transcript}»</p>
+            {review.length > 0 && <p className="text-xs text-brass-700 mt-1.5">Revise: {review.join(', ')}.</p>}
+          </div>
+        )}
+        {!client && dictClients.length > 0 && (
+          <div>
+            <p className="eyebrow mb-1">¿Es alguno de estos clientes?</p>
+            <ul className="card divide-y divide-charcoal-100">
+              {dictClients.map((c) => <li key={c.id}><button className="w-full text-left p-2.5 text-sm hover:bg-cream-100/60" onClick={() => setClient(c)}>{c.fantasyName ?? c.name} <span className="text-[11px] text-charcoal-300">{c.rut ?? ''}</span></button></li>)}
+            </ul>
+          </div>
+        )}
         {client ? (
           <div className="card p-3 flex items-center justify-between gap-2">
             <div className="min-w-0"><p className="text-sm font-semibold truncate">{client.fantasyName ?? client.name}</p><p className="text-[11px] text-charcoal-300">{client.rut ?? 'Sin RUT'}</p></div>

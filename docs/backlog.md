@@ -48,7 +48,7 @@ Fuente: notas y transcripción de la visita (Google Doc «20261105 La Charcuter�
 | 2 | Edición de pedidos hasta antes de facturar, tarjeta naranja con cambios (+ verde, − rojo) en ambos sentidos, eliminar pedidos (vendedor los propios, superAdmin cualquiera; invisible en la app, queda en la base) — [ADR-0018](adr/0018-edicion-y-eliminacion-de-pedidos.md) | Hecho y en producción (06-11) |
 | 3 | Comanda impresa de 80 mm (o 58 mm) por pedido, en lote desde «Total en armado» o al tomar: tablet Android + térmica ESC/POS WiFi/Bluetooth + app RawBT; alternativa con el diálogo del navegador | Hecho 06-11; falta probar con la impresora real (comprar térmica, instalar RawBT) |
 | 4 | Compras (Gabriela, administración) separadas de la recepción en la fábrica: compra → por recibir → recepción contra la compra, con entregas parciales; reciben producción, despacho y superAdmin ([ADR-0017](adr/0017-compras-e-insumos.md), actualización 06-11) | Hecho y en producción (06-11) |
-| 5 | Oportunidades por dictado de voz para Ciro (Gemini) con vista de confirmación | Pendiente |
+| 5 | Oportunidades por dictado de voz (o texto) con Gemini: ejecutivo, cliente, productos, acción y fecha, con vista de confirmación que marca lo que no calza | Hecho 06-11; falta probar con un audio real en producción |
 | 6 | Consumo de insumos en producción (FIFO por lote) | Etapa dic → ene |
 
 Pendiente de la fase 1: un informe en el Panel con las muestras que tiene cada vendedor.

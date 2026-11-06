@@ -69,6 +69,11 @@ const GUIDES: Record<Role, Guide> = {
       'Si usted rebaja algo (faltó o empacó menos unidades), el vendedor lo ve destacado para avisarle al cliente.',
     ]],
     ['Despachar', ['Cuando el pedido tiene su documento aparece «Despachar». Un pedido solo de muestras se cierra con «Registrar salida».']],
+    ['Recibir compras', [
+      '«Compras» → «Por recibir»: lo que administración compró y cuándo llega. Cuando llegue el proveedor toque «Recibir» en esa compra.',
+      '1) Documento: foto de la factura o guía, «Desde archivo» o «Sin documento». 2) Escanee la etiqueta de cada caja (peso, lote y vencimiento). 3) Confirme con su PIN: la pantalla compara lo que llegó con lo comprado.',
+      'Si llega solo una parte, la compra queda «Parcial» y lo que falta se recibe en la próxima entrega. Si llega algo sin compra registrada, recíbalo igual desde «Recibir».',
+    ]],
   ] },
   reparto: { title: 'Reparto', sections: [
     ACCESS,
@@ -90,11 +95,21 @@ const GUIDES: Record<Role, Guide> = {
       'Producción también arma pedidos, igual que despacho: en «Pedidos» toque «Tomar» y luego «Armar», y use «Total en armado» para sumar lo que hay que ir a buscar.',
       'Cuando el pedido tiene su documento aparece «Despachar». Un pedido solo de muestras se cierra con «Registrar salida».',
     ]],
+    ['Recibir compras', [
+      '«Compras» → «Por recibir»: lo que administración compró y cuándo llega. Cuando llegue el proveedor toque «Recibir» en esa compra.',
+      '1) Documento: foto de la factura o guía, «Desde archivo» o «Sin documento». 2) Escanee la etiqueta de cada caja (peso, lote y vencimiento). 3) Confirme con su PIN: la pantalla compara lo que llegó con lo comprado.',
+      'Si llega solo una parte, la compra queda «Parcial» y lo que falta se recibe en la próxima entrega. Si llega algo sin compra registrada, recíbalo igual desde «Recibir».',
+    ]],
   ] },
   admin: { title: 'Administración', sections: [
     ACCESS,
     ['Facturar', ['En «Pedidos», columna Por facturar: emita en el POS de Bsale con los pesos del armado y toque «Facturar» para vincular el documento (pide PIN). La reserva de stock se libera sola.', 'Si el documento trae el número del pedido en la referencia, o es del mismo RUT con un total parecido, Comandas lo marca «Sugerido»: revíselo y confírmelo.', '«Ver cómo lo facturaría Comandas» muestra la factura que emitiría la app (no emite nada). Compárela con la del POS: si calzan varios días seguidos, se enciende la facturación desde Comandas.']],
     ['Pendiente en Bsale', ['Su lista de trabajo del día: pedidos armados o entregados sin documento (con «Confirmar» cuando hay sugerencia), envíos a Bsale con error, producción y muestras que no llegaron a Bsale y clientes por revisar. Déjela en cero antes de irse.']],
+    ['Compras', [
+      '«Compras» → «Por recibir» → «+ Nueva compra»: proveedor, fecha en que llega y cada insumo con su cantidad (kg o unidades) y, si quiere, el precio. Si el insumo no existe, «Insumo nuevo».',
+      'La fábrica la recibe contra esa compra y ve lo que falta. Si llega en partes, queda «Parcial»; cuando el proveedor ya no entregará el resto, «Cerrar con diferencia» con el motivo. Una compra sin recepciones se puede «Anular».',
+      '«Recepciones» muestra lo que llegó, con el documento; «Stock de insumos», los lotes por insumo.',
+    ]],
     ['Todo lo demás', ['Puede tomar pedidos, armar, despachar, ver el Panel y el Catálogo como los perfiles de operación. «Oportunidades» la ve en modo lectura.']],
   ] },
   superAdmin: { title: 'Super administración', sections: [
@@ -106,9 +121,10 @@ const GUIDES: Record<Role, Guide> = {
       '«Equipo»: abiertas, vencidas, postergadas, ganadas, perdidas, conversión y muestras por ejecutivo (90 días). Toque a alguien para ver sus abiertas.',
       'En cualquier oportunidad puede cambiar el ejecutivo y hacer lo mismo que él: registrar, postergar, dar por perdida o crear muestras y pedidos.',
     ]],
-    ['Compras e insumos (piloto)', [
+    ['Compras e insumos', [
+      '«Por recibir»: las compras que registra administración (también puede registrarlas usted). La fábrica (producción y despacho) recibe contra ellas.',
       '«Recibir»: 1) «Con factura o guía»: foto del documento o «Desde archivo» (foto de la galería o PDF), que queda guardado y la app lee el timbre y las líneas; o «Sin documento», con el proveedor opcional; 2) «Escanear cajas»: cada etiqueta suma peso, lote y vencimiento, y la primera vez un código pregunta qué insumo es; 3) confirmar con su PIN. Cuadrar las líneas del documento con los insumos es opcional.',
-      '«Compras»: el historial con su documento (toque la miniatura para abrirlo) y «+ Agregar foto o PDF», también para las compras sin documento. «Stock de insumos»: los lotes por insumo con su vencimiento y «+ Insumo nuevo».',
+      '«Recepciones»: el historial con su documento (toque la miniatura para abrirlo) y «+ Agregar foto o PDF», también para las compras sin documento. «Stock de insumos»: los lotes por insumo con su vencimiento y «+ Insumo nuevo».',
       '«Laboratorio»: escanee etiquetas o elija fotos y PDF para ver qué lee la app. No crea compras ni stock.',
     ]],
     ['Personas', ['«Usuarios» → «+ Agregar persona» o «Invitar con su historial» (trae los pedidos y la cartera de WhatsApp). Cada persona crea su PIN al entrar. Aquí se desactiva a alguien o se borra su PIN.']],

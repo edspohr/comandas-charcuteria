@@ -24,7 +24,11 @@ service cloud.firestore {
     function canViewAllOpps() { return roleIn(['admin', 'superAdmin', 'consultor']); }
     // Compras e insumos (ADR-0017): prototipo, solo super administración.
     // Para abrirlo a la fábrica, agregar los perfiles aquí y en permissions.ts.
-    function canReceivePurchases() { return roleIn(['superAdmin']); }
+    // Compras e insumos (ADR-0017, Fase 4 del 06-11): administración crea las
+    // compras; producción y despacho reciben en la fábrica.
+    function canReceivePurchases() { return roleIn(['produccion', 'despacho', 'superAdmin']); }
+    function canOrderPurchases()   { return roleIn(['admin', 'superAdmin']); }
+    function canSeePurchases()     { return canReceivePurchases() || canOrderPurchases() || role() == 'consultor'; }
     // Lectura: cualquier perfil (el consultor ve todo, sin escribir nada).
     function canRead()        { return hasRole(); }
 
@@ -207,18 +211,31 @@ service cloud.firestore {
     // Compras e insumos (ADR-0017). Compras y lotes solo se crean, nunca se
     // editan ni se borran: el stock de insumos es la suma de los lotes.
     match /suppliers/{id} {
-      allow read: if canReceivePurchases();
-      allow create, update: if canReceivePurchases();
+      allow read: if canSeePurchases();
+      allow create, update: if canReceivePurchases() || canOrderPurchases();
       allow delete: if false;
     }
     match /supplies/{id} {
-      allow read: if canReceivePurchases();
-      allow create: if canReceivePurchases() && request.resource.data.createdBy == request.auth.uid;
-      allow update: if canReceivePurchases() && unchanged('createdBy');
+      allow read: if canSeePurchases();
+      allow create: if (canReceivePurchases() || canOrderPurchases()) && request.resource.data.createdBy == request.auth.uid;
+      allow update: if (canReceivePurchases() || canOrderPurchases()) && unchanged('createdBy');
+      allow delete: if false;
+    }
+    // Compra (lo que administración espera recibir). Quien recibe solo suma lo
+    // recibido y la deja parcial o recibida; administración la edita, cierra
+    // con diferencia o anula.
+    match /purchaseOrders/{id} {
+      allow read: if canSeePurchases();
+      allow create: if canOrderPurchases() && request.resource.data.createdBy == request.auth.uid && request.resource.data.status == 'por_recibir';
+      allow update: if canOrderPurchases()
+        || (canReceivePurchases()
+          && resource.data.status in ['por_recibir', 'parcial']
+          && request.resource.data.status in ['parcial', 'recibida']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['received', 'receptions', 'status', 'updatedAt']));
       allow delete: if false;
     }
     match /purchases/{id} {
-      allow read: if canReceivePurchases();
+      allow read: if canSeePurchases();
       allow create: if canReceivePurchases() && request.resource.data.receivedBy == request.auth.uid;
       // Solo se pueden agregar documentos (fotos o PDF) a una compra ya registrada.
       allow update: if canReceivePurchases()
@@ -227,7 +244,7 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /supplyLots/{id} {
-      allow read: if canReceivePurchases();
+      allow read: if canSeePurchases();
       allow create: if canReceivePurchases() && request.resource.data.receivedBy == request.auth.uid && request.resource.data.kg >= 0;
       allow update, delete: if false;
     }

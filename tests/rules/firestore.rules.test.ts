@@ -274,7 +274,7 @@ describe('oportunidades', () => {
   });
 });
 
-describe('compras e insumos (prototipo, solo superAdmin)', () => {
+describe('compras e insumos (ADR-0017 + Fase 4: administración compra, la fábrica recibe)', () => {
   const purchase = (by: string) => ({ id: '761234567-33-10', supplierRut: '76.123.456-7', supplierName: 'Proveedor', docKind: 'factura', folio: '10', lines: [], boxes: [], summary: [], read: { timbre: true, foto: false }, receivedBy: by, receivedByName: 'X', receivedAt: 1 });
   it('superAdmin registra la compra; nadie la edita después', async () => {
     const ciro = as('u-ciro', 'superAdmin');
@@ -289,11 +289,32 @@ describe('compras e insumos (prototipo, solo superAdmin)', () => {
     await assertSucceeds(setDoc(doc(ciro, 'supplyLots', 'l-1'), { supplyId: 's-1', kg: 12.5, receivedBy: 'u-ciro', receivedAt: 1 }));
     await assertFails(updateDoc(doc(ciro, 'supplyLots', 'l-1'), { kg: 99 }));
   });
-  it('los demás perfiles no ven ni registran compras', async () => {
+  it('producción y despacho reciben; administración y consultor solo ven; vendedor no ve', async () => {
     await seed('purchases/p-1', purchase('u-ciro'));
-    for (const [uid, role] of [['u-yury', 'produccion'], ['u-miguel', 'admin'], ['u-ed', 'consultor'], ['u-edu', 'despacho']] as const) {
-      await assertFails(getDoc(doc(as(uid, role), 'purchases', 'p-1')));
-      await assertFails(setDoc(doc(as(uid, role), 'supplies', `s-${uid}`), { name: 'x', createdBy: uid }));
+    for (const [uid, role] of [['u-yury', 'produccion'], ['u-edu', 'despacho']] as const) {
+      await assertSucceeds(getDoc(doc(as(uid, role), 'purchases', 'p-1')));
+      await assertSucceeds(setDoc(doc(as(uid, role), 'purchases', `r-${uid}`), { ...purchase(uid), id: `r-${uid}` }));
     }
+    for (const [uid, role] of [['u-miguel', 'admin'], ['u-ed', 'consultor']] as const) {
+      await assertSucceeds(getDoc(doc(as(uid, role), 'purchases', 'p-1')));
+      await assertFails(setDoc(doc(as(uid, role), 'purchases', `r-${uid}`), { ...purchase(uid), id: `r-${uid}` }));
+    }
+    await assertSucceeds(setDoc(doc(as('u-miguel', 'admin'), 'supplies', 's-miguel'), { name: 'x', createdBy: 'u-miguel' }));
+    await assertFails(setDoc(doc(as('u-ed', 'consultor'), 'supplies', 's-ed'), { name: 'x', createdBy: 'u-ed' }));
+    await assertFails(getDoc(doc(as('u-rafael', 'vendedor'), 'purchases', 'p-1')));
+  });
+
+  it('compras por recibir: administración crea y cierra; quien recibe solo suma lo recibido', async () => {
+    const po = { id: 'po-1', number: 'OC-1', supplierName: 'Proveedor', expectedDate: '2026-11-07', items: [{ supplyId: 's-1', supplyName: 'Pierna', unit: 'kg', qty: 100 }], status: 'por_recibir', received: {}, receptions: [], createdBy: 'u-miguel', createdByName: 'Miguel', createdAt: 1, updatedAt: 1 };
+    await assertSucceeds(setDoc(doc(as('u-miguel', 'admin'), 'purchaseOrders', 'po-1'), po));
+    await assertFails(setDoc(doc(as('u-yury', 'produccion'), 'purchaseOrders', 'po-2'), { ...po, id: 'po-2', createdBy: 'u-yury' }));
+    await assertFails(setDoc(doc(as('u-miguel', 'admin'), 'purchaseOrders', 'po-3'), { ...po, id: 'po-3', status: 'recibida' }));
+    const yury = as('u-yury', 'produccion');
+    await assertSucceeds(updateDoc(doc(yury, 'purchaseOrders', 'po-1'), { received: { 's-1': 60 }, receptions: ['r-1'], status: 'parcial', updatedAt: 2 }));
+    await assertFails(updateDoc(doc(yury, 'purchaseOrders', 'po-1'), { items: [] }));
+    await assertFails(updateDoc(doc(yury, 'purchaseOrders', 'po-1'), { status: 'cerrada', updatedAt: 3 }));
+    await assertSucceeds(updateDoc(doc(as('u-miguel', 'admin'), 'purchaseOrders', 'po-1'), { status: 'cerrada', closedNote: 'el proveedor no tenía', updatedAt: 4 }));
+    await assertFails(updateDoc(doc(yury, 'purchaseOrders', 'po-1'), { received: { 's-1': 90 }, status: 'parcial', updatedAt: 5 }));
+    await assertFails(getDoc(doc(as('u-rafael', 'vendedor'), 'purchaseOrders', 'po-1')));
   });
 });

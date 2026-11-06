@@ -79,3 +79,18 @@ El stock de un insumo es la suma de sus lotes. Todavía no hay consumo.
 - El borrador de la recepción guarda los archivos en IndexedDB del teléfono, para que no se pierdan si la pantalla se apaga.
 - Las fotos de etiquetas que lee Gemini no se guardan; solo el documento tributario.
 - La lectura del timbre depende de la impresión: si el papel térmico está gastado, la foto y la escritura a mano son el respaldo.
+
+## Actualización 06-11-2026: compras separadas de la recepción
+
+A partir de la visita del 05-11, compra y recepción quedan separadas:
+
+- **Administración crea la compra.** Gabriela y Miguel (perfil administración) y los superAdmin registran lo que compraron en `purchaseOrders/*`: proveedor, fecha en que llega y, por insumo, la cantidad en kg o unidades (precio opcional). La compra queda «por recibir».
+- **La fábrica recibe contra la compra.** Producción, despacho y superAdmin reciben con el flujo de siempre (documento → cajas → confirmar). La recepción se liga a la compra (`purchase.orderId`) y suma lo recibido por insumo en la misma transacción.
+- **Entregas parciales.** La compra queda «parcial» hasta completarse. Cada insumo se da por completo con el 98 % de lo comprado. Si el proveedor no entregará el resto, administración la cierra con la diferencia («cerrada»). Una compra sin recepciones se puede anular.
+- **Recepción sin compra.** Sigue permitida, para lo que llega sin compra registrada.
+- **Permisos** (`firestore.rules` y `storage.rules`):
+  - `canReceivePurchases` = producción, despacho y superAdmin.
+  - `canOrderPurchases` = administración y superAdmin.
+  - Administración y el consultor leen todo.
+  - Quien recibe solo puede cambiar lo recibido, las recepciones y el estado (a parcial o recibida).
+- **Laboratorio.** Queda solo para superAdmin.

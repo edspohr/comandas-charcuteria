@@ -85,6 +85,8 @@ export interface Purchase {
   receivedAt: number;
   /** Segundos desde que se empezó la recepción (KPI-3). */
   durationSec?: number;
+  /** Compra (purchaseOrders) contra la que se recibió, si había una. */
+  orderId?: string;
 }
 
 export interface SupplyLot {
@@ -176,3 +178,60 @@ export function lotsFrom(boxes: ReceivedBox[], summary: PurchaseSupplyRow[]): Ar
   }
   return [...out.values()];
 }
+
+// ---------- Compras por recibir (Fase 4, visita del 05-11) ----------
+// Administración (Gabriela) registra lo que compró; la fábrica recibe contra
+// esa compra. Una compra puede llegar en varias entregas: queda «parcial»
+// hasta completarse, o administración la cierra con la diferencia.
+
+export type PurchaseOrderStatus = 'por_recibir' | 'parcial' | 'recibida' | 'cerrada' | 'anulada';
+export const ORDER_STATUS_LABEL: Record<PurchaseOrderStatus, string> = { por_recibir: 'Por recibir', parcial: 'Parcial', recibida: 'Recibida', cerrada: 'Cerrada con diferencia', anulada: 'Anulada' };
+export const isOpenOrder = (o: Pick<PurchaseOrder, 'status'>) => o.status === 'por_recibir' || o.status === 'parcial';
+
+export interface PurchaseOrderItem { supplyId: string; supplyName: string; unit: SupplyUnit; qty: number; priceCLP?: number }
+
+export interface PurchaseOrder {
+  id: string;
+  number: string;
+  supplierRut?: string;
+  supplierName: string;
+  expectedDate: string;
+  items: PurchaseOrderItem[];
+  note?: string;
+  status: PurchaseOrderStatus;
+  /** Recibido por insumo: kg o unidades según el insumo. */
+  received: Record<string, number>;
+  receptions: string[];
+  createdBy: string;
+  createdByName: string;
+  createdAt: number;
+  updatedAt: number;
+  closedBy?: string;
+  closedAt?: number;
+  closedNote?: string;
+}
+
+// Se da por completo un insumo con el 98 % de lo comprado (el peso real de
+// las cajas nunca calza exacto).
+export const RECEIVED_TOLERANCE = 0.98;
+
+export interface OrderProgressRow { supplyId: string; name: string; unit: SupplyUnit; qty: number; received: number; pending: number; done: boolean }
+export function orderProgress(o: Pick<PurchaseOrder, 'items' | 'received'>): OrderProgressRow[] {
+  return o.items.map((i) => {
+    const received = r3(o.received?.[i.supplyId] ?? 0);
+    return { supplyId: i.supplyId, name: i.supplyName, unit: i.unit, qty: i.qty, received, pending: r3(Math.max(0, i.qty - received)), done: received >= i.qty * RECEIVED_TOLERANCE };
+  });
+}
+
+// Suma una recepción a la compra: lo recibido por insumo y el estado nuevo.
+export function applyReception(o: Pick<PurchaseOrder, 'items' | 'received'>, summary: PurchaseSupplyRow[]): { received: Record<string, number>; status: 'parcial' | 'recibida' } {
+  const received: Record<string, number> = { ...(o.received ?? {}) };
+  for (const r of summary) {
+    const add = r.unit === 'unidad' ? r.units : r.kg;
+    if (add > 0) received[r.supplyId] = r3((received[r.supplyId] ?? 0) + add);
+  }
+  const all = orderProgress({ items: o.items, received }).every((x) => x.done);
+  return { received, status: all ? 'recibida' : 'parcial' };
+}
+
+export const orderTotal = (o: Pick<PurchaseOrder, 'items'>) => o.items.reduce((s, i) => s + (i.priceCLP ? Math.round(i.priceCLP * i.qty) : 0), 0);

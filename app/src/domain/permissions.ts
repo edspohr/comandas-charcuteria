@@ -31,7 +31,8 @@ export type Capability =
   // Stock / Bsale
   | 'stock.sync'            // pedir una sincronización con Bsale
   | 'production.receive'    // registrar producción terminada → recepción Bsale
-  | 'purchase.receive'      // recibir compras e insumos (ADR-0017; prototipo: solo superAdmin)
+  | 'purchase.receive'      // recibir compras e insumos en la fábrica (ADR-0017)
+  | 'purchase.order'        // crear las compras que se esperan recibir (Fase 4, 06-11)
   | 'catalog.map'           // cruzar variantes Bsale ↔ catálogo de la app
   | 'bsale.explore'         // ventana de solo lectura a los datos de Bsale
   | 'bsale.configure'       // sucursales, lista de precios, escrituras on/off
@@ -48,22 +49,22 @@ const ROLE_CAPS: Record<Role, Capability[]> = {
   vendedor: ['order.create', 'order.cancelOwn', 'client.quickCreate', 'opportunity.manageOwn'],
   // La tienda también toma pedidos de clientes (Lucy), además de su reposición.
   tienda: ['order.create', 'order.createTransfer', 'order.cancelOwn', 'transfer.receive', 'client.quickCreate', 'opportunity.manageOwn'],
-  despacho: ['order.pack', 'order.dispatch', 'stock.sync'],
+  despacho: ['order.pack', 'order.dispatch', 'stock.sync', 'purchase.receive'],
   reparto: ['order.dispatch', 'order.deliver'],
   // Desde el 06-11 producción también arma y despacha (Yurij y Eduanis tienen
   // el mismo acceso: cargan producción y arman pedidos).
-  produccion: ['production.receive', 'stock.sync', 'order.pack', 'order.dispatch'],
+  produccion: ['production.receive', 'stock.sync', 'order.pack', 'order.dispatch', 'purchase.receive'],
   admin: [
     'order.create', 'order.createTransfer', 'order.cancelOwn', 'order.cancelAny', 'order.pack', 'order.link',
     'order.dispatch', 'order.deliver', 'transfer.receive', 'client.quickCreate', 'client.edit', 'stock.sync',
-    'production.receive', 'catalog.map', 'bsale.explore', 'panel.view', 'opportunity.viewAll',
+    'production.receive', 'catalog.map', 'bsale.explore', 'panel.view', 'opportunity.viewAll', 'purchase.order',
   ],
   superAdmin: [
     'order.create', 'order.createTransfer', 'order.cancelOwn', 'order.cancelAny', 'order.pack', 'order.link',
     'order.dispatch', 'order.deliver', 'transfer.receive', 'client.quickCreate', 'client.edit', 'stock.sync',
     'production.receive', 'catalog.map', 'bsale.explore', 'bsale.configure', 'panel.view', 'users.manage',
     'settings.edit', 'order.invoiceLate', 'order.approve', 'opportunity.manageOwn', 'opportunity.manageAll', 'opportunity.viewAll',
-    'purchase.receive', 'order.editAny', 'order.delete',
+    'purchase.receive', 'purchase.order', 'order.editAny', 'order.delete',
   ],
   // Auditor: ve todo, no escribe nada.
   consultor: ['bsale.explore', 'panel.view', 'opportunity.viewAll'],
@@ -135,7 +136,7 @@ export const ROUTE_ACCESS: Record<RouteKey, (role: Role) => boolean> = {
   bsaleExplorer: (r) => can(r, 'bsale.explore'),
   pendienteBsale: (r) => can(r, 'order.link') || isReadOnly(r),
   oportunidades: (r) => canAny(r, ['opportunity.manageOwn', 'opportunity.viewAll']),
-  compras: (r) => can(r, 'purchase.receive'),
+  compras: (r) => canAny(r, ['purchase.receive', 'purchase.order']) || isReadOnly(r),
 };
 
 export const ROLE_HOME: Record<Role, string> = {

@@ -7,33 +7,46 @@ import BarcodeScanner, { LABEL_FORMATS, TIMBRE_FORMATS, readImage, type ScanHit 
 import { DOC_ACCEPT, pageImages } from '@/lib/docFiles';
 import { describeFirestoreError } from '@/lib/errors';
 import { useCurrentUser } from '@/data/auth';
-import { addPurchaseDocuments, createSupply, documentUrl, saveScanTest, usePurchases, useScanTests, useSupplies, useSupplyLots } from '@/data/purchases';
+import { addPurchaseDocuments, createSupply, documentUrl, saveScanTest, usePurchaseOrders, usePurchases, useScanTests, useSupplies, useSupplyLots } from '@/data/purchases';
 import { parseLabel, visibleRaw } from '@/domain/gs1';
 import { parseTed } from '@/domain/ted';
 import { DOC_KIND_LABEL, type Purchase, type PurchaseDocument, type Supply, type SupplyLot } from '@/domain/purchases';
 import { formatCLP } from '@/lib/pricing';
 import { addDaysIso, todayInSantiago } from '@/lib/format';
 import Recibir from './Recibir';
+import PorRecibir from './PorRecibir';
+import { can, isReadOnly } from '@/domain/permissions';
 
-// Compras e insumos (ADR-0017). Prototipo: solo super administración.
+// Compras e insumos (ADR-0017 + Fase 4 del 06-11). Administración registra
+// las compras por recibir; producción, despacho y superAdmin reciben.
 
-type Tab = 'recibir' | 'compras' | 'insumos' | 'laboratorio';
+type Tab = 'porRecibir' | 'recibir' | 'compras' | 'insumos' | 'laboratorio';
 const kg = (n: number) => `${n.toLocaleString('es-CL', { maximumFractionDigits: 1 })} kg`;
 
 export default function Compras() {
   const { current } = useCurrentUser();
   const me = { uid: current!.appUser.uid, name: current!.appUser.displayName };
+  const role = current!.appUser.role;
+  const canReceive = can(role, 'purchase.receive');
+  const canOrder = can(role, 'purchase.order');
   const [params, setParams] = useSearchParams();
-  const tab = (params.get('tab') as Tab | null) ?? 'recibir';
-  const setTab = (t: Tab) => setParams((p) => { p.set('tab', t); return p; }, { replace: true });
+  const tabs: Array<[Tab, string]> = [
+    ['porRecibir', 'Por recibir'],
+    ...(canReceive ? [['recibir', 'Recibir'] as [Tab, string]] : []),
+    ['compras', 'Recepciones'], ['insumos', 'Stock de insumos'],
+    ...(role === 'superAdmin' ? [['laboratorio', 'Laboratorio'] as [Tab, string]] : []),
+  ];
+  const asked = params.get('tab') as Tab | null;
+  const tab: Tab = asked && tabs.some(([t]) => t === asked) ? asked : 'porRecibir';
+  const setTab = (t: Tab) => setParams((p) => { p.set('tab', t); p.delete('compra'); return p; }, { replace: true });
   const { items: supplies, error } = useSupplies();
-
-  const tabs: Array<[Tab, string]> = [['recibir', 'Recibir'], ['compras', 'Compras'], ['insumos', 'Stock de insumos'], ['laboratorio', 'Laboratorio']];
+  const { items: orders } = usePurchaseOrders();
+  const startOrderId = params.get('compra');
   return (
     <div>
       <header className="mb-3">
         <h1 className="text-xl sm:text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Compras e insumos</h1>
-        <p className="text-xs text-charcoal-300 mt-1">Prototipo · solo super administración · el stock de insumos vive en Comandas, no en Bsale</p>
+        <p className="text-xs text-charcoal-300 mt-1">{canOrder ? 'Registre lo que compró; la fábrica lo recibe contra la compra.' : canReceive ? 'Reciba lo que llega contra la compra registrada por administración.' : isReadOnly(role) ? 'Solo lectura.' : ''} El stock de insumos vive en Comandas, no en Bsale.</p>
       </header>
       <div className="flex gap-1.5 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 mb-4">
         {tabs.map(([t, label]) => (
@@ -41,15 +54,16 @@ export default function Compras() {
         ))}
       </div>
       {error && <ErrorBanner message={error} />}
-      {tab === 'recibir' && <Recibir me={me} supplies={supplies} />}
-      {tab === 'compras' && <PurchaseList uid={me.uid} />}
-      {tab === 'insumos' && <SupplyStock supplies={supplies} uid={me.uid} />}
+      {tab === 'porRecibir' && <PorRecibir me={me} supplies={supplies} canOrder={canOrder} canReceive={canReceive} onReceive={(po) => setParams((p) => { p.set('tab', 'recibir'); p.set('compra', po.id); return p; }, { replace: true })} />}
+      {tab === 'recibir' && <Recibir me={me} supplies={supplies} orders={orders} startOrderId={startOrderId} onStarted={() => setParams((p) => { p.delete('compra'); return p; }, { replace: true })} />}
+      {tab === 'compras' && <PurchaseList uid={me.uid} canAdd={canReceive} />}
+      {tab === 'insumos' && <SupplyStock supplies={supplies} uid={me.uid} canCreate={canReceive || canOrder} />}
       {tab === 'laboratorio' && <Laboratorio uid={me.uid} />}
     </div>
   );
 }
 
-function PurchaseList({ uid }: { uid: string }) {
+function PurchaseList({ uid, canAdd }: { uid: string; canAdd: boolean }) {
   const { items, loading, error } = usePurchases(100);
   const [open, setOpen] = useState<string | null>(null);
   if (loading) return <p className="text-sm text-charcoal-300">Cargando…</p>;
@@ -57,12 +71,12 @@ function PurchaseList({ uid }: { uid: string }) {
   if (!items.length) return <p className="text-sm text-charcoal-300">Todavía no hay compras registradas.</p>;
   return (
     <ul className="space-y-2">
-      {items.map((p) => <PurchaseCard key={p.id} p={p} uid={uid} open={open === p.id} onToggle={() => setOpen(open === p.id ? null : p.id)} />)}
+      {items.map((p) => <PurchaseCard key={p.id} p={p} uid={uid} canAdd={canAdd} open={open === p.id} onToggle={() => setOpen(open === p.id ? null : p.id)} />)}
     </ul>
   );
 }
 
-function PurchaseCard({ p, uid, open, onToggle }: { p: Purchase; uid: string; open: boolean; onToggle: () => void }) {
+function PurchaseCard({ p, uid, canAdd, open, onToggle }: { p: Purchase; uid: string; canAdd: boolean; open: boolean; onToggle: () => void }) {
   const totalKg = p.summary.reduce((a, r) => a + r.kg, 0);
   const boxes = p.summary.reduce((a, r) => a + r.boxes, 0);
   return (
@@ -80,7 +94,7 @@ function PurchaseCard({ p, uid, open, onToggle }: { p: Purchase; uid: string; op
           {p.summary.map((r) => <p key={r.supplyId}>{r.name}: <b>{r.unit === 'unidad' ? `${r.units} un.` : kg(r.kg)}</b>{r.docKg != null ? ` (doc. ${kg(r.docKg)})` : ''}{r.costPerKg ? ` · ${formatCLP(r.costPerKg)}/kg` : ''}</p>)}
           <p className="text-xs text-charcoal-300">Lectura: {p.read.timbre ? 'timbre' : 'sin timbre'}{p.read.foto ? ' + foto' : ''}{p.durationSec != null ? ` · registrada en ${Math.max(1, Math.round(p.durationSec / 60))} min` : ''}</p>
           {p.note && <p className="text-xs text-charcoal-700">Nota: {p.note}</p>}
-          <PurchaseDocs p={p} uid={uid} />
+          <PurchaseDocs p={p} uid={uid} canAdd={canAdd} />
         </div>
       )}
     </li>
@@ -88,7 +102,7 @@ function PurchaseCard({ p, uid, open, onToggle }: { p: Purchase; uid: string; op
 }
 
 // Documentos guardados de la compra (fotos o PDF) y agregar más.
-function PurchaseDocs({ p, uid }: { p: Purchase; uid: string }) {
+function PurchaseDocs({ p, uid, canAdd }: { p: Purchase; uid: string; canAdd: boolean }) {
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,14 +136,14 @@ function PurchaseDocs({ p, uid }: { p: Purchase; uid: string }) {
           </li>
         ))}
       </ul>
-      <button className="mt-2 text-xs underline text-charcoal-500" disabled={busy} onClick={() => input.current?.click()}>{busy ? 'Subiendo…' : '+ Agregar foto o PDF'}</button>
+      {canAdd && <button className="mt-2 text-xs underline text-charcoal-500" disabled={busy} onClick={() => input.current?.click()}>{busy ? 'Subiendo…' : '+ Agregar foto o PDF'}</button>}
       <input ref={input} type="file" accept={DOC_ACCEPT} multiple className="hidden" onChange={(e) => { void add([...(e.target.files ?? [])]); e.target.value = ''; }} />
       {error && <p className="text-xs text-red-700 mt-1">{error}</p>}
     </div>
   );
 }
 
-function SupplyStock({ supplies, uid }: { supplies: Supply[]; uid: string }) {
+function SupplyStock({ supplies, uid, canCreate }: { supplies: Supply[]; uid: string; canCreate: boolean }) {
   const { items: lots, loading } = useSupplyLots();
   const [open, setOpen] = useState<string | null>(null);
   const soon = addDaysIso(todayInSantiago(), 7);
@@ -146,7 +160,7 @@ function SupplyStock({ supplies, uid }: { supplies: Supply[]; uid: string }) {
   if (loading) return <p className="text-sm text-charcoal-300">Cargando…</p>;
   return (
     <div className="space-y-2">
-      <NewSupply uid={uid} existing={supplies} />
+      {canCreate && <NewSupply uid={uid} existing={supplies} />}
       {!supplies.length && <p className="text-sm text-charcoal-300">Los insumos se crean aquí o al recibir una compra.</p>}
       {supplies.length > 0 && <p className="text-xs text-charcoal-500">Stock = todo lo recibido. El consumo en producción viene en la próxima etapa.</p>}
       <ul className="space-y-2">

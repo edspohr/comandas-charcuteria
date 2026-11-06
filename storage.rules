@@ -2,17 +2,20 @@ rules_version = '2';
 
 // Archivos de la app. Hoy solo los documentos de compra (ADR-0017): la foto o
 // el PDF de cada factura o guía recibida, para consultarlos después.
-// Prototipo: solo super administración, igual que canReceivePurchases() en
-// firestore.rules. Para abrirlo a la fábrica, cambiar los perfiles en los dos.
+// Mismos perfiles que firestore.rules: suben quienes reciben en la fábrica;
+// leen también administración y el consultor. Cambiar los perfiles en los dos.
 service firebase.storage {
   match /b/{bucket}/o {
     function canReceivePurchases() {
-      return request.auth != null && request.auth.token.role in ['superAdmin'];
+      return request.auth != null && request.auth.token.role in ['produccion', 'despacho', 'superAdmin'];
+    }
+    function canSeePurchases() {
+      return request.auth != null && request.auth.token.role in ['produccion', 'despacho', 'admin', 'superAdmin', 'consultor'];
     }
 
     // purchases/{compra}/{archivo}: solo se agregan, nunca se reemplazan ni se borran.
     match /purchases/{purchaseId}/{file} {
-      allow read: if canReceivePurchases();
+      allow read: if canSeePurchases();
       allow create: if canReceivePurchases()
         && request.resource.size < 15 * 1024 * 1024
         && request.resource.contentType.matches('image/.*|application/pdf');

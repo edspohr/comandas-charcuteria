@@ -14,6 +14,7 @@ import { readLabelPhoto, readPurchaseDocument } from '@/domain/parse/purchase';
 import {
   DOC_KIND_LABEL, DTE_OF, docKindFromDte, kgDiff, purchaseId, suggestSupply, summarize,
   type DocKind, type DocLine, type Purchase, type ReceivedBox, type Supply, type SupplyKind, type SupplyUnit,
+  applyReception, isOpenOrder, ORDER_STATUS_LABEL, orderProgress, RECEIVED_TOLERANCE, type PurchaseOrder, type PurchaseSupplyRow,
 } from '@/domain/purchases';
 import { clearDraft, loadDraft, saveDraft } from '@/lib/draft';
 import { describeFirestoreError } from '@/lib/errors';
@@ -32,7 +33,7 @@ interface Head {
   againstGuide: boolean; guideFolio?: string;
 }
 interface DocFileMeta { id: string; name: string; type: string; size: number }
-interface Draft { startedAt: number; step: Step; head: Head; lines: DocLine[]; boxes: ReceivedBox[]; read: { timbre: boolean; foto: boolean }; note: string; files?: DocFileMeta[] }
+interface Draft { startedAt: number; step: Step; head: Head; lines: DocLine[]; boxes: ReceivedBox[]; read: { timbre: boolean; foto: boolean }; note: string; files?: DocFileMeta[]; orderId?: string }
 
 // Archivos del documento: en memoria y en IndexedDB (sobreviven a una recarga).
 interface FileApi { add: (files: File[]) => Promise<DocFileMeta[]>; get: (id: string) => Promise<Blob | undefined>; remove: (id: string) => void }
@@ -50,7 +51,11 @@ const dec = (v: string) => { const n = Number(v.trim().replace(',', '.')); retur
 const num = (v: string) => { const n = Number(v.replace(/\./g, '').replace(',', '.')); return v.trim() === '' || !Number.isFinite(n) ? undefined : n; };
 const uid8 = () => Math.random().toString(36).slice(2, 10);
 
-export default function Recibir({ me, supplies }: { me: { uid: string; name: string }; supplies: Supply[] }) {
+export default function Recibir({ me, supplies, orders, startOrderId, onStarted }: {
+  me: { uid: string; name: string }; supplies: Supply[];
+  // Compras por recibir (Fase 4): la recepción se liga a una de ellas.
+  orders: PurchaseOrder[]; startOrderId?: string | null; onStarted?: () => void;
+}) {
   const draftKey = `compra-${me.uid}`;
   const [d, setD] = useState<Draft>(() => loadDraft<Draft>(draftKey) ?? emptyDraft());
   useEffect(() => { if (d.step !== 'listo') saveDraft(draftKey, d); }, [d, draftKey]);
@@ -58,6 +63,23 @@ export default function Recibir({ me, supplies }: { me: { uid: string; name: str
   const patchHead = (p: Partial<Head>) => setD((x) => ({ ...x, head: { ...x.head, ...p } }));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Purchase | null>(null);
+  const openOrders = useMemo(() => orders.filter(isOpenOrder).sort((a, b) => a.expectedDate.localeCompare(b.expectedDate)), [orders]);
+  const order = d.orderId ? orders.find((o) => o.id === d.orderId) ?? null : null;
+  function pickOrder(id: string | undefined) {
+    const po = id ? orders.find((o) => o.id === id) : undefined;
+    setD((x) => ({
+      ...x, orderId: po?.id,
+      head: po && !x.head.supplierName && !x.head.supplierRut ? { ...x.head, supplierName: po.supplierName, supplierRut: po.supplierRut ? formatRut(po.supplierRut) : '' } : x.head,
+    }));
+  }
+  // «Recibir» desde Compras por recibir: abre la recepción con esa compra.
+  useEffect(() => {
+    if (!startOrderId || !orders.some((o) => o.id === startOrderId)) return;
+    if (d.step === 'listo') { setD({ ...emptyDraft(), orderId: undefined }); setSaved(null); }
+    pickOrder(startOrderId);
+    onStarted?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startOrderId, orders.length]);
 
   const blobs = useRef(new Map<string, Blob>());
   const fileKey = (id: string) => `${draftKey}-${id}`;
@@ -87,9 +109,10 @@ export default function Recibir({ me, supplies }: { me: { uid: string; name: str
         </div>
       )}
       {error && <ErrorBanner message={error} />}
+      {d.step !== 'listo' && <OrderBanner order={order} openOrders={openOrders} canChange={d.step === 'doc'} onChange={pickOrder} />}
       {d.step === 'doc' && <DocStep d={d} patch={patch} update={setD} patchHead={patchHead} supplies={supplies} setError={setError} files={files} />}
       {d.step === 'cajas' && <BoxesStep d={d} patch={patch} supplies={supplies} me={me} setError={setError} />}
-      {d.step === 'cuadre' && <ReconcileStep d={d} patch={patch} supplies={supplies} me={me} setError={setError} files={files} onSaved={(p) => { dropFiles(); clearDraft(draftKey); setSaved(p); patch({ step: 'listo' }); }} />}
+      {d.step === 'cuadre' && <ReconcileStep d={d} order={order} patch={patch} supplies={supplies} me={me} setError={setError} files={files} onSaved={(p) => { dropFiles(); clearDraft(draftKey); setSaved(p); patch({ step: 'listo' }); }} />}
       {d.step === 'listo' && saved && (
         <div className="card p-4 space-y-3">
           <p className="text-lg font-semibold text-emerald-800">Compra registrada</p>
@@ -99,6 +122,7 @@ export default function Recibir({ me, supplies }: { me: { uid: string; name: str
           </ul>
           {saved.documents?.length ? <p className="text-xs text-charcoal-500">Documento guardado ({saved.documents.length} archivo{saved.documents.length === 1 ? '' : 's'}): se ve en la pestaña Compras.</p> : null}
           {saved.againstGuide && <p className="text-xs text-charcoal-500">Factura de mercadería recibida con guía: no sumó stock.</p>}
+          {saved.orderId && (() => { const po = orders.find((o) => o.id === saved.orderId); return po ? <p className="text-sm text-charcoal-700">Compra {po.number}: <b>{ORDER_STATUS_LABEL[po.status].toLowerCase()}</b>{po.status === 'parcial' ? ' (falta parte; se completa en la próxima entrega)' : ''}.</p> : null; })()}
           {saved.durationSec != null && <p className="text-xs text-charcoal-300">Tiempo de registro: {Math.round(saved.durationSec / 60)} min</p>}
           <Button onClick={restart}>Recibir otra compra</Button>
         </div>
@@ -552,7 +576,7 @@ function ManualBox({ supplies, lines, me, onAdd, onClose, setError }: { supplies
 
 // ─── Paso 3: cuadre ──────────────────────────────────────────────────────
 
-function ReconcileStep({ d, patch, supplies, me, setError, files, onSaved }: { d: Draft; patch: (p: Partial<Draft>) => void; supplies: Supply[]; me: { uid: string; name: string }; setError: (e: string | null) => void; files: FileApi; onSaved: (p: Purchase) => void }) {
+function ReconcileStep({ d, order, patch, supplies, me, setError, files, onSaved }: { d: Draft; order: PurchaseOrder | null; patch: (p: Partial<Draft>) => void; supplies: Supply[]; me: { uid: string; name: string }; setError: (e: string | null) => void; files: FileApi; onSaved: (p: Purchase) => void }) {
   const [busy, setBusy] = useState(false);
   const used = new Set(d.boxes.map((b) => b.supplyId));
   const ordered = [...supplies.filter((s) => used.has(s.id)), ...supplies.filter((s) => !used.has(s.id))];
@@ -587,6 +611,7 @@ function ReconcileStep({ d, patch, supplies, me, setError, files, onSaved }: { d
         boxes: h.againstGuide ? [] : d.boxes.map(({ key: _k, ...b }) => b),
         summary, read: d.read, documents, note: d.note.trim() || undefined,
         receivedBy: me.uid, receivedByName: me.name, receivedAt: now, durationSec: Math.round((now - d.startedAt) / 1000),
+        orderId: order?.id,
       };
       await savePurchase(p, h.againstGuide ? [] : d.boxes);
       onSaved(p);
@@ -640,6 +665,7 @@ function ReconcileStep({ d, patch, supplies, me, setError, files, onSaved }: { d
           </tbody>
         </table>
       </div>
+      {order && <OrderReconcile order={order} summary={h.againstGuide ? [] : summary} />}
       {summary.some((r) => kgDiff(r)?.ok === false) && <p className="text-xs text-red-700">Hay diferencias entre lo recibido y el documento. Revise las cajas o anótelo en la nota (se puede confirmar igual).</p>}
 
       <textarea className="field h-auto py-2 text-sm" rows={2} placeholder="Nota (opcional): faltó una caja, temperatura, etc." value={d.note} onChange={(e) => patch({ note: e.target.value })} />
@@ -647,6 +673,68 @@ function ReconcileStep({ d, patch, supplies, me, setError, files, onSaved }: { d
         <Button variant="secondary" onClick={() => patch({ step: h.againstGuide ? 'doc' : 'cajas' })}>Atrás</Button>
         <Button size="lg" className="flex-1" disabled={busy || (!h.againstGuide && d.boxes.length === 0)} onClick={confirm}>{busy ? 'Guardando…' : 'Confirmar con PIN'}</Button>
       </div>
+    </div>
+  );
+}
+
+// ---------- Compra por recibir (Fase 4) ----------
+
+const qtyOf = (n: number, unit: 'kg' | 'unidad') => (unit === 'unidad' ? `${n.toLocaleString('es-CL')} un.` : kg(n));
+
+function OrderBanner({ order, openOrders, canChange, onChange }: { order: PurchaseOrder | null; openOrders: PurchaseOrder[]; canChange: boolean; onChange: (id: string | undefined) => void }) {
+  if (!order && (!canChange || openOrders.length === 0)) return null;
+  return (
+    <div className={'card p-3 ' + (order ? 'border-brass-300 bg-brass-50' : '')}>
+      {order ? (
+        <>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm"><span className="eyebrow">Recibiendo la compra</span><br /><span className="font-semibold text-charcoal-900">{order.supplierName}</span> <span className="font-mono text-[11px] text-charcoal-400">{order.number}</span></p>
+            {canChange && <button type="button" onClick={() => onChange(undefined)} className="text-xs underline text-charcoal-500">Sin compra</button>}
+          </div>
+          <ul className="mt-1 text-xs text-charcoal-700">
+            {orderProgress(order).map((r) => <li key={r.supplyId}>{r.done ? '✓ ' : ''}{r.name}: {r.received > 0 ? `${qtyOf(r.received, r.unit)} ya recibido de ` : ''}<b>{qtyOf(r.qty, r.unit)}</b></li>)}
+          </ul>
+        </>
+      ) : (
+        <label className="text-sm text-charcoal-700 block">¿Es de una compra registrada?
+          <select value="" onChange={(e) => onChange(e.target.value || undefined)} className="field h-10 text-sm mt-1">
+            <option value="">No, recibir sin compra</option>
+            {openOrders.map((o) => <option key={o.id} value={o.id}>{o.supplierName} · {o.number} · llega {o.expectedDate.split('-').reverse().slice(0, 2).join('-')}</option>)}
+          </select>
+        </label>
+      )}
+    </div>
+  );
+}
+
+function OrderReconcile({ order, summary }: { order: PurchaseOrder; summary: PurchaseSupplyRow[] }) {
+  const after = applyReception(order, summary);
+  const rows = orderProgress(order);
+  const now = new Map(summary.map((r) => [r.supplyId, r.unit === 'unidad' ? r.units : r.kg]));
+  const extra = summary.filter((r) => !order.items.some((i) => i.supplyId === r.supplyId));
+  return (
+    <div className="card p-4 space-y-2">
+      <p className="eyebrow">Contra la compra {order.number}</p>
+      <table className="w-full text-sm">
+        <thead><tr className="text-left text-[11px] uppercase tracking-display text-charcoal-500"><th className="py-1">Insumo</th><th className="py-1 text-right">Comprado</th><th className="py-1 text-right">Antes</th><th className="py-1 text-right">Ahora</th><th className="py-1 text-right">Falta</th></tr></thead>
+        <tbody className="divide-y divide-charcoal-100">
+          {rows.map((r) => {
+            const add = now.get(r.supplyId) ?? 0;
+            const left = Math.max(0, Math.round((r.qty - r.received - add) * 1000) / 1000);
+            return (
+              <tr key={r.supplyId}>
+                <td className="py-1">{r.name}</td>
+                <td className="py-1 text-right whitespace-nowrap">{qtyOf(r.qty, r.unit)}</td>
+                <td className="py-1 text-right whitespace-nowrap text-charcoal-400">{r.received ? qtyOf(r.received, r.unit) : '—'}</td>
+                <td className="py-1 text-right whitespace-nowrap font-semibold">{add ? qtyOf(add, r.unit) : '—'}</td>
+                <td className="py-1 text-right whitespace-nowrap">{left > 0 && (r.received + add) < r.qty * RECEIVED_TOLERANCE ? <span className="text-brass-700">{qtyOf(left, r.unit)}</span> : <span className="text-emerald-700">✓</span>}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {extra.length > 0 && <p className="text-xs text-charcoal-500">Llegó también, fuera de la compra: {extra.map((r) => r.name).join(', ')}.</p>}
+      <p className="text-xs text-charcoal-700">Al confirmar, la compra queda <b>{after.status === 'recibida' ? 'recibida' : 'parcial'}</b>{after.status === 'parcial' ? ': lo que falta se recibe en la próxima entrega o administración la cierra con la diferencia' : ''}.</p>
     </div>
   );
 }

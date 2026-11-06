@@ -4,10 +4,10 @@ import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage
 import { db, storage } from './firebase';
 import { forStorage } from '@/lib/docFiles';
 import { describeFirestoreError } from '@/lib/errors';
-import { lotsFrom, normText, type Purchase, type PurchaseDocument, type ReceivedBox, type Supplier, type Supply, type SupplyKind, type SupplyLot, type SupplyUnit } from '@/domain/purchases';
+import { applyReception, isOpenOrder, lotsFrom, normText, type Purchase, type PurchaseOrder, type PurchaseOrderItem, type PurchaseDocument, type ReceivedBox, type Supplier, type Supply, type SupplyKind, type SupplyLot, type SupplyUnit } from '@/domain/purchases';
 
-// Compras e insumos (ADR-0017). Solo super administración mientras dure el
-// prototipo (firestore.rules: canReceivePurchases).
+// Compras e insumos (ADR-0017). Administración crea las compras por recibir;
+// producción, despacho y superAdmin reciben (firestore.rules).
 
 function useCollection<T>(path: string, order?: [string, 'asc' | 'desc'], max?: number): { items: T[]; loading: boolean; error: string | null } {
   const [state, setState] = useState<{ items: T[]; loading: boolean; error: string | null }>({ items: [], loading: true, error: null });
@@ -26,6 +26,7 @@ export const useSupplies = () => {
 };
 export const useSuppliers = () => useCollection<Supplier>('suppliers');
 export const usePurchases = (max = 100) => useCollection<Purchase>('purchases', ['receivedAt', 'desc'], max);
+export const usePurchaseOrders = (max = 200) => useCollection<PurchaseOrder>('purchaseOrders', ['createdAt', 'desc'], max);
 export const useSupplyLots = () => useCollection<SupplyLot>('supplyLots', ['receivedAt', 'desc'], 2000);
 export const useScanTests = (max = 50) => useCollection<ScanTest & { id: string }>('scanTests', ['at', 'desc'], max);
 
@@ -80,9 +81,18 @@ export class DuplicatePurchase extends Error {
 export async function savePurchase(p: Purchase, boxes: ReceivedBox[]): Promise<void> {
   const purchaseRef = doc(db, 'purchases', p.id);
   const supplierRef = doc(db, 'suppliers', p.supplierRut.replace(/[^0-9kK]/g, '').toUpperCase() || '_sin_rut');
+  const orderRef = p.orderId ? doc(db, 'purchaseOrders', p.orderId) : null;
   await runTransaction(db, async (tx) => {
-    const [existing, supplier] = await Promise.all([tx.get(purchaseRef), tx.get(supplierRef)]);
+    const [existing, supplier, orderSnap] = await Promise.all([tx.get(purchaseRef), tx.get(supplierRef), orderRef ? tx.get(orderRef) : Promise.resolve(null)]);
     if (existing.exists()) throw new DuplicatePurchase(existing.data() as Purchase);
+    // Recepción contra una compra: suma lo recibido y la deja parcial o recibida.
+    if (orderRef && orderSnap) {
+      const po = orderSnap.data() as PurchaseOrder | undefined;
+      if (!po) throw new Error('La compra ya no existe.');
+      if (!isOpenOrder(po)) throw new Error(`La compra ${po.number} ya está ${po.status === 'anulada' ? 'anulada' : 'cerrada'}.`);
+      const next = p.againstGuide ? { received: po.received ?? {}, status: po.status === 'por_recibir' ? 'parcial' as const : po.status } : applyReception(po, p.summary);
+      tx.update(orderRef, { received: next.received, status: next.status, receptions: arrayUnion(p.id), updatedAt: p.receivedAt });
+    }
     // Sin RUT (compra sin documento) no se crea proveedor.
     if (supplierRef.id !== '_sin_rut' && !supplier.exists()) {
       tx.set(supplierRef, { id: supplierRef.id, rut: p.supplierRut, name: p.supplierName, createdAt: p.receivedAt, createdBy: p.receivedBy } satisfies Supplier);
@@ -97,6 +107,46 @@ export async function savePurchase(p: Purchase, boxes: ReceivedBox[]): Promise<v
       tx.set(ref, strip({ ...l, id: ref.id, origin: 'compra', purchaseId: p.id, supplierName: p.supplierName, receivedAt: p.receivedAt, receivedBy: p.receivedBy } as Record<string, unknown>));
     }
   });
+}
+
+// ---------- Compras por recibir ----------
+
+export interface NewPurchaseOrder { supplierRut?: string; supplierName: string; expectedDate: string; items: PurchaseOrderItem[]; note?: string }
+
+function validOrder(o: NewPurchaseOrder) {
+  if (!o.supplierName.trim()) throw new Error('Indique el proveedor.');
+  if (!o.expectedDate) throw new Error('Indique la fecha en que llega.');
+  if (!o.items.length || o.items.some((i) => !(i.qty > 0))) throw new Error('Agregue al menos un insumo con su cantidad.');
+}
+
+export async function createPurchaseOrder(o: NewPurchaseOrder, me: { uid: string; name: string }): Promise<PurchaseOrder> {
+  validOrder(o);
+  const ref = doc(collection(db, 'purchaseOrders'));
+  const now = Date.now();
+  const d = new Date(now);
+  const number = `OC-${d.getFullYear() % 100}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${ref.id.slice(0, 4).toUpperCase()}`;
+  const po: PurchaseOrder = {
+    id: ref.id, number, supplierRut: o.supplierRut?.trim() || undefined, supplierName: o.supplierName.trim(), expectedDate: o.expectedDate,
+    items: o.items, note: o.note?.trim() || undefined, status: 'por_recibir', received: {}, receptions: [],
+    createdBy: me.uid, createdByName: me.name, createdAt: now, updatedAt: now,
+  };
+  await setDoc(ref, strip(po));
+  return po;
+}
+
+// Antes de la primera recepción se puede corregir todo; después, solo
+// cantidades, fecha y nota (lo recibido queda).
+export async function updatePurchaseOrder(po: PurchaseOrder, o: NewPurchaseOrder) {
+  validOrder(o);
+  await updateDoc(doc(db, 'purchaseOrders', po.id), strip({
+    supplierRut: o.supplierRut?.trim() || null, supplierName: o.supplierName.trim(), expectedDate: o.expectedDate,
+    items: o.items, note: o.note?.trim() || null, updatedAt: Date.now(),
+  }) as Record<string, unknown>);
+}
+
+export async function closePurchaseOrder(po: PurchaseOrder, by: string, note: string, cancel = false) {
+  if (!note.trim()) throw new Error('Indique el motivo.');
+  await updateDoc(doc(db, 'purchaseOrders', po.id), { status: cancel ? 'anulada' : 'cerrada', closedBy: by, closedAt: Date.now(), closedNote: note.trim().slice(0, 300), updatedAt: Date.now() });
 }
 
 // Laboratorio de escaneo: cada lectura queda para ajustar el intérprete con

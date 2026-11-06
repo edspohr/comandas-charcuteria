@@ -308,7 +308,7 @@ const AREAS: Array<{ title: string; intro: string; features: Feature[] }> = [
       { icon: <IconFactory />, title: 'Producción', text: 'Lo que falta producir según los pedidos, por día. La carga se hace con una foto de la planilla o a mano, entra a Bsale como recepción y reasigna el stock a los pedidos que esperaban.' },
       { icon: <IconScale />, title: 'Armado con peso real', text: 'Despacho y producción registran lo que realmente se empacó: el pedido se factura con esos pesos y la diferencia queda medida. «Total en armado» suma los productos de los pedidos tomados para ir a buscar todo de una vez, y cada pedido sale impreso en una comanda de 80 mm para pegar en el paquete.' },
       { icon: <IconStore />, title: 'Reposición de tienda', text: 'La tienda pide por el mismo canal, despacho registra el traslado en Bsale y la tienda confirma lo que llegó.' },
-      { icon: <IconScan />, title: 'Compras e insumos', tag: 'Piloto', text: 'Al recibir una compra se escanean las etiquetas de cada caja: peso, lote y vencimiento. Con factura o guía, la foto o el PDF queda guardado, la app lee el timbre y las líneas y, si quiere, cuadra los kilos y el costo por kilo; también se puede registrar sin documento. Arma el stock de insumos por lote.' },
+      { icon: <IconScan />, title: 'Compras e insumos', text: 'Administración registra lo que compró y la fábrica lo recibe contra esa compra, también en varias entregas, viendo lo que falta. Al recibir se escanean las etiquetas de cada caja: peso, lote y vencimiento. Con factura o guía, la foto o el PDF queda guardado, la app lee el timbre y las líneas y, si quiere, cuadra los kilos y el costo por kilo; también se puede registrar sin documento. Arma el stock de insumos por lote.' },
     ],
   },
   {

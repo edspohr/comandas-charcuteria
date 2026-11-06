@@ -18,6 +18,8 @@ import ErrorBanner from '@/components/ui/ErrorBanner';
 import SampleTag from '@/components/orders/SampleTag';
 import SampleFollowups from '@/components/orders/SampleFollowups';
 import PickingTotals from '@/components/orders/PickingTotals';
+import { usePrintOrders } from '@/components/orders/PrintTicket';
+import { loadPrinter } from '@/lib/printer';
 import { ChangeItems, lastChange } from '@/components/orders/OrderChanges';
 import { lineKey, sampleLabel } from '@/domain/samples';
 import { ApprovalDialog, AnularDialog, DeliverDialog, DispatchDialog, TrasladoDialog, SalidaMuestrasDialog, VincularDocumentoDialog } from '@/components/orders/OrderDialogs';
@@ -161,11 +163,12 @@ export default function Tablero() {
   const [picking, setPicking] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const printOrders = usePrintOrders();
   async function run(kind: ActionKind, order: Order) {
     setActionError(null);
     try {
       switch (kind) {
-        case 'take': await assignPacker(order.id, uid); break;
+        case 'take': await assignPacker(order.id, uid); if (loadPrinter().autoOnTake) printOrders([{ ...order, assignedPackerId: uid }]); break;
         case 'arm': navigate(`/despacho/cola/${order.id}`); break;
         case 'link':
         case 'transfer':

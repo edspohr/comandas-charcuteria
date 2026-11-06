@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button';
 import { pickingTotals } from '@/domain/picking';
 import type { Order } from '@/domain/types';
 import { formatQty } from '@/lib/format';
+import { PrinterSettingsDialog, usePrintOrders } from '@/components/orders/PrintTicket';
 
 // Hoja «Total en armado»: lo que hay que ir a buscar para los pedidos tomados.
 export default function PickingTotals({ orders, uid, onClose }: { orders: Order[]; uid: string; onClose: () => void }) {
@@ -13,6 +14,8 @@ export default function PickingTotals({ orders, uid, onClose }: { orders: Order[
   const list = onlyMine ? inPacking.filter((o) => o.assignedPackerId === uid) : inPacking;
   const rows = useMemo(() => pickingTotals(list), [list]);
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const print = usePrintOrders();
+  const [printerOpen, setPrinterOpen] = useState(false);
   const toggle = (k: string) => setChecked((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
 
   return (
@@ -45,7 +48,12 @@ export default function PickingTotals({ orders, uid, onClose }: { orders: Order[
             ))}
           </ul>
         )}
-        <Button variant="secondary" className="w-full mt-4" onClick={onClose}>Cerrar</Button>
+        <div className="flex gap-2 mt-4">
+          <Button variant="secondary" className="flex-1" onClick={onClose}>Cerrar</Button>
+          <Button className="flex-1" disabled={list.length === 0} onClick={() => print([...list].sort((a, b) => a.requestedDate.localeCompare(b.requestedDate) || (a.deliveryWindow?.from ?? '99').localeCompare(b.deliveryWindow?.from ?? '99')))}>Imprimir comandas ({list.length})</Button>
+        </div>
+        <button type="button" onClick={() => setPrinterOpen(true)} className="block mx-auto mt-2 text-[11px] underline text-charcoal-500">Configurar impresora</button>
+        {printerOpen && <PrinterSettingsDialog sample={list[0]} onClose={() => setPrinterOpen(false)} />}
       </div>
     </Backdrop>
   );

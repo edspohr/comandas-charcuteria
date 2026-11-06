@@ -8,6 +8,8 @@ import StatusPill from '@/components/ui/StatusPill';
 import { useCurrentUser } from '@/data/auth';
 import { assignPacker, markArmado, useOrder } from '@/data/orders';
 import { ChangeNoticeBox, ChangesHistory } from '@/components/orders/OrderChanges';
+import { PrintOrderButton, usePrintOrders } from '@/components/orders/PrintTicket';
+import { loadPrinter } from '@/lib/printer';
 import { formatDateLong, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 import ErrorBanner from '@/components/ui/ErrorBanner';
@@ -74,10 +76,14 @@ export default function DetalleArmado() {
     [order, state],
   );
 
+  const printOrders = usePrintOrders();
   async function take() {
     if (!order) return;
     setError(null);
-    try { await assignPacker(order.id, uid); } catch (e) { setError(describeFirestoreError(e)); }
+    try {
+      await assignPacker(order.id, uid);
+      if (loadPrinter().autoOnTake) printOrders([{ ...order, assignedPackerId: uid }]);
+    } catch (e) { setError(describeFirestoreError(e)); }
   }
 
   async function done() {
@@ -136,6 +142,7 @@ export default function DetalleArmado() {
         <p className="text-sm text-charcoal-900 font-semibold mt-1">
           {order.receivingHours ? `Recibe ${order.receivingHours}` : 'Sin horario de entrega'}
         </p>
+        {order.status !== 'anulado' && <PrintOrderButton order={order} className="mt-2" />}
       </header>
 
       <ChangeNoticeBox order={order} role={current!.appUser.role} uid={uid} nameOf={nameOf} />

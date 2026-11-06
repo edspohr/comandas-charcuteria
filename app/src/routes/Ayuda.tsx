@@ -60,6 +60,7 @@ const GUIDES: Record<Role, Guide> = {
     ['Armar', [
       '«Pedidos» ordena cada columna por fecha y hora de entrega. Toque «Tomar» y luego «Armar».',
       'Tome varios pedidos y toque «Total en armado»: suma los productos de los pedidos que tomó para ir a buscar todo de una vez. Marque lo que ya sacó.',
+      'Comandas impresas: en «Total en armado» toque «Imprimir comandas» (una por pedido, en orden de entrega) o, dentro del pedido, «Imprimir comanda». Péguela en el paquete. En «Impresora» se elige RawBT (tablet Android con la térmica) o el diálogo del navegador, y si se imprime apenas toma un pedido.',
       'Registre lo que realmente empacó (peso real en granel y piezas). Si algo faltó, márquelo con el motivo.',
       'Si una línea dice «Sin stock en Bsale», arme con lo que haya en cámara y registre lo empacado.',
       'Las muestras vienen marcadas «MUESTRA»: rotúlelas con el nombre del cliente.',

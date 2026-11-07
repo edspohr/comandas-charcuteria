@@ -13,6 +13,7 @@ import Stepper from '@/components/ui/Stepper';
 import SampleTag from '@/components/orders/SampleTag';
 import { useCurrentUser } from '@/data/auth';
 import { useClients, searchClients } from '@/data/clients';
+import { clientAltName } from '@/domain/parse/client';
 import { useProducts } from '@/data/products';
 import { useAllStock, availableFor, semaphore } from '@/data/stock';
 import { createOrder, useLastOrderForClient, type DraftLine } from '@/data/orders';
@@ -334,10 +335,12 @@ function StepCliente({
 }) {
   const [q, setQ] = useState('');
   const [creating, setCreating] = useState(false);
-  // Su cartera primero; el resto después, en el orden de la búsqueda.
+  // Sin búsqueda, su cartera primero. Al buscar manda el parecido con lo
+  // escrito; la cartera solo desempata.
   const results = useMemo(() => {
     const r = searchClients(clients, q);
-    return [...r.filter((c) => c.ownerUid === uid), ...r.filter((c) => c.ownerUid !== uid)];
+    if (!q.trim()) return [...r.filter((c) => c.ownerUid === uid), ...r.filter((c) => c.ownerUid !== uid)];
+    return r;
   }, [clients, q, uid]);
 
   return (
@@ -409,6 +412,7 @@ function StepCliente({
                   <span className="text-[10px] uppercase tracking-display bg-brass-100 text-brass-700 border border-brass-300 px-2 py-0.5 rounded">Facturación incompleta</span>
                 )}
               </div>
+              {clientAltName(c) && <div className="text-xs text-charcoal-500 mt-0.5">{clientAltName(c)}</div>}
               <div className="text-xs text-charcoal-300 mt-1">
                 {c.rut ?? 'Sin RUT'} · {c.address ?? 'Sin dirección'}
               </div>

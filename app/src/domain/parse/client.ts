@@ -77,24 +77,66 @@ function tidyName(raw: string): string {
 
 const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-// Try to recognise an existing client from the hints: RUT wins, then phone,
-// then a loose name match on fantasyName / razón social.
+// Nombre comparable: sin tildes, signos ni la forma societaria («ANDAR CAFE
+// SPA» = «Andar Café»).
+const LEGAL = /\b(spa|s a|sa|ltda|limitada|eirl|e i r l|sociedad|cia|y cia)\b/g;
+export const baseName = (s: string | undefined | null) =>
+  norm(s ?? '').replace(/[^a-z0-9ñ]+/g, ' ').replace(LEGAL, ' ').replace(/\s+/g, ' ').trim();
+
+function nameScore(n: string, f: string): number {
+  if (!n || !f) return 0;
+  if (f === n) return 80;
+  if (f.length >= 4 && (f.startsWith(n + ' ') || n.startsWith(f + ' '))) return 60;
+  if (` ${f} `.includes(` ${n} `) || (f.length >= 5 && ` ${n} `.includes(` ${f} `))) return 45;
+  const nw = n.split(' ').filter((w) => w.length > 2);
+  const fw = new Set(f.split(' ').filter((w) => w.length > 2));
+  if (!nw.length) return 0;
+  const hit = nw.filter((w) => fw.has(w)).length / nw.length;
+  return hit >= 0.6 ? Math.round(30 * hit) : 0;
+}
+
+export interface RankedClient { client: Client; score: number }
+
+// Todos los clientes que podrían ser el del mensaje, del más probable al
+// menos: RUT, teléfono y nombre (fantasía o razón social, sin forma
+// societaria). Con datos incompletos también cuentan: se elige y se piden
+// los datos que faltan (caso Andar Café, 06-11).
+export function rankClients(hints: ClientHints, clients: Client[], max = 5): RankedClient[] {
+  const rut = hints.rut ? cleanRut(hints.rut) : '';
+  const digits = hints.phone ? hints.phone.replace(/\D/g, '').slice(-8) : '';
+  const names = [hints.fantasyName, hints.name].map(baseName).filter(Boolean);
+  const out: RankedClient[] = [];
+  for (const c of clients) {
+    let score = 0;
+    if (rut && c.rut && cleanRut(c.rut) === rut) score = 100;
+    else if (digits.length >= 8 && c.contactPhone && c.contactPhone.replace(/\D/g, '').endsWith(digits)) score = 90;
+    else {
+      const fields = [baseName(c.fantasyName), baseName(c.name)];
+      for (const n of names) for (const f of fields) score = Math.max(score, nameScore(n, f));
+    }
+    if (score > 0) out.push({ client: c, score: score + (c.rut ? 3 : 0) + (c.bsaleClientId ? 2 : 0) });
+  }
+  return out.sort((a, b) => b.score - a.score).slice(0, max);
+}
+
+export const CONFIDENT_MATCH = 45;
+
+// El más probable, si es lo bastante seguro.
 export function matchExistingClient(hints: ClientHints, clients: Client[]): Client | null {
-  if (hints.rut) {
-    const c = clients.find((x) => x.rut && cleanRut(x.rut) === cleanRut(hints.rut!));
-    if (c) return c;
-  }
-  if (hints.phone) {
-    const digits = hints.phone.replace(/\D/g, '').slice(-8);
-    const c = clients.find((x) => x.contactPhone && x.contactPhone.replace(/\D/g, '').endsWith(digits));
-    if (c) return c;
-  }
-  const candidates = [hints.fantasyName, hints.name].filter(Boolean).map((s) => norm(s!));
-  for (const n of candidates) {
-    const c = clients.find((x) => norm(x.fantasyName ?? '') === n || norm(x.name) === n || norm(x.name).includes(n) || (x.fantasyName ? n.includes(norm(x.fantasyName)) : false));
-    if (c) return c;
-  }
-  return null;
+  const best = rankClients(hints, clients, 1)[0];
+  return best && best.score >= CONFIDENT_MATCH ? best.client : null;
+}
+
+// Datos que faltan para facturar.
+export function missingBillingData(c: Pick<Client, 'rut' | 'giro' | 'address' | 'name'>): string[] {
+  return [!c.rut && 'RUT', !c.name && 'razón social', !c.giro && 'giro', !c.address && 'dirección'].filter(Boolean) as string[];
+}
+
+// Segunda línea para reconocer al cliente: la razón social cuando difiere del
+// nombre de fantasía (en Bsale a veces la fantasía es el contacto: «DAYANA
+// SILVA» es ANDAR CAFE SPA).
+export function clientAltName(c: Pick<Client, 'name' | 'fantasyName'>): string | null {
+  return c.fantasyName && baseName(c.fantasyName) !== baseName(c.name) ? c.name : null;
 }
 
 export function hintsHaveSomething(h: ClientHints): boolean {

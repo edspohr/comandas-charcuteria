@@ -7,6 +7,7 @@ import { bsaleWritesOn } from './bsaleOps';
 import { describeFirestoreError } from '@/lib/errors';
 import type { Client, DeliveryMode, Order } from '@/domain/types';
 import { cleanRut, formatRut, isValidRut } from '@/lib/rut';
+import { baseName } from '@/domain/parse/client';
 
 // One shared listener per session for the client mirror (~2.000 docs since
 // Bsale went live): every screen that needs clients reuses it instead of
@@ -37,13 +38,28 @@ export function useClients(): ClientsState {
 
 const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
+// Lo que más se parece primero: nombre exacto, después los que empiezan con
+// lo escrito y al final los que lo contienen (antes salía en el orden de la
+// colección y «Andar Café» quedaba al fondo).
 export function searchClients(all: Client[], query: string): Client[] {
   if (!query.trim()) return all.slice(0, 20);
-  const q = norm(query);
+  const q = norm(query.trim());
+  const qb = baseName(query);
+  const rank = (c: Client) => {
+    const fields = [baseName(c.fantasyName), baseName(c.name)];
+    if (fields.includes(qb)) return 0;
+    if (fields.some((f) => f.startsWith(qb))) return 1;
+    if (fields.some((f) => f.split(' ').some((w) => w.startsWith(qb)))) return 2;
+    return 3;
+  };
   return all
     .filter((c) => norm(c.name).includes(q)
       || norm(c.fantasyName ?? '').includes(q)
-      || norm(c.rut ?? '').includes(q))
+      || norm(c.rut ?? '').includes(q)
+      || (qb.length > 2 && (baseName(c.name).includes(qb) || baseName(c.fantasyName).includes(qb))))
+    .map((c, i) => ({ c, r: rank(c), i }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map((x) => x.c)
     .slice(0, 20);
 }
 

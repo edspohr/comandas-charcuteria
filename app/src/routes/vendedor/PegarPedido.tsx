@@ -9,8 +9,8 @@ import { geminiEnabled, parseWithGeminiFull } from '@/domain/parse/gemini';
 import { applySamples } from '@/domain/parse/samples';
 import { isSellable } from '@/domain/types';
 import { SAMPLE_DEFAULT_GRAMS, sampleLine } from '@/domain/samples';
-import { extractClientHints, hintsHaveSomething, isClientInfoLine, matchExistingClient, type ClientHints } from '@/domain/parse/client';
-import { useClients } from '@/data/clients';
+import { clientAltName, CONFIDENT_MATCH, extractClientHints, hintsHaveSomething, isClientInfoLine, missingBillingData, rankClients, type ClientHints } from '@/domain/parse/client';
+import { searchClients, useClients } from '@/data/clients';
 import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
 import type { Client } from '@/domain/types';
 import { loadDraft, saveDraft } from '@/lib/draft';
@@ -72,6 +72,8 @@ export default function PegarPedido() {
   // client the vendedor just created from the hints.
   const [hints, setHints] = useState<ClientHints | null>(null);
   const [client, setClient] = useState<Client | null>(null);
+  // Todos los que podrían ser (Andar Café, 06-11): «No es este» ofrece los otros.
+  const [candidates, setCandidates] = useState<Client[]>([]);
   const [creating, setCreating] = useState(false);
 
   async function interpret() {
@@ -105,7 +107,9 @@ export default function PegarPedido() {
       if (usedFallback) setAiFallback(true);
     } finally {
       setHints(hintsHaveSomething(h) ? h : null);
-      setClient(hintsHaveSomething(h) ? matchExistingClient(h, clients) : null);
+      const ranked = hintsHaveSomething(h) ? rankClients(h, clients.filter((c) => !c.isInternalShop)) : [];
+      setCandidates(ranked.filter((r) => r.score >= 30).map((r) => r.client));
+      setClient(ranked[0] && ranked[0].score >= CONFIDENT_MATCH ? ranked[0].client : null);
       setBusy(false);
     }
   }
@@ -233,35 +237,14 @@ export default function PegarPedido() {
       )}
 
       {parsed && hints && (
-        <section className="mb-4">
-          <p className="eyebrow mb-2">Cliente detectado en el mensaje</p>
-          <div className={'card p-4 ' + (client ? 'border-emerald-200' : 'border-brass-300')}>
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div className="min-w-0 text-sm">
-                {client ? (
-                  <>
-                    <p className="font-semibold text-charcoal-900">{client.fantasyName ?? client.name} <span className="ml-2 text-[10px] uppercase tracking-display bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 rounded">Cliente existente</span></p>
-                    <p className="text-xs text-charcoal-500 mt-0.5">{client.rut ?? 'Sin RUT'} · {client.address ?? 'Sin dirección'}</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-semibold text-charcoal-900">{hints.fantasyName ?? hints.name ?? 'Cliente nuevo'} <span className="ml-2 text-[10px] uppercase tracking-display bg-brass-50 text-brass-700 border border-brass-300 px-1.5 rounded">No está en el catálogo</span></p>
-                    <p className="text-xs text-charcoal-500 mt-0.5">
-                      {[hints.rut, hints.phone, hints.address, hints.receivingHours].filter(Boolean).join(' · ') || 'Sin más datos en el mensaje'}
-                    </p>
-                  </>
-                )}
-              </div>
-              <div className="flex gap-2 shrink-0">
-                {client ? (
-                  <Button size="sm" variant="secondary" onClick={() => setClient(null)}>No es este</Button>
-                ) : (
-                  <Button size="sm" onClick={() => setCreating(true)}>Crear cliente con estos datos</Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
+        <ClientDetected
+          hints={hints}
+          client={client}
+          candidates={candidates}
+          clients={clients}
+          onPick={setClient}
+          onCreate={() => setCreating(true)}
+        />
       )}
 
       {creating && hints && (
@@ -405,5 +388,68 @@ function ParsedLineCard({
         </button>
       </div>
     </div>
+  );
+}
+
+// Cliente detectado en el mensaje: el más probable, los otros que calzan y un
+// buscador antes de crear uno nuevo. Un cliente con datos incompletos se
+// elige igual: se avisa qué falta para facturar.
+function ClientDetected({ hints, client, candidates, clients, onPick, onCreate }: {
+  hints: ClientHints; client: Client | null; candidates: Client[]; clients: Client[];
+  onPick: (c: Client | null) => void; onCreate: () => void;
+}) {
+  const [q, setQ] = useState('');
+  const others = candidates.filter((c) => c.id !== client?.id);
+  const results = q.trim() ? searchClients(clients.filter((c) => !c.isInternalShop), q).slice(0, 8) : [];
+  const missing = client ? missingBillingData(client) : [];
+  const row = (c: Client) => (
+    <li key={c.id}>
+      <button className="w-full text-left p-2.5 hover:bg-cream-100/60" onClick={() => { onPick(c); setQ(''); }}>
+        <span className="text-sm font-semibold text-charcoal-900">{c.fantasyName ?? c.name}</span>
+        {clientAltName(c) && <span className="text-xs text-charcoal-500"> · {clientAltName(c)}</span>}
+        <span className="block text-[11px] text-charcoal-400">{c.rut ?? 'Sin RUT'} · {c.address ?? 'Sin dirección'}{!c.invoicingComplete ? ' · datos incompletos' : ''}</span>
+      </button>
+    </li>
+  );
+  return (
+    <section className="mb-4">
+      <p className="eyebrow mb-2">Cliente detectado en el mensaje</p>
+      <div className={'card p-4 ' + (client ? 'border-emerald-200' : 'border-brass-300')}>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0 text-sm">
+            {client ? (
+              <>
+                <p className="font-semibold text-charcoal-900">{client.fantasyName ?? client.name} <span className="ml-2 text-[10px] uppercase tracking-display bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 rounded">Cliente existente</span></p>
+                {clientAltName(client) && <p className="text-xs text-charcoal-600">{clientAltName(client)}</p>}
+                <p className="text-xs text-charcoal-500 mt-0.5">{client.rut ?? 'Sin RUT'} · {client.address ?? 'Sin dirección'}</p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold text-charcoal-900">{hints.fantasyName ?? hints.name ?? 'Cliente nuevo'} <span className="ml-2 text-[10px] uppercase tracking-display bg-brass-50 text-brass-700 border border-brass-300 px-1.5 rounded">{others.length ? 'Elija el cliente' : 'No lo encontramos'}</span></p>
+                <p className="text-xs text-charcoal-500 mt-0.5">{[hints.rut, hints.phone, hints.address, hints.receivingHours].filter(Boolean).join(' · ') || 'Sin más datos en el mensaje'}</p>
+              </>
+            )}
+          </div>
+          {client && <Button size="sm" variant="secondary" onClick={() => onPick(null)}>No es este</Button>}
+        </div>
+        {client && missing.length > 0 && (
+          <p className="mt-2 text-xs rounded-md bg-brass-50 border border-brass-300 text-brass-700 p-2">Faltan datos para facturar: {missing.join(', ')}. El pedido se envía igual; pídale estos datos al cliente y anótelos en la nota del pedido para que administración los complete.</p>
+        )}
+        {!client && (
+          <div className="mt-3 space-y-2">
+            {others.length > 0 && (
+              <>
+                <p className="text-xs text-charcoal-600">¿Es alguno de estos?</p>
+                <ul className="card divide-y divide-charcoal-100">{others.map(row)}</ul>
+              </>
+            )}
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar otro cliente (nombre, razón social o RUT)" className="field h-10 text-sm" />
+            {results.length > 0 && <ul className="card divide-y divide-charcoal-100">{results.map(row)}</ul>}
+            {q.trim() && results.length === 0 && <p className="text-xs text-charcoal-400">Ningún cliente coincide con «{q.trim()}».</p>}
+            <Button size="sm" onClick={onCreate}>Crear cliente con estos datos</Button>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

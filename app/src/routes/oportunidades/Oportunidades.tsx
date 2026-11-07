@@ -9,6 +9,7 @@ import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
 import VoiceOpportunity from '@/components/opportunities/VoiceOpportunity';
 import { useProducts } from '@/data/products';
 import { matchClients, matchExecutive } from '@/domain/oppMatch';
+import { clientAltName } from '@/domain/parse/client';
 import type { DictatedOpportunity } from '@/domain/parse/opportunity';
 import { useCurrentUser } from '@/data/auth';
 import { searchClients, useClients } from '@/data/clients';
@@ -76,14 +77,16 @@ export default function Oportunidades() {
 
   return (
     <div>
-      <header className="mb-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
+      {/* Título y botones: en pantallas angostas los botones bajan a su propia
+          fila en vez de apretar (y tapar) el título. */}
+      <header className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0 flex-1 basis-56">
           <h1 className="text-xl sm:text-2xl font-semibold text-charcoal-900 tracking-display uppercase">Oportunidades</h1>
           <p className="text-xs text-charcoal-300 mt-1">{viewAll ? 'Todo el equipo' : 'Sus oportunidades'} · {opportunities.filter(isOpen).length} abiertas</p>
         </div>
         {canCreate && (
-          <div className="shrink-0 flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setDictating(true)} title="Grabar o escribir la oportunidad y ordenarla con IA">🎤 Dictar</Button>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" variant="secondary" onClick={() => setDictating(true)} title="Grabar o escribir la oportunidad y ordenarla con IA" aria-label="Dictar oportunidad">🎤 Dictar</Button>
             <Button size="sm" onClick={() => { setDictated(null); setCreating(true); }}><Icon name="plus" size={14} /> Oportunidad</Button>
           </div>
         )}
@@ -425,7 +428,7 @@ function NewOpportunityDialog({ uid, manageAll, executives, dictated, onClose, o
           <div>
             <p className="eyebrow mb-1">¿Es alguno de estos clientes?</p>
             <ul className="card divide-y divide-charcoal-100">
-              {dictClients.map((c) => <li key={c.id}><button className="w-full text-left p-2.5 text-sm hover:bg-cream-100/60" onClick={() => setClient(c)}>{c.fantasyName ?? c.name} <span className="text-[11px] text-charcoal-300">{c.rut ?? ''}</span></button></li>)}
+              {dictClients.map((c) => <li key={c.id}><button className="w-full text-left p-2.5 text-sm hover:bg-cream-100/60" onClick={() => setClient(c)}>{c.fantasyName ?? c.name}{clientAltName(c) ? <span className="text-[11px] text-charcoal-500"> · {clientAltName(c)}</span> : null} <span className="text-[11px] text-charcoal-300">{c.rut ?? ''}</span></button></li>)}
             </ul>
           </div>
         )}
@@ -440,7 +443,7 @@ function NewOpportunityDialog({ uid, manageAll, executives, dictated, onClose, o
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, razón social o RUT" className="field h-10 text-sm w-full" />
             {results.length > 0 && (
               <ul className="card divide-y divide-charcoal-100 mt-1">
-                {results.map((c) => <li key={c.id}><button className="w-full text-left p-2.5 text-sm hover:bg-cream-100/60" onClick={() => setClient(c)}>{c.fantasyName ?? c.name} <span className="text-[11px] text-charcoal-300">{c.rut ?? ''}</span></button></li>)}
+                {results.map((c) => <li key={c.id}><button className="w-full text-left p-2.5 text-sm hover:bg-cream-100/60" onClick={() => setClient(c)}>{c.fantasyName ?? c.name}{clientAltName(c) ? <span className="text-[11px] text-charcoal-500"> · {clientAltName(c)}</span> : null} <span className="text-[11px] text-charcoal-300">{c.rut ?? ''}</span></button></li>)}
               </ul>
             )}
             <button className="text-xs underline mt-1.5" onClick={() => setNewClient(true)}>+ Cliente nuevo (prospecto)</button>

@@ -31,6 +31,7 @@ export function ticketFor(o: Order, names: { seller: string; packer?: string }, 
     { kind: 'big', text: client },
   ];
   if (o.clientSnapshot.fantasyName && o.clientSnapshot.fantasyName !== o.clientSnapshot.name) rows.push({ kind: 'text', text: o.clientSnapshot.name });
+  rows.push({ kind: 'text', text: `Origen: ${o.stockSource === 'tienda' ? 'TIENDA' : 'FABRICA'}`, bold: true });
   rows.push({ kind: 'text', text: when, bold: true });
   if (o.deliveryWindow?.note && windowTimes(o.deliveryWindow)) rows.push({ kind: 'text', text: o.deliveryWindow.note });
   if (o.deliveryMode !== 'retiro' && o.deliveryAddress) rows.push({ kind: 'text', text: o.deliveryAddress });

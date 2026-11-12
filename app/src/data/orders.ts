@@ -15,7 +15,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db, functions } from './firebase';
-import type { Client, Order, OrderLine, OrderStatus, ProductFormat, StockDoc, StockMovement } from '@/domain/types';
+import type { Client, Order, OrderLine, OrderStatus, Product, ProductFormat, StockDoc, StockMovement } from '@/domain/types';
 import { stockDocId } from '@/domain/types';
 import { describeFirestoreError } from '@/lib/errors';
 import { computeLineSubtotal } from '@/lib/pricing';
@@ -112,13 +112,21 @@ export async function createOrder(
     throw new Error('Las muestras a su nombre solo pueden llevar muestras. Para vender, elija un cliente.');
   }
 
-  const result = await runTransaction(db, async (tx) => {
+  let observedCounter = -1;
+  const commit = () => runTransaction(db, async (tx) => {
     // ---- Reads
     const counterSnap = await tx.get(counterRef);
-    const nextN = (counterSnap.data()?.last ?? 0) + 1;
+    observedCounter = Number(counterSnap.data()?.last ?? 0);
+    const nextN = observedCounter + 1;
     const orderId = `PED-${year}-${String(nextN).padStart(4, '0')}`;
 
     const stockReads = await readStocks(tx, input.lines);
+    const missingProducts = new Set(input.lines.filter(l => !l.sample && !l.format).map(l => l.productId));
+    const catalog = new Map<string, Product>();
+    for (const id of missingProducts) {
+      const snap = await tx.get(doc(db, 'products', id));
+      if (snap.exists()) catalog.set(id, snap.data() as Product);
+    }
     const oppRef = input.opportunityId ? doc(db, 'opportunities', input.opportunityId) : null;
     const opp = oppRef ? ((await tx.get(oppRef)).data() as Opportunity | undefined) : undefined;
     if (oppRef && !opp) throw new Error('La oportunidad ya no existe.');
@@ -152,8 +160,10 @@ export async function createOrder(
           missing: pendingProductionQty,
         });
       }
-      const subtotalCLP = line.sample ? 0 : line.format ? computeLineSubtotal(line.format, line.qty) : undefined;
-      const unitPriceSnapshotCLP = line.sample ? undefined : line.format?.priceCLP ?? line.format?.pricePerKgCLP;
+      const format = line.format ?? catalog.get(line.productId)?.formats.find(f => f.formatId === line.formatId);
+      if (!line.sample && !format) throw new Error(`Vuelva a seleccionar el formato de ${line.productName}: no está disponible en el catálogo.`);
+      const subtotalCLP = line.sample ? 0 : format ? computeLineSubtotal(format, line.qty) : undefined;
+      const unitPriceSnapshotCLP = line.sample ? undefined : format?.priceCLP ?? format?.pricePerKgCLP;
       enriched.push({
         productId: line.productId,
         productName: line.productName,
@@ -242,6 +252,19 @@ export async function createOrder(
 
     return { orderId, status, parcialLines, awaitingApproval: !!order.approval };
   });
+  // With two different sellers the losing counter transaction may be denied
+  // by rules before Firestore evaluates its stale-write precondition: the
+  // generated order id now belongs to the winner. Retry only if the shared
+  // counter actually advanced; ordinary permission errors still fail.
+  let result: CreateOrderResult;
+  for (let attempt = 0; ; attempt++) {
+    try { result = await commit(); break; }
+    catch (error) {
+      if (attempt >= 3 || (error as { code?: string }).code !== 'permission-denied') throw error;
+      const latest = await getDoc(counterRef);
+      if (Number(latest.data()?.last ?? 0) <= observedCounter) throw error;
+    }
+  }
   if (!sellerSamples) await rememberClientHabits(input);
   return result;
 }

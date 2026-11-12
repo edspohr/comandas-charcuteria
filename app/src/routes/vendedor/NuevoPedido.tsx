@@ -1,3 +1,4 @@
+import { withDraftFormats } from '@/domain/orderDraft';
 import { stockForSource, type StockSource } from '@/domain/stockSource';
 import { Backdrop, SHEET_ACTIONS, SHEET_PANEL } from '@/components/ui/Sheet';
 import { Icon } from '@/components/ui/Icon';
@@ -97,6 +98,12 @@ export default function NuevoPedido() {
     setDraft((d) => ({ ...d, clientId: clients[0].id, stockSource: 'fabrica', deliveryMode: 'despacho', step: Math.max(d.step, 2) }));
   }, [isTienda, clients, draft.clientId]);
   const { products } = useProducts();
+  useEffect(() => {
+    setDraft(d => {
+      const lines = withDraftFormats(d.lines, products);
+      return lines === d.lines ? d : { ...d, lines };
+    });
+  }, [products, draft.lines]);
   const { stock: allStock } = useAllStock();
   const stock = useMemo(() => stockForSource(allStock, draft.stockSource), [allStock, draft.stockSource]);
   // Muestras a nombre del vendedor (sin cliente): un cliente virtual propio.

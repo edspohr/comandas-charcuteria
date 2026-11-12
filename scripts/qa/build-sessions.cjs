@@ -1,0 +1,10 @@
+const {build}=require('esbuild');const {resolve,dirname}=require('node:path');const fs=require('node:fs');
+const app=resolve('app'),src=resolve(app,'src'),out=resolve('private/qa-runtime/bundles');fs.mkdirSync(out,{recursive:true});
+(async()=>{for(const uid of ['seller-a','seller-b','packer','admin','driver']){
+ await build({stdin:{contents:`export * from ${JSON.stringify(resolve(src,'data/orders.ts'))}; export {createClientQuick} from ${JSON.stringify(resolve(src,'data/clients.ts'))}; export {db,auth,qaSdk,qaAuth} from 'qa-firebase';`,resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',packages:'external',outfile:resolve(out,uid+'.mjs'),define:{'import.meta.env':JSON.stringify({VITE_BSALE_MODE:'mock'})},plugins:[{name:'qa-isolated',setup(b){
+ b.onResolve({filter:/^firebase\//},a=>({path:require.resolve(a.path,{paths:[app]}),external:true}));
+ b.onResolve({filter:/^(qa-firebase|@\/data\/firebase|\.\/firebase)$/},a=>({path:'qa-firebase',namespace:'qa'}));
+ b.onLoad({filter:/.*/,namespace:'qa'},()=>({contents:`import {initializeApp} from 'firebase/app';import * as qaAuth from 'firebase/auth';import * as qaSdk from 'firebase/firestore';import {getFunctions,connectFunctionsEmulator} from 'firebase/functions';const app=initializeApp({projectId:'demo-comandas-qa',apiKey:'demo-key',appId:'qa-app'},'flow-${uid}');export const auth=qaAuth.getAuth(app);qaAuth.connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true});export const db=qaSdk.initializeFirestore(app,{ignoreUndefinedProperties:true});qaSdk.connectFirestoreEmulator(db,'127.0.0.1',8080);export const functions=getFunctions(app,'us-central1');connectFunctionsEmulator(functions,'127.0.0.1',5001);export {qaSdk,qaAuth};`,resolveDir:app}));
+ b.onResolve({filter:/^@\//},a=>{const p=resolve(src,a.path.slice(2));for(const ext of ['', '.ts','.tsx'])if(fs.existsSync(p+ext)&&fs.statSync(p+ext).isFile())return{path:p+ext};throw Error('No resuelto '+p);});
+ }}]});}
+ console.log('Cinco sesiones independientes empaquetadas desde el código real.');})().catch(e=>{console.error(e);process.exitCode=1});

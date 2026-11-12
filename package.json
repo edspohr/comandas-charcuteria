@@ -17,7 +17,9 @@
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,storage --project comandas-charcuteria",
     "appcheck:setup": "node scripts/appcheck-setup.mjs",
     "test:rules:emu": "PATH=\"/opt/homebrew/opt/openjdk@21/bin:$PATH\" firebase emulators:exec --only firestore --project comandas-rules-test \"npm run test:rules\"",
-    "test:unit": "vitest run tests/unit"
+    "test:unit": "vitest run tests/unit",
+    "test:flows": "node scripts/qa/build-sessions.cjs && vitest run --config tests/flows/vitest.config.mts",
+    "test:flows:emu": "PATH=\"/opt/homebrew/opt/openjdk@21/bin:$PATH\" firebase emulators:exec --only auth,firestore --project demo-comandas-qa \"npm run test:flows\""
   },
   "dependencies": {
     "firebase-admin": "^12.7.0"

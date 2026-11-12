@@ -152,6 +152,7 @@ export function OrderDrawer({ order, tone, action, onAction, onClose, detailTo, 
       <header className="px-5 py-4 border-b border-charcoal-100 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="eyebrow">{order.id} · {ORDER_STATUS_LABEL[order.status]}</p>
+          <p className="text-xs text-charcoal-500">Origen del stock: {order.stockSource === 'tienda' ? 'Tienda' : 'Fábrica'}</p>
           <h2 className="text-lg font-semibold text-charcoal-900 leading-tight truncate">{order.clientSnapshot.fantasyName ?? order.clientSnapshot.name}</h2>
           <p className="text-xs text-charcoal-500 first-letter:uppercase">{formatDateShort(order.requestedDate)} · {order.deliveryMode === 'retiro' ? 'retiro' : 'despacho'} · {nameOf(order.createdBy)}</p>
         </div>

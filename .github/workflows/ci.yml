@@ -24,3 +24,4 @@ jobs:
       - run: npx tsc -p functions --noEmit
       - run: npm --workspace app run build
       - run: npx firebase-tools@14 emulators:exec --only firestore --project comandas-rules-test "npm run test:rules"
+      - run: npx firebase-tools@14 emulators:exec --only auth,firestore --project demo-comandas-qa "npm run test:flows"

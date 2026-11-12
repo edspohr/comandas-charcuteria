@@ -9,7 +9,7 @@ import { geminiEnabled, parseWithGeminiFull } from '@/domain/parse/gemini';
 import { applySamples } from '@/domain/parse/samples';
 import { isSellable } from '@/domain/types';
 import { SAMPLE_DEFAULT_GRAMS, sampleLine } from '@/domain/samples';
-import { clientAltName, CONFIDENT_MATCH, extractClientHints, hintsHaveSomething, isClientInfoLine, missingBillingData, rankClients, type ClientHints } from '@/domain/parse/client';
+import { clientAltName, CONFIDENT_MATCH, extractClientHints, hintsHaveSomething, isClientInfoLine, missingBillingData, rankClients, rankClientsInText, type ClientHints } from '@/domain/parse/client';
 import { searchClients, useClients } from '@/data/clients';
 import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
 import type { Client } from '@/domain/types';
@@ -106,10 +106,12 @@ export default function PegarPedido() {
       setEngine('local');
       if (usedFallback) setAiFallback(true);
     } finally {
-      setHints(hintsHaveSomething(h) ? h : null);
-      const ranked = hintsHaveSomething(h) ? rankClients(h, clients.filter((c) => !c.isInternalShop)) : [];
+      setHints(hintsHaveSomething(h) ? h : {});
+      const eligible = clients.filter(c => !c.isInternalShop);
+      const ranked = hintsHaveSomething(h) ? rankClients(h, eligible) : rankClientsInText(text, eligible);
+      if (!hintsHaveSomething(h) && ranked[0]) { h = { fantasyName: ranked[0].client.fantasyName || ranked[0].client.name }; setHints(h); }
       setCandidates(ranked.filter((r) => r.score >= 30).map((r) => r.client));
-      setClient(ranked[0] && ranked[0].score >= CONFIDENT_MATCH ? ranked[0].client : null);
+      setClient(ranked[0] && ranked[0].score >= CONFIDENT_MATCH && (!ranked[1] || ranked[0].score > ranked[1].score) ? ranked[0].client : null);
       setBusy(false);
     }
   }

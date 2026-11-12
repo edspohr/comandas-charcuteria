@@ -18,3 +18,9 @@ La empresa factura, lleva stock por sucursal y mantiene sus clientes en Bsale. C
 - El stock que se ve en la app es el de Bsale con hasta 10 minutos de atraso (sincronización por cron + webhooks).
 - Los cambios de precio o de cliente se hacen en Bsale; la app los toma en la siguiente sincronización.
 - Solo los cruces de `catalogMap` con estado `confirmado` mueven stock: un producto sin cruce no tiene stock en la app.
+
+## Aclaración del 12-11-2026
+
+La razón social y los datos de contacto se leen de Bsale por separado. El nombre comercial es un dato propio de Comandas cuando la cuenta de Bsale no dispone de un atributo de fantasía; nunca se escribe sobre el contacto. Se sincronizan todos los clientes activos.
+
+Cada pedido elige fábrica o tienda como origen. Las reservas de Comandas se mantienen por separado (`reserved` / `storeReserved`), y no modifican los saldos de Bsale. Al vincular la factura del POS, el servidor valida la sucursal, lee los saldos posteriores a la venta y libera la reserva en una sola transacción. Los pedidos anteriores sin origen explícito corresponden a fábrica.

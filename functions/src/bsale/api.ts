@@ -121,6 +121,7 @@ export interface RawClient {
   id: number; firstName?: string; lastName?: string; email?: string; code?: string; phone?: string; createdAt?: number | string;
   company?: string; activity?: string; address?: string; city?: string; municipality?: string;
   companyOrPerson?: number; state?: number; updatedAt?: number;
+  attributes?: { items?: Array<{ id: number; name: string; value?: string }> };
 }
 export interface RawUser { id: number; firstName?: string; lastName?: string; email?: string; state?: number; office?: RawRef }
 export interface RawDocumentDetail { id: number; quantity: number; netUnitValue?: number; totalUnitValue?: number; netAmount?: number; totalAmount?: number; note?: string; variant?: RawRef & { code?: string; description?: string } }

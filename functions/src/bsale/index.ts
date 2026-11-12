@@ -1,3 +1,4 @@
+import { linkPosDocument } from './link';
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions/v2';
@@ -87,10 +88,10 @@ export const bsaleWebhook = onRequest({ region: REGION, secrets, timeoutSeconds:
       const variant = body.resource?.match(/variant(?:id)?=(\d+)/)?.[1] ?? id;
       if (variant) await syncStock(api, s, { variantIds: [variant], by: 'bsale-webhook' });
     } else if (topic === 'client' && id) {
-      const c = customerFromRaw(await api.get<RawClient>(`/clients/${id}.json`));
+      const c = customerFromRaw(await api.get<RawClient>(`/clients/${id}.json`, { expand: '[attributes]' }));
       const existing = await db.collection('clients').where('bsaleClientId', '==', c.id).limit(1).get();
       if (!existing.empty) {
-        await existing.docs[0].ref.set(stripUndefined({ name: c.name, rut: c.rut, giro: c.giro, address: c.address, contactPhone: c.phone, email: c.email, invoicingComplete: !!(c.rut && c.name && c.address && c.giro), bsaleSyncedAt: Date.now() }), { merge: true });
+        await existing.docs[0].ref.set(stripUndefined({ name: c.name, fantasyName: c.fantasyName ?? (existing.docs[0].get('fantasyName') === c.contactName ? null : existing.docs[0].get('fantasyName') ?? null), contactName: c.contactName ?? null, rut: c.rut, giro: c.giro, address: c.address, contactPhone: c.phone, email: c.email, invoicingComplete: !!(c.rut && c.name && c.address && c.giro), bsaleSyncedAt: Date.now() }), { merge: true });
       }
       // Clientes nuevos entran en la próxima corrida completa.
     }
@@ -103,6 +104,18 @@ export const bsaleWebhook = onRequest({ region: REGION, secrets, timeoutSeconds:
     // 200 igual: el cron de 10 min cubre lo que falte y Bsale no reintenta en loop.
     res.status(200).send('error');
   }
+});
+
+export const bsaleLinkDocument = onCall({ region: REGION, secrets, timeoutSeconds: 120 }, async req => {
+  const { uid, role } = requireRole(req, ['admin', 'superAdmin'], 'vincular documentos');
+  const s = await loadSettings();
+  requireEnabled(s);
+  const orderId = String(req.data?.orderId ?? '');
+  const documentId = String(req.data?.documentId ?? '');
+  const number = String(req.data?.number ?? '').trim().toUpperCase();
+  if (!orderId || !documentId || !/^(FA|BO)-\d{6,}$/.test(number)) throw new HttpsError('invalid-argument', 'Falta el pedido o el documento válido.');
+  await checkPin(req, 'vincular', orderId);
+  return linkPosDocument(apiFromSecret(), s, orderId, documentId, number, uid, role === 'superAdmin');
 });
 
 // ---------- Escritura ----------

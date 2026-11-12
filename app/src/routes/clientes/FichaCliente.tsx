@@ -117,6 +117,7 @@ export default function FichaCliente() {
               )}
               {client.email && <a href={`mailto:${client.email}`} className="block underline text-sm">{client.email}</a>}
             </dd>
+            <Row k="Contacto" v={client.contactName ?? '—'} />
             <Row k="Vendedor" v={client.ownerUid ? nameOf(client.ownerUid) : 'Sin asignar'} />
             {client.notes && <Row k="Notas" v={client.notes} />}
           </dl>

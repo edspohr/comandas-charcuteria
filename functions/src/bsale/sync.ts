@@ -1,3 +1,4 @@
+import { customerFromRaw } from './customers';
 import { getFirestore, type DocumentReference, type Firestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
 import type { BsaleApi, RawClient, RawDocument, RawStock } from './api';
@@ -22,7 +23,7 @@ const SYSTEM = 'bsale-sync';
 interface CatalogMapDoc { variantId: string; productId?: string; formatId?: string; status: 'sugerido' | 'confirmado' | 'ignorado' }
 
 interface OrderLine { productId: string; formatId: string; reservedQty: number; pendingProductionQty: number; [k: string]: unknown }
-interface Order { id: string; status: string; requestedDate: string; createdAt: number; lines: OrderLine[]; statusHistory: unknown[] }
+interface Order { stockSource?: 'fabrica' | 'tienda'; id: string; status: string; requestedDate: string; createdAt: number; lines: OrderLine[]; statusHistory: unknown[] }
 
 export interface SyncSummary {
   at: number;
@@ -56,6 +57,7 @@ const availableOf = (s: RawStock) => Number(s.quantityAvailable ?? (Number(s.qua
 
 export async function syncStock(api: BsaleApi, settings: BsaleSettings, opts: { variantIds?: string[]; by?: string } = {}): Promise<SyncSummary> {
   const db = getFirestore();
+  const balanceReadStartedAt = Date.now();
   const by = opts.by ?? SYSTEM;
   const factory = settings.factoryOfficeId;
   const store = settings.storeOfficeId;
@@ -125,34 +127,40 @@ export async function syncStock(api: BsaleApi, settings: BsaleSettings, opts: { 
     logger.warn(`[bsale] ${invalid.length} cruces con id inválido omitidos`, { keys: invalid.slice(0, 20), variants: invalid.slice(0, 20).map((k) => agg.get(k)?.variantIds) });
     invalid.forEach((k) => agg.delete(k));
   }
-  const keys = [...agg.keys()];
-  const stockSnaps = [];
-  for (let i = 0; i < keys.length; i += 200) {
-    const refs = keys.slice(i, i + 200).map((k) => db.doc(`stock/${k}`));
-    if (refs.length) stockSnaps.push(...await db.getAll(...refs));
+  // A variant with no stock rows means zero, not its previous balance.
+  const targetKeys = opts.variantIds ? new Set(opts.variantIds.map(v => map.get(v)).filter(Boolean)) : null;
+  for (const [v, k] of map) {
+    if (targetKeys && !targetKeys.has(k)) continue;
+    if (!validKey(k)) continue;
+    const a = agg.get(k) ?? { onHand: 0, storeOnHand: 0, variantIds: [] };
+    if (!a.variantIds.includes(v)) a.variantIds.push(v);
+    agg.set(k, a);
   }
-  const prevByKey = new Map(stockSnaps.filter((s) => s.exists).map((s) => [s.id, s.data() as { onHand: number; reserved: number; storeOnHand?: number; bsaleVariantIds?: string[] }]));
-  const writes: WriteOp[] = [];
   const compromised: string[] = [];
   let updated = 0;
   for (const [k, a] of agg) {
-    const prev = prevByKey.get(k);
-    const [productId, formatId] = k.split('__');
-    if (prev && prev.reserved > a.onHand) compromised.push(k);
-    if (prev && prev.onHand === a.onHand) {
-      const sameVariants = (prev.bsaleVariantIds ?? []).join(',') === a.variantIds.join(',');
-      if (prev.storeOnHand !== a.storeOnHand || !sameVariants) {
-        writes.push({ ref: db.doc(`stock/${k}`), data: { storeOnHand: a.storeOnHand, bsaleVariantIds: a.variantIds, syncedAt: now }, merge: true });
+    const result = await db.runTransaction(async tx => {
+      const ref = db.doc(`stock/${k}`);
+      const snap = await tx.get(ref);
+      const prev = snap.data() as { onHand?: number; reserved?: number; storeOnHand?: number; storeReserved?: number; balanceReadStartedAt?: number } | undefined;
+      // A POS link or a newer webhook may have refreshed this balance while
+      // the API pagination was in flight. Never overwrite that newer reading.
+      if ((prev?.balanceReadStartedAt ?? 0) > balanceReadStartedAt) return { changed: false, compromised: false };
+      const [productId, formatId] = k.split('__');
+      const changed = prev?.onHand !== a.onHand || prev?.storeOnHand !== a.storeOnHand;
+      tx.set(ref, { productId, formatId, onHand: a.onHand, storeOnHand: a.storeOnHand,
+        bsaleVariantId: a.variantIds[0], bsaleVariantIds: a.variantIds, syncedAt: now, balanceReadStartedAt,
+        ...(!snap.exists ? { reserved: 0, storeReserved: 0 } : {}) }, { merge: true });
+      if (changed) {
+        const mv = db.collection('stockMovements').doc();
+        tx.set(mv, { id: mv.id, productId, formatId, qty: a.onHand - (prev?.onHand ?? 0), type: 'sync_bsale', by, at: now,
+          reason: `Bsale fábrica: ${prev?.onHand ?? 0} → ${a.onHand}; tienda: ${prev?.storeOnHand ?? 0} → ${a.storeOnHand}` });
       }
-      continue;
-    }
-    updated++;
-    // merge: nunca pisa `reserved`, que es de la app.
-    writes.push({ ref: db.doc(`stock/${k}`), data: { productId, formatId, onHand: a.onHand, storeOnHand: a.storeOnHand, bsaleVariantId: a.variantIds[0], bsaleVariantIds: a.variantIds, syncedAt: now, ...(prev ? {} : { reserved: 0 }) }, merge: true });
-    const mv = db.collection('stockMovements').doc();
-    writes.push({ ref: mv, data: { id: mv.id, productId, formatId, qty: a.onHand - (prev?.onHand ?? 0), type: 'sync_bsale', by, at: now, reason: `Bsale: ${prev?.onHand ?? 0} → ${a.onHand}` } });
+      return { changed, compromised: !!prev && ((prev.reserved ?? 0) > a.onHand || (prev.storeReserved ?? 0) > a.storeOnHand) };
+    });
+    if (result.changed) updated++;
+    if (result.compromised) compromised.push(k);
   }
-  await writeInChunks(db, writes);
 
   // 3. Reasignación FIFO donde el stock nuevo alcanza.
   const { absorbed, promoted } = await absorbAllPending(db, by, opts.variantIds ? new Set([...agg.keys()]) : undefined);
@@ -176,25 +184,30 @@ export async function absorbAllPending(db: Firestore, by: string, onlyKeys?: Set
   let absorbed = 0;
   const promoted: string[] = [];
   for (const k of keys) {
-    const r = await absorbForKey(db, k, by);
-    absorbed += r.absorbed;
-    promoted.push(...r.promoted);
+    for (const source of ['fabrica', 'tienda'] as const) {
+      const r = await absorbForKey(db, k, by, source);
+      absorbed += r.absorbed;
+      promoted.push(...r.promoted);
+    }
   }
   return { absorbed, promoted };
 }
 
-async function absorbForKey(db: Firestore, k: string, by: string): Promise<{ absorbed: number; promoted: string[] }> {
+async function absorbForKey(db: Firestore, k: string, by: string, source: 'fabrica' | 'tienda'): Promise<{ absorbed: number; promoted: string[] }> {
   const [productId, formatId] = k.split('__');
   return db.runTransaction(async (tx) => {
     const stockRef = db.doc(`stock/${k}`);
     const stockSnap = await tx.get(stockRef);
     if (!stockSnap.exists) return { absorbed: 0, promoted: [] };
-    const st = stockSnap.data() as { onHand: number; reserved: number };
-    let remaining = Math.max(0, st.onHand - st.reserved);
+    const st = stockSnap.data() as { onHand: number; reserved: number; storeOnHand?: number; storeReserved?: number };
+    const field = source === 'tienda' ? 'storeReserved' : 'reserved';
+    const held = st[field] ?? 0;
+    let remaining = Math.max(0, (source === 'tienda' ? st.storeOnHand ?? 0 : st.onHand) - held);
     if (remaining <= 0) return { absorbed: 0, promoted: [] };
 
     const q = await tx.get(db.collection('orders').where('status', 'in', ['confirmado_parcial', 'recibido']));
     const candidates = q.docs.map((d) => ({ ref: d.ref, order: d.data() as Order }))
+      .filter(c => (c.order.stockSource ?? 'fabrica') === source)
       .filter((c) => c.order.lines.some((l) => l.productId === productId && l.formatId === formatId && l.pendingProductionQty > 0))
       .sort((a, b) => a.order.requestedDate.localeCompare(b.order.requestedDate) || a.order.createdAt - b.order.createdAt);
 
@@ -214,7 +227,7 @@ async function absorbForKey(db: Firestore, k: string, by: string): Promise<{ abs
     if (absorbed === 0) return { absorbed: 0, promoted: [] };
 
     const now = Date.now();
-    tx.update(stockRef, { reserved: st.reserved + absorbed });
+    tx.update(stockRef, { [field]: held + absorbed });
     const mv = db.collection('stockMovements').doc();
     tx.set(mv, { id: mv.id, productId, formatId, qty: absorbed, type: 'reserva', by, at: now, reason: 'Reasignación FIFO tras sync Bsale' });
     const promoted: string[] = [];
@@ -235,75 +248,60 @@ async function absorbForKey(db: Firestore, k: string, by: string): Promise<{ abs
 // ---------- Clientes ----------
 
 interface AppClient {
-  id: string; name: string; fantasyName?: string; rut?: string; giro?: string; address?: string;
+  id: string; name: string; fantasyName?: string | null; rut?: string; giro?: string; address?: string;
   contactPhone?: string; email?: string; deliveryMode: 'retiro' | 'despacho'; invoicingComplete: boolean;
   needsReview?: boolean; bsaleClientId?: string; bsaleSyncedAt?: number; [k: string]: unknown;
 }
 
-export function customerFromRaw(c: RawClient) {
-  const person = [c.firstName, c.lastName].filter(Boolean).join(' ').trim();
-  const address = [c.address, c.municipality, c.city].filter(Boolean).join(', ');
-  return {
-    id: String(c.id),
-    rut: c.code || undefined,
-    name: (c.company || person || `Cliente ${c.id}`).trim(),
-    fantasyName: c.company && person && person !== c.company ? person : undefined,
-    giro: c.activity || undefined,
-    address: address || undefined,
-    phone: c.phone || undefined,
-    email: c.email || undefined,
-  };
-}
+export { customerFromRaw } from './customers';
 
 const slug = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
 const cleanRut = (r?: string) => (r ?? '').replace(/[^0-9kK]/g, '').toUpperCase();
 
-// The account has ~6.000 clients since 2022; the app only needs the ones
-// that buy. Mirrored: clients with a document in the mirror (last months),
-// clients created in Bsale in the last year, and any already linked.
+// Every active Bsale client is searchable, regardless of age or sales history.
 export async function syncClients(api: BsaleApi): Promise<{ updated: number; total: number }> {
   const db = getFirestore();
-  const all = await api.getAll<RawClient>('/clients.json', { state: 0 });
-  // Buyers: clients of documents mirrored since the last client sync (the
-  // ones already linked are covered by byBsale below). Reading only the new
-  // documents instead of the whole mirror keeps this hourly job cheap.
-  const since = (await loadSettings()).clientsSyncedAt ?? 0;
-  const buyers = new Set<string>();
-  (await db.collection('bsale').doc('sales').collection('documents').where('syncedAt', '>=', since).select('bsaleClientId').get())
-    .forEach((d) => { const id = d.get('bsaleClientId'); if (id) buyers.add(String(id)); });
+  const all = await api.getAll<RawClient>('/clients.json', { state: 0, expand: '[attributes]' });
   const snap = await db.collection('clients').get();
   const byBsale = new Map<string, AppClient>();
-  const byRut = new Map<string, AppClient>();
+  const byRut = new Map<string, AppClient | null>();
   // Clients that came from the WhatsApp history have no RUT: match by name,
   // only when the name is unique on both sides.
   const byName = new Map<string, AppClient | null>();
-  const nameKey = (s?: string) => slug(s ?? '');
+  const nameKey = (s?: string | null) => slug(s ?? '');
   snap.forEach((d) => {
     const c = d.data() as AppClient;
     if (c.bsaleClientId) byBsale.set(c.bsaleClientId, c);
-    if (c.rut) byRut.set(cleanRut(c.rut), c);
-    if (!c.bsaleClientId && !c.isInternalShop) {
+    if (c.rut) { const k = cleanRut(c.rut); byRut.set(k, byRut.has(k) ? null : c); }
+    if (!c.bsaleClientId && !c.isInternalShop && !c.canonicalClientId) {
       for (const k of new Set([nameKey(c.name), nameKey(c.fantasyName)])) {
         if (!k || k.startsWith('sin-cliente')) continue;
         byName.set(k, byName.has(k) ? null : c);
       }
     }
   });
-  const yearAgoS = Math.floor(Date.now() / 1000) - 365 * 86400;
-  const remote = all.filter((c) => buyers.has(String(c.id)) || byBsale.has(String(c.id)) || Number(c.createdAt || 0) >= yearAgoS).map(customerFromRaw);
+  const remote = all.map(customerFromRaw);
+  const remoteRutCount = new Map<string, number>();
+  for (const r of remote) if (r.rut) { const k = cleanRut(r.rut); remoteRutCount.set(k, (remoteRutCount.get(k) ?? 0) + 1); }
   const remoteNameCount = new Map<string, number>();
   for (const r of remote) for (const k of new Set([nameKey(r.name), nameKey(r.fantasyName)])) if (k) remoteNameCount.set(k, (remoteNameCount.get(k) ?? 0) + 1);
   const now = Date.now();
   const writes: WriteOp[] = [];
+  const claimedLocals = new Set<string>();
   for (const r of remote) {
     const nameMatch = [nameKey(r.name), nameKey(r.fantasyName)].map((k) => (k && remoteNameCount.get(k) === 1 ? byName.get(k) : undefined)).find(Boolean) ?? undefined;
-    const local = byBsale.get(r.id) ?? (r.rut ? byRut.get(cleanRut(r.rut)) : undefined) ?? nameMatch;
+    const rutMatch = r.rut && remoteRutCount.get(cleanRut(r.rut)) === 1 ? byRut.get(cleanRut(r.rut)) : undefined;
+    const safeNameMatch = nameMatch && (!r.rut || !nameMatch.rut || cleanRut(r.rut) === cleanRut(nameMatch.rut)) ? nameMatch : undefined;
+    const candidate = byBsale.get(r.id) ?? (rutMatch && !rutMatch.bsaleClientId ? rutMatch : undefined) ?? safeNameMatch;
+    const local = candidate && !claimedLocals.has(candidate.id) ? candidate : undefined;
+    if (local) claimedLocals.add(local.id);
     const invoicingComplete = !!(r.rut && r.name && r.address && r.giro);
     const merged: AppClient = {
       ...(local ?? {}),
       id: local?.id ?? `${slug(r.fantasyName ?? r.name) || 'cliente'}-${r.id}`,
       name: r.name,
-      fantasyName: r.fantasyName ?? local?.fantasyName,
+      fantasyName: r.fantasyName ?? (local?.fantasyName && slug(local.fantasyName) !== slug(r.contactName ?? '') ? local.fantasyName : null),
+      contactName: r.contactName ?? null,
       rut: r.rut ?? local?.rut,
       giro: r.giro ?? local?.giro,
       address: r.address ?? local?.address,
@@ -316,7 +314,7 @@ export async function syncClients(api: BsaleApi): Promise<{ updated: number; tot
       bsaleClientId: r.id,
       bsaleSyncedAt: now,
     };
-    const same = local && ['name', 'fantasyName', 'rut', 'giro', 'address', 'contactPhone', 'email', 'invoicingComplete', 'bsaleClientId']
+    const same = local && ['name', 'fantasyName', 'contactName', 'rut', 'giro', 'address', 'contactPhone', 'email', 'invoicingComplete', 'bsaleClientId']
       .every((f) => (local as Record<string, unknown>)[f] === (merged as Record<string, unknown>)[f]);
     if (same) continue;
     writes.push({ ref: db.doc(`clients/${merged.id}`), data: stripUndefined(merged), merge: true });

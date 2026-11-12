@@ -1,3 +1,4 @@
+import { sourceStock } from '@/domain/stockSource';
 import { useEffect, useState } from 'react';
 import { collection, doc, getDocs, onSnapshot, query, runTransaction, where } from 'firebase/firestore';
 import { db, functions } from './firebase';
@@ -44,14 +45,14 @@ export function availableFor(
 
 // True when Bsale reports less than what open orders hold — somebody sold
 // reserved goods at the counter. The kanban paints those orders red.
-export function isCompromised(stock: Map<string, StockDoc>, productId: string, formatId: string): boolean {
+export function isCompromised(stock: Map<string, StockDoc>, productId: string, formatId: string, source?: Order['stockSource']): boolean {
   const doc = stock.get(stockDocId(productId, formatId));
-  return !!doc && doc.onHand < doc.reserved;
+  return !!doc && sourceStock(doc, source).onHand < sourceStock(doc, source).reserved;
 }
 
 export function orderHasCompromisedStock(order: Order, stock: Map<string, StockDoc>): boolean {
   if (!['confirmado', 'confirmado_parcial', 'en_armado'].includes(order.status)) return false;
-  return order.lines.some((l) => l.reservedQty > 0 && isCompromised(stock, l.productId, l.formatId));
+  return order.lines.some((l) => l.reservedQty > 0 && isCompromised(stock, l.productId, l.formatId, order.stockSource));
 }
 
 export type Semaphore = 'ok' | 'partial' | 'none';

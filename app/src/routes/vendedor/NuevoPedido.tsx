@@ -1,3 +1,4 @@
+import { stockForSource, type StockSource } from '@/domain/stockSource';
 import { Backdrop, SHEET_ACTIONS, SHEET_PANEL } from '@/components/ui/Sheet';
 import { Icon } from '@/components/ui/Icon';
 
@@ -33,6 +34,7 @@ import { SAMPLE_DEFAULT_GRAMS, SAMPLE_GRAM_OPTIONS, lineKey, sampleLabel, sample
 import { isSellable, type Client, type Product, type ProductFormat, type StockDoc } from '@/domain/types';
 
 interface Draft {
+  stockSource?: StockSource;
   clientId: string | null;
   lines: DraftLine[];
   requestedDate: string;
@@ -92,10 +94,11 @@ export default function NuevoPedido() {
   const clients = useMemo(() => (isTienda ? allClients.filter((c) => c.isInternalShop) : allClients), [allClients, isTienda]);
   useEffect(() => {
     if (!isTienda || draft.clientId || clients.length === 0) return;
-    setDraft((d) => ({ ...d, clientId: clients[0].id, deliveryMode: 'despacho', step: Math.max(d.step, 2) }));
+    setDraft((d) => ({ ...d, clientId: clients[0].id, stockSource: 'fabrica', deliveryMode: 'despacho', step: Math.max(d.step, 2) }));
   }, [isTienda, clients, draft.clientId]);
   const { products } = useProducts();
-  const { stock } = useAllStock();
+  const { stock: allStock } = useAllStock();
+  const stock = useMemo(() => stockForSource(allStock, draft.stockSource), [allStock, draft.stockSource]);
   // Muestras a nombre del vendedor (sin cliente): un cliente virtual propio.
   const canSelfSamples = can(current!.appUser.role, 'order.create') && !isTienda;
   const selfClient = useMemo(() => sellerSamplesClient(uid, current!.appUser.displayName), [uid, current]);
@@ -138,6 +141,7 @@ export default function NuevoPedido() {
     try {
       await confirmPin('crear_pedido', `${isTienda ? 'Enviar reposición' : 'Enviar pedido'} · ${client.fantasyName ?? client.name}`);
       const res = await createOrder(uid, {
+        stockSource: draft.stockSource ?? 'fabrica',
         client,
         lines: draft.lines,
         requestedDate: draft.requestedDate,
@@ -201,6 +205,7 @@ export default function NuevoPedido() {
           onSelect={(c) => {
             // A different client brings its own usual window and fantasy name.
             if (c.id !== draft.clientId) setDraft((d) => ({ ...d, deliveryFrom: undefined, deliveryTo: undefined, deliveryNote: undefined, fantasyName: undefined, opportunityId: undefined }));
+            if (c.isInternalShop) update('stockSource', 'fabrica');
             update('clientId', c.id); update('deliveryMode', c.deliveryMode); goto(2);
           }}
           onRepeat={() => {
@@ -226,6 +231,14 @@ export default function NuevoPedido() {
         </p>
       )}
 
+      {draft.step === 2 && client && !client.isInternalShop && (
+        <label className="block mb-4"><span className="eyebrow block mb-1">Stock de origen</span>
+          <select className="field" value={draft.stockSource ?? 'fabrica'} onChange={e => update('stockSource', e.target.value as StockSource)}>
+            <option value="fabrica">Fábrica</option><option value="tienda">Tienda</option>
+          </select>
+          <span className="text-xs text-charcoal-500">El pedido reserva en esta sucursal. Facture desde la misma sucursal en Bsale.</span>
+        </label>
+      )}
       {draft.step === 2 && client && (
         <StepProductos
           products={products}
@@ -412,6 +425,7 @@ function StepCliente({
                   <span className="text-[10px] uppercase tracking-display bg-brass-100 text-brass-700 border border-brass-300 px-2 py-0.5 rounded">Facturación incompleta</span>
                 )}
               </div>
+              {c.contactName && <div className="text-xs text-charcoal-500 mt-0.5">Contacto: {c.contactName}</div>}
               {clientAltName(c) && <div className="text-xs text-charcoal-500 mt-0.5">{clientAltName(c)}</div>}
               <div className="text-xs text-charcoal-300 mt-1">
                 {c.rut ?? 'Sin RUT'} · {c.address ?? 'Sin dirección'}
@@ -891,6 +905,7 @@ function StepConfirmar({
       <div className="card p-4 space-y-2">
         <div>
           <p className="eyebrow">Cliente</p>
+          <p className="text-xs text-charcoal-500">Origen del stock: {draft.stockSource === 'tienda' ? 'Tienda' : 'Fábrica'}</p>
           <p className="font-semibold text-charcoal-900 mt-1">{draft.fantasyName?.trim() || client.fantasyName || client.name}</p>
           {(draft.fantasyName?.trim() || client.fantasyName) && client.name !== (draft.fantasyName?.trim() || client.fantasyName) && (
             <p className="text-xs text-charcoal-300 mt-0.5">Razón social: {client.name}</p>

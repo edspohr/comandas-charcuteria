@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import Button from '@/components/ui/Button';
 import { ModalShell } from '@/components/orders/OrderDialogs';
-import { createClientQuick } from '@/data/clients';
+import { createClientQuick, useClients } from '@/data/clients';
 import { describeFirestoreError } from '@/lib/errors';
+import { duplicateClient, searchClients } from '@/domain/clientSearch';
 import { isValidRut } from '@/lib/rut';
 import type { Client, DeliveryMode } from '@/domain/types';
 import type { ClientHints } from '@/domain/parse/client';
@@ -16,6 +17,7 @@ export default function NuevoClienteDialog({ initial, uid, onClose, onCreated }:
   onClose: () => void;
   onCreated: (c: Client) => void;
 }) {
+  const { clients, loading: clientsLoading, error: clientsError } = useClients();
   const [fantasyName, setFantasyName] = useState(initial?.fantasyName ?? '');
   const [name, setName] = useState(initial?.name ?? '');
   const [rut, setRut] = useState(initial?.rut ?? '');
@@ -29,6 +31,8 @@ export default function NuevoClienteDialog({ initial, uid, onClose, onCreated }:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const duplicate = duplicateClient(clients, { name, fantasyName, rut });
+  const candidates = searchClients(clients, rut.trim() || fantasyName || name, 4);
   const rutOk = !rut.trim() || isValidRut(rut);
   const complete = !!(rut.trim() && rutOk && (name.trim() || fantasyName.trim()) && address.trim() && giro.trim());
 
@@ -45,6 +49,13 @@ export default function NuevoClienteDialog({ initial, uid, onClose, onCreated }:
   return (
     <ModalShell title="Nuevo cliente" eyebrow="Alta rápida" onClose={onClose}>
       <div className="space-y-3">
+        {clientsError && <p className="text-sm text-red-700">No pudimos comprobar clientes existentes: {clientsError}</p>}
+        {(duplicate || (fantasyName.trim().length > 2 && candidates.length > 0)) && (
+          <div className="rounded-md border border-brass-300 bg-brass-50 p-3 text-sm">
+            <p className="font-semibold">{duplicate ? 'Este cliente ya existe. Selecciónelo para continuar.' : 'Revise estas coincidencias antes de crear otro cliente.'}</p>
+            {(duplicate ? [duplicate] : candidates).map(c => <button key={c.id} type="button" onClick={() => onCreated(c)} className="block text-left w-full py-2 underline">{c.fantasyName || c.name} · {c.rut || 'Sin RUT'}{c.fantasyName && c.fantasyName !== c.name ? ` · ${c.name}` : ''}</button>)}
+          </div>
+        )}
         <Field label="Nombre del local / cliente *"><input value={fantasyName} onChange={(e) => setFantasyName(e.target.value)} autoFocus placeholder="Ej: Café Oven" className="field h-10 text-sm" /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="RUT"><input value={rut} onChange={(e) => setRut(e.target.value)} placeholder="76.888.111-2" className={'field h-10 text-sm ' + (!rutOk ? 'border-red-400' : '')} /></Field>
@@ -71,7 +82,7 @@ export default function NuevoClienteDialog({ initial, uid, onClose, onCreated }:
         {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-800 p-2 text-sm">{error}</div>}
         <div className="flex gap-2">
           <Button variant="secondary" onClick={onClose} className="flex-1" disabled={busy}>Cancelar</Button>
-          <Button onClick={submit} className="flex-1" disabled={busy || fantasyName.trim().length < 2}>{busy ? 'Creando…' : 'Crear cliente'}</Button>
+          <Button onClick={submit} className="flex-1" disabled={busy || clientsLoading || !!clientsError || !!duplicate || fantasyName.trim().length < 2}>{busy ? 'Creando…' : 'Crear cliente'}</Button>
         </div>
       </div>
     </ModalShell>

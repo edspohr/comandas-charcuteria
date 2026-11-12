@@ -195,7 +195,7 @@ function Stock() {
       const k = `${p.id}__${f.formatId}`;
       const s = stock.get(k);
       const v = vById.get(confirmed.get(k) ?? '');
-      return { key: k, product: p.name, format: f.label, unit: f.unit, code: v?.code ?? '', factory: s?.onHand ?? 0, store: s?.storeOnHand, reserved: s?.reserved ?? 0, available: Math.max(0, (s?.onHand ?? 0) - (s?.reserved ?? 0)), mapped: !!v || !isRealBsale };
+      return { key: k, product: p.name, format: f.label, unit: f.unit, code: v?.code ?? '', factory: s?.onHand ?? 0, store: s?.storeOnHand, storeReserved: s?.storeReserved ?? 0, storeAvailable: Math.max(0, (s?.storeOnHand ?? 0) - (s?.storeReserved ?? 0)), reserved: s?.reserved ?? 0, available: Math.max(0, (s?.onHand ?? 0) - (s?.reserved ?? 0)), mapped: !!v || !isRealBsale };
     })).filter((r) => !needle || `${r.product} ${r.format} ${r.code}`.toLowerCase().includes(needle));
   }, [products, stock, confirmed, vById, q]);
   const unmapped = rows.filter((r) => !r.mapped).length;
@@ -204,7 +204,7 @@ function Stock() {
       <div className="mb-3 flex flex-wrap gap-2 items-center">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Producto, formato o código Bsale" className="field h-9 text-sm w-full sm:w-72" />
         {isRealBsale && unmapped > 0 && <Pill tone="warn">{unmapped} formatos sin cruce con Bsale</Pill>}
-        <span className="ml-auto"><Csv name="bsale-stock" rows={rows} cols={[['product', 'Producto'], ['format', 'Formato'], ['code', 'Código Bsale'], ['factory', 'Fábrica'], ['store', 'Tienda'], ['reserved', 'Reservado app'], ['available', 'Disponible']]} /></span>
+        <span className="ml-auto"><Csv name="bsale-stock" rows={rows} cols={[['product', 'Producto'], ['format', 'Formato'], ['code', 'Código Bsale'], ['factory', 'Fábrica'], ['store', 'Tienda'], ['reserved', 'Reservado app'], ['available', 'Disponible fábrica'], ['storeReserved', 'Reservado tienda'], ['storeAvailable', 'Disponible tienda']]} /></span>
       </div>
       <DataTable
         rows={rows}
@@ -214,6 +214,8 @@ function Stock() {
           { key: 'p', label: 'Producto', mobile: true, render: (r) => <div><p className="font-semibold text-charcoal-900">{r.product}</p><p className="text-[11px] text-charcoal-300">{r.format}{r.code ? ` · ${r.code}` : ''}</p></div> },
           { key: 'f', label: 'Fábrica', align: 'right', mobile: true, render: (r) => formatQty(r.factory, r.unit) },
           { key: 's', label: 'Tienda', align: 'right', render: (r) => (r.store != null ? formatQty(r.store, r.unit) : '—'), muted: true },
+          { key: 'sr', label: 'Reserv. tienda', align: 'right', render: r => formatQty(r.storeReserved, r.unit) },
+          { key: 'sa', label: 'Disp. tienda', align: 'right', mobile: true, render: r => formatQty(r.storeAvailable, r.unit) },
           { key: 'r', label: 'Reservado', align: 'right', render: (r) => formatQty(r.reserved, r.unit), muted: true },
           { key: 'a', label: 'Disponible', align: 'right', mobile: true, render: (r) => <span className={r.factory < r.reserved ? 'text-red-700 font-semibold' : 'font-semibold'}>{r.factory < r.reserved ? 'comprometido' : formatQty(r.available, r.unit)}</span> },
         ]}

@@ -12,7 +12,7 @@ export { bsaleProxy } from './bsaleProxy';
 export { claimInvite, adminInviteUser, adminUpdateUser, adminDeleteInvite } from './users';
 export { setOwnPin, pinLogin, adminResetPin, verifyPin } from './pin';
 export {
-  bsaleDiagnose, bsaleSyncNow, bsaleScheduledSync, bsaleWebhook, bsaleWebhookInfo,
+  bsaleLinkDocument, bsaleDiagnose, bsaleSyncNow, bsaleScheduledSync, bsaleWebhook, bsaleWebhookInfo,
   bsaleReceiveProduction, bsaleTransferToStore, bsaleCreateClient, bsaleUpdateClient,
   bsaleInvoicePreview, bsaleEmitInvoice, bsaleFactsBackfill, bsaleRefreshCosts, bsaleDailyCosts, bsaleConsumeSamples,
 } from './bsale';

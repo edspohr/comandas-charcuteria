@@ -122,6 +122,8 @@ function CatalogoStock() {
           { key: 'price', label: 'Precio', align: 'right', render: (r) => <span className="text-xs">{unitPriceLabel(r.format) || '—'}</span>, muted: true },
           { key: 'bsale', label: 'Fábrica', align: 'right', render: (r) => formatQty(r.stock?.onHand ?? 0, r.format.unit) },
           { key: 'store', label: 'Tienda', align: 'right', render: (r) => r.stock?.storeOnHand != null ? formatQty(r.stock.storeOnHand, r.format.unit) : <span className="text-charcoal-300">—</span>, muted: true },
+          { key: 'storeReserved', label: 'Reserv. tienda', align: 'right', render: r => formatQty(r.stock?.storeReserved ?? 0, r.format.unit), muted: true },
+          { key: 'storeAvailable', label: 'Disp. tienda', align: 'right', mobile: true, render: r => formatQty(Math.max(0, (r.stock?.storeOnHand ?? 0) - (r.stock?.storeReserved ?? 0)), r.format.unit) },
           { key: 'reserved', label: 'Reserv.', align: 'right', render: (r) => formatQty(r.stock?.reserved ?? 0, r.format.unit), muted: true },
           { key: 'available', label: 'Disp.', align: 'right', mobile: true, render: (r) => {
             const comp = !!r.stock && r.stock.onHand < r.stock.reserved;

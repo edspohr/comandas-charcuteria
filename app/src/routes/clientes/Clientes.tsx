@@ -9,10 +9,10 @@ import DataTable, { Pill } from '@/components/ui/DataTable';
 import NuevoClienteDialog from '@/components/clients/NuevoClienteDialog';
 import EditarClienteDialog from '@/components/clients/EditarClienteDialog';
 import { useCurrentUser } from '@/data/auth';
-import { useClients } from '@/data/clients';
+import { searchClients, useClients } from '@/data/clients';
 import { useSettings } from '@/data/settings';
 import { useUsers } from '@/data/users';
-import { can, isSeller } from '@/domain/permissions';
+import { can } from '@/domain/permissions';
 import { clientRows, rangeFor, HEALTH_LABEL, DEFAULT_CLIENT_HEALTH, type ClientHealth, type ClientRow } from '@/domain/analytics';
 import { formatDateShort } from '@/lib/format';
 import { formatCLP } from '@/lib/pricing';
@@ -33,7 +33,9 @@ export default function Clientes() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [q, setQ] = useState('');
   const [params] = useSearchParams();
-  const [filter, setFilter] = useState<Filter>(params.get('filtro') === 'revision' ? 'revision' : isSeller(role) ? 'cartera' : 'todos');
+  const [filter, setFilter] = useState<Filter>(params.get('filtro') === 'revision' ? 'revision' : 'todos');
+  const [visible, setVisible] = useState(100);
+  useEffect(() => setVisible(100), [q, filter]);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const isAdmin = can(role, 'client.edit');
@@ -50,17 +52,18 @@ export default function Clientes() {
 
   const filtered = useMemo(() => {
     const needle = norm(q.trim());
+    const matches = new Set(searchClients(clients, q, Infinity).map(c => c.id));
     return rows.filter((r) => {
       if (filter === 'cartera' && r.ownerUid !== uid) return false;
       if (filter === 'riesgo' && r.health !== 'en_riesgo' && r.health !== 'inactivo') return false;
       if (filter === 'revision' && !r.needsReview && r.invoicingComplete) return false;
       if (needle) {
         const c = byId.get(r.id);
-        if (!norm(`${r.name} ${c?.name ?? ''} ${c?.rut ?? ''} ${c?.address ?? ''}`).includes(needle)) return false;
+        if (!matches.has(r.id) && !norm(c?.address ?? '').includes(needle)) return false;
       }
       return true;
     });
-  }, [rows, filter, q, uid, byId]);
+  }, [rows, filter, q, uid, byId, clients]);
 
   // Habituales por cliente (top 3 por veces), para el detalle inline.
   const habituales = useMemo(() => {
@@ -101,7 +104,7 @@ export default function Clientes() {
       {error && <ErrorBanner message={error} />}
 
       <DataTable<ClientRow>
-        rows={filtered}
+        rows={filtered.slice(0, visible)}
         rowKey={(r) => r.id}
         rowTone={(r) => (r.health === 'inactivo' ? 'bad' : r.health === 'en_riesgo' || r.needsReview ? 'warn' : undefined)}
         emptyText="Sin clientes con este filtro."
@@ -128,6 +131,7 @@ export default function Clientes() {
         expand={(r) => <ClientDetail client={byId.get(r.id)} row={r} habituales={habituales(r.id)} onEdit={isAdmin ? (c) => setEditing(c) : undefined} />}
       />
 
+      {filtered.length > visible && <Button variant="secondary" className="mt-3 w-full" onClick={() => setVisible(n => n + 100)}>Mostrar más ({visible} de {filtered.length})</Button>}
       {creating && <NuevoClienteDialog uid={uid} onClose={() => setCreating(false)} onCreated={() => setCreating(false)} />}
       {editing && <EditarClienteDialog client={editing} uid={uid} onClose={() => setEditing(null)} />}
     </div>

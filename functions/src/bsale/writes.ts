@@ -118,7 +118,7 @@ function clientBody(i: Partial<CustomerInput>) {
   // Bsale: company = razón social, activity = giro, code = RUT.
   return stripUndefined({
     company: i.name,
-    firstName: i.fantasyName ?? i.name,
+    // The commercial alias belongs to Comandas; firstName is the contact.
     code: i.rut,
     activity: i.giro,
     address: i.address,
@@ -126,11 +126,18 @@ function clientBody(i: Partial<CustomerInput>) {
     ...bsaleLocality(i.address, i.city),
     phone: i.phone,
     email: i.email,
-    companyOrPerson: i.rut ? 1 : 0,
+    companyOrPerson: i.name ? 1 : undefined,
   });
 }
 
 export async function createClient(api: BsaleApi, s: BsaleSettings, by: string, input: CustomerInput) {
+  if (input.rut) {
+    const norm = (r: string) => r.replace(/[^0-9kK]/g, '').toUpperCase();
+    const matches = await api.getAll<RawClient>('/clients.json', { code: input.rut });
+    if (matches.some(c => norm(c.code ?? '') === norm(input.rut!))) {
+      throw new HttpsError('already-exists', 'Ese RUT ya existe en Bsale. Sincronice y seleccione el cliente existente.');
+    }
+  }
   const r = await send<RawClient>(api, s, 'cliente_alta', by, 'POST', '/v1/clients.json', clientBody(input));
   return { ...r, customer: r.response ? customerFromRaw(r.response) : null };
 }

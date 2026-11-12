@@ -318,3 +318,18 @@ describe('compras e insumos (ADR-0017 + Fase 4: administración compra, la fábr
     await assertFails(getDoc(doc(as('u-rafael', 'vendedor'), 'purchaseOrders', 'po-1')));
   });
 });
+
+describe('reservas por sucursal', () => {
+  it('vendedor reserva tienda sin alterar los saldos del maestro', async () => {
+    await seed('stock/p__kg', { onHand: 10, reserved: 2, storeOnHand: 8, storeReserved: 1 });
+    const ref = doc(as('alice', 'vendedor'), 'stock', 'p__kg');
+    await assertSucceeds(updateDoc(ref, { storeReserved: 3 }));
+    await assertFails(updateDoc(ref, { storeOnHand: 100 }));
+    await assertFails(updateDoc(ref, { onHand: 100 }));
+    await assertFails(updateDoc(ref, { storeReserved: -1 }));
+  });
+  it('el origen del pedido no cambia después de reservar', async () => {
+    await seedOrder('store', 'alice', { stockSource: 'tienda' });
+    await assertFails(updateDoc(doc(as('alice', 'vendedor'), 'orders', 'store'), { stockSource: 'fabrica' }));
+  });
+});

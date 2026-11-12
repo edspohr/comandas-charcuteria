@@ -20,6 +20,7 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
+      - run: npm run test:unit
       - run: npx tsc -p functions --noEmit
       - run: npm --workspace app run build
       - run: npx firebase-tools@14 emulators:exec --only firestore --project comandas-rules-test "npm run test:rules"

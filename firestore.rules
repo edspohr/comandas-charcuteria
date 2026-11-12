@@ -143,17 +143,20 @@ service cloud.firestore {
 
       allow create: if (isSupervisor() || canSync())
         && request.resource.data.onHand >= 0
-        && request.resource.data.reserved >= 0;
+        && request.resource.data.reserved >= 0
+        && request.resource.data.get('storeReserved', 0) >= 0;
 
       allow update: if hasRole()
         && request.resource.data.onHand >= 0
         && request.resource.data.reserved >= 0
+        && request.resource.data.get('storeReserved', 0) >= 0
         && (
           isSupervisor()
           // Sync: onHand ← Bsale, reserved ← reasignación FIFO.
           || canSync()
           // Quien toma pedidos solo mueve reservas.
-          || (canCreateOrder() && request.resource.data.onHand == resource.data.onHand)
+          || (canCreateOrder()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reserved', 'storeReserved']))
         );
 
       allow delete: if isSupervisor();
@@ -259,7 +262,9 @@ service cloud.firestore {
 
       allow create: if canCreateOrder()
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.status in ['recibido', 'confirmado', 'confirmado_parcial'];
+        && request.resource.data.status in ['recibido', 'confirmado', 'confirmado_parcial']
+        && request.resource.data.get('stockSource', 'fabrica') in ['fabrica', 'tienda']
+        && (request.resource.data.get('kind', 'venta') != 'reposicion' || request.resource.data.get('stockSource', 'fabrica') == 'fabrica');
 
       allow update: if hasRole() && (
         isSupervisor()
@@ -276,7 +281,7 @@ service cloud.firestore {
             || (resource.data.status in ['confirmado', 'confirmado_parcial'] && request.resource.data.status in ['confirmado', 'confirmado_parcial'])
             || (resource.data.status == 'armado' && request.resource.data.status == 'en_armado')
           )
-          && unchanged('createdBy') && unchanged('invoiceRef') && unchanged('clientId') && unchanged('kind')
+          && unchanged('createdBy') && unchanged('invoiceRef') && unchanged('clientId') && unchanged('kind') && unchanged('stockSource')
           && unchanged('assignedPackerId') && unchanged('approval') && unchanged('samplesHolderUid') && unchanged('bsaleDocumentId')
         )
         || (

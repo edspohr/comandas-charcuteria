@@ -192,7 +192,7 @@ export async function absorbPendingForKey(
       const snap = await tx.get(ref);
       if (!snap.exists()) continue;
       const o = snap.data() as Order;
-      if (o.status !== 'confirmado_parcial' && o.status !== 'recibido') continue;
+      if ((o.stockSource ?? 'fabrica') !== 'fabrica' || (o.status !== 'confirmado_parcial' && o.status !== 'recibido')) continue;
       o.lines.forEach((l, i) => {
         if (l.productId === productId && l.formatId === formatId && l.pendingProductionQty > 0) {
           candidates.push({ ref, order: o, lineIdx: i, pending: l.pendingProductionQty });

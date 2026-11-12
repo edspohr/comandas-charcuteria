@@ -1,5 +1,5 @@
-import type { Client, DeliveryMode } from '@/domain/types';
-import { cleanRut, formatRut, isValidRut } from '@/lib/rut';
+import type { Client, DeliveryMode } from '../types';
+import { cleanRut, formatRut, isValidRut } from '../../lib/rut';
 
 // Datos de cliente que se pueden rescatar de un mensaje de WhatsApp. Todo es
 // opcional: lo que no aparece lo completa el vendedor en el formulario.
@@ -107,11 +107,12 @@ export function rankClients(hints: ClientHints, clients: Client[], max = 5): Ran
   const names = [hints.fantasyName, hints.name].map(baseName).filter(Boolean);
   const out: RankedClient[] = [];
   for (const c of clients) {
+    if (rut && c.rut && cleanRut(c.rut) !== rut) continue;
     let score = 0;
     if (rut && c.rut && cleanRut(c.rut) === rut) score = 100;
     else if (digits.length >= 8 && c.contactPhone && c.contactPhone.replace(/\D/g, '').endsWith(digits)) score = 90;
     else {
-      const fields = [baseName(c.fantasyName), baseName(c.name)];
+      const fields = [baseName(c.fantasyName), baseName(c.name), baseName(c.contactName)];
       for (const n of names) for (const f of fields) score = Math.max(score, nameScore(n, f));
     }
     if (score > 0) out.push({ client: c, score: score + (c.rut ? 3 : 0) + (c.bsaleClientId ? 2 : 0) });
@@ -148,4 +149,20 @@ export function hintsHaveSomething(h: ClientHints): boolean {
 export function isClientInfoLine(raw: string): boolean {
   return RUT_RE.test(raw) || PHONE_RE.test(raw) || EMAIL_RE.test(raw)
     || /\b(direcci[oó]n|fono|tel[eé]fono|celular|whatsapp|rut|raz[oó]n social|horario|recibimos|atendemos|gracias|saludos)\b/i.test(raw);
+}
+
+// The local fallback also recognises client names inside short messages such
+// as "10 pastrami para andar cafe", without depending on Gemini extraction.
+export function rankClientsInText(text: string, clients: Client[], max = 5): RankedClient[] {
+  const normalized = ` ${baseName(text)} `;
+  const matches = new Map<string, RankedClient>();
+  for (const c of clients) {
+    for (const name of [c.fantasyName, c.name]) {
+      const n = baseName(name);
+      if (n.length < 4 || !normalized.includes(` ${n} `)) continue;
+      const ranked = rankClients({ fantasyName: name }, [c], 1)[0];
+      if (ranked) matches.set(c.id, ranked);
+    }
+  }
+  return [...matches.values()].sort((a, b) => b.score - a.score).slice(0, max);
 }

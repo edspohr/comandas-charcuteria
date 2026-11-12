@@ -1,3 +1,6 @@
+import { httpsCallable } from 'firebase/functions';
+import { withPin } from './pin';
+import { reserveField, sourceStock, sourceAvailable, type StockSource } from '@/domain/stockSource';
 import { useEffect, useState } from 'react';
 import {
   collection,
@@ -11,7 +14,7 @@ import {
   where,
   limit,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, functions } from './firebase';
 import type { Client, Order, OrderLine, OrderStatus, ProductFormat, StockDoc, StockMovement } from '@/domain/types';
 import { stockDocId } from '@/domain/types';
 import { describeFirestoreError } from '@/lib/errors';
@@ -42,12 +45,12 @@ async function readStocks(tx: Transaction, lines: Array<Pick<OrderLine, 'product
 }
 
 // Releases the reservation of every line in one write per stock doc.
-function releaseReserved(tx: Transaction, reads: Map<string, StockRead>, lines: OrderLine[]) {
+function releaseReserved(tx: Transaction, reads: Map<string, StockRead>, lines: OrderLine[], source?: StockSource) {
   const total = new Map<string, number>();
   for (const l of lines) if (l.reservedQty > 0) { const id = stockDocId(l.productId, l.formatId); total.set(id, (total.get(id) ?? 0) + l.reservedQty); }
   for (const [id, qty] of total) {
     const r = reads.get(id);
-    if (r?.prev) tx.update(r.ref, { reserved: Math.max(0, r.prev.reserved - qty) });
+    if (r?.prev) tx.update(r.ref, { [reserveField(source)]: Math.max(0, sourceStock(r.prev, source).reserved - qty) });
   }
 }
 
@@ -68,6 +71,7 @@ export interface DraftLine {
 }
 
 export interface DraftOrderInput {
+  stockSource?: StockSource;
   client: Client;
   lines: DraftLine[];
   requestedDate: string;
@@ -99,6 +103,8 @@ export async function createOrder(
   createdByUid: string,
   input: DraftOrderInput,
 ): Promise<CreateOrderResult> {
+  const stockSource = input.stockSource ?? 'fabrica';
+  if (input.client.isInternalShop && stockSource !== 'fabrica') throw new Error('La reposición de tienda sale de fábrica.');
   const year = new Date().getFullYear();
   const counterRef = doc(db, 'counters', `orders-${year}`);
   const sellerSamples = isSellerSamplesClientId(input.client.id);
@@ -118,7 +124,7 @@ export async function createOrder(
     if (oppRef && !opp) throw new Error('La oportunidad ya no existe.');
     // Available per stock doc, consumed line by line: regular lines first so
     // a sample never takes stock a sale needs.
-    const left = new Map([...stockReads].map(([id, r]) => [id, r.prev ? Math.max(0, r.prev.onHand - r.prev.reserved) : 0]));
+    const left = new Map([...stockReads].map(([id, r]) => [id, r.prev ? sourceAvailable(r.prev, stockSource) : 0]));
     const order_ = input.lines.map((l, i) => ({ l, i })).sort((a, b) => Number(!!a.l.sample) - Number(!!b.l.sample));
     const split = new Map<number, { reservedQty: number; pendingProductionQty: number }>();
     for (const { l, i } of order_) {
@@ -173,6 +179,7 @@ export async function createOrder(
 
     const order: Order = {
       id: orderId,
+      stockSource,
       kind: input.client.isInternalShop ? 'reposicion' : enriched.every((l) => l.sample) ? 'muestras' : 'venta',
       createdBy: createdByUid,
       ...(sellerSamples ? { samplesHolderUid: createdByUid } : {}),
@@ -210,7 +217,7 @@ export async function createOrder(
     for (const line of enriched) if (line.reservedQty > 0) { const id = stockDocId(line.productId, line.formatId); addReserved.set(id, (addReserved.get(id) ?? 0) + line.reservedQty); }
     for (const [id, qty] of addReserved) {
       const { ref, prev } = stockReads.get(id)!;
-      if (prev) tx.update(ref, { reserved: prev.reserved + qty });
+      if (prev) tx.update(ref, { [reserveField(stockSource)]: sourceStock(prev, stockSource).reserved + qty });
     }
     enriched.forEach((line) => {
       if (line.reservedQty > 0) {
@@ -430,7 +437,7 @@ export async function markArmado(
       if (line.reservedQty <= 0) continue;
       const st = reads.get(stockDocId(line.productId, line.formatId))?.prev;
       const label = `${line.productName} · ${line.formatLabel}`;
-      if (st && st.onHand < st.reserved && !compromised.includes(label)) compromised.push(label);
+      if (st && sourceStock(st, order.stockSource).onHand < sourceStock(st, order.stockSource).reserved && !compromised.includes(label)) compromised.push(label);
     }
     if (compromised.length > 0 && opts.strictStock) {
       throw new Error(`Bsale reporta menos stock del reservado en ${compromised.join(', ')}. Sincronice con Bsale o resuelva el pedido desde administración antes de armar.`);
@@ -498,6 +505,11 @@ export async function vincularDocumento(
   document: { id: string; number: string },
   by: string,
 ): Promise<void> {
+  if (isRealBsale) {
+    const link = httpsCallable(functions, 'bsaleLinkDocument');
+    await withPin(`Vincular ${document.number}`, pin => link({ orderId, documentId: document.id, number: document.number, pin }));
+    return;
+  }
   const orderRef = doc(db, 'orders', orderId);
   const docRef = doc(db, DOCUMENTS_PATH.join('/'), document.id);
   const number = document.number.trim().toUpperCase();
@@ -521,7 +533,7 @@ export async function vincularDocumento(
     const reads = await readStocks(tx, reserved);
 
     const now = Date.now();
-    releaseReserved(tx, reads, order.lines);
+    releaseReserved(tx, reads, order.lines, order.stockSource);
     for (const line of reserved) {
       const mvRef = doc(collection(db, 'stockMovements'));
       const mv: StockMovement = {
@@ -575,7 +587,7 @@ export async function registrarTraslado(order: Order, by: string): Promise<{ dry
     const reserved = fresh.lines.filter((l) => l.reservedQty > 0);
     const reads = await readStocks(tx, reserved);
     const now = Date.now();
-    releaseReserved(tx, reads, fresh.lines);
+    releaseReserved(tx, reads, fresh.lines, fresh.stockSource);
     for (const line of reserved) {
       const mvRef = doc(collection(db, 'stockMovements'));
       const mv: StockMovement = {
@@ -615,7 +627,7 @@ export async function registrarSalidaMuestras(order: Order, by: string): Promise
     const reserved = fresh.lines.filter((l) => l.reservedQty > 0);
     const reads = await readStocks(tx, reserved);
     const now = Date.now();
-    releaseReserved(tx, reads, fresh.lines);
+    releaseReserved(tx, reads, fresh.lines, fresh.stockSource);
     for (const line of reserved) {
       const mvRef = doc(collection(db, 'stockMovements'));
       tx.set(mvRef, { id: mvRef.id, productId: line.productId, formatId: line.formatId, qty: line.packedQty ?? line.reservedQty, type: 'venta_bsale', orderId: order.id, by, at: now, reason: `${ref} · muestra` });
@@ -730,14 +742,14 @@ export async function editOrderLines(orderId: string, next: EditLine[], by: stri
     if (order.deleted || !isEditable(order.status)) throw new Error(`No se puede modificar un pedido ${ORDER_STATUS_TEXT[order.status] ?? order.status}.`);
     if (isSellerSamplesClientId(order.clientId) && next.some((l) => l.qty > 0 && !l.sample)) throw new Error('Las muestras a su nombre solo llevan muestras.');
     const reads = await readStocks(tx, [...order.lines, ...next]);
-    const available = new Map([...reads].map(([id, r]) => [id, r.prev ? Math.max(0, r.prev.onHand - r.prev.reserved) : 0]));
+    const available = new Map([...reads].map(([id, r]) => [id, r.prev ? sourceAvailable(r.prev, order.stockSource) : 0]));
     const plan = planLineEdit(order.lines, next, available);
     if (plan.items.length === 0 && JSON.stringify(plan.lines) === JSON.stringify(order.lines)) return { changed: 0, anyPending: plan.anyPending };
 
     const now = Date.now();
     for (const [id, delta] of plan.reserveDelta) {
       const r = reads.get(id);
-      if (r?.prev && delta !== 0) tx.update(r.ref, { reserved: Math.max(0, Math.round((r.prev.reserved + delta) * 1000) / 1000) });
+      if (r?.prev && delta !== 0) tx.update(r.ref, { [reserveField(order.stockSource)]: Math.max(0, Math.round((sourceStock(r.prev, order.stockSource).reserved + delta) * 1000) / 1000) });
     }
     for (const m of plan.movements) {
       const mvRef = doc(collection(db, 'stockMovements'));
@@ -806,7 +818,7 @@ export async function anularOrder(orderId: string, by: string, reason: string, o
 
     // Writes
     const now = Date.now();
-    releaseReserved(tx, reads, order.lines);
+    releaseReserved(tx, reads, order.lines, order.stockSource);
     for (const line of reserved) {
       const mvRef = doc(collection(db, 'stockMovements'));
       tx.set(mvRef, {
@@ -830,7 +842,7 @@ export async function anularOrder(orderId: string, by: string, reason: string, o
       status: 'anulado',
       ...(opts.deleted ? { deleted: opts.deleted, changeNotice: null } : {}),
       updatedAt: now,
-      lines: order.lines.map((l) => ({ ...l, pendingProductionQty: 0 })),
+      lines: order.lines.map((l) => ({ ...l, reservedQty: 0, pendingProductionQty: 0 })),
       statusHistory: [...order.statusHistory, { status: 'anulado', by, at: now, note }],
     });
   });

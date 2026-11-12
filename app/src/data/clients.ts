@@ -7,7 +7,7 @@ import { bsaleWritesOn } from './bsaleOps';
 import { describeFirestoreError } from '@/lib/errors';
 import type { Client, DeliveryMode, Order } from '@/domain/types';
 import { cleanRut, formatRut, isValidRut } from '@/lib/rut';
-import { baseName } from '@/domain/parse/client';
+import { duplicateClient } from '@/domain/clientSearch';
 
 // One shared listener per session for the client mirror (~2.000 docs since
 // Bsale went live): every screen that needs clients reuses it instead of
@@ -22,7 +22,7 @@ function startClients() {
     collection(db, 'clients'),
     (snap) => {
       const list: Client[] = [];
-      snap.forEach((d) => list.push(d.data() as Client));
+      snap.forEach((d) => { const c = d.data() as Client; if (!c.canonicalClientId) list.push(c); });
       list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
       clientsState = { clients: list, loading: false, error: null };
       clientListeners.forEach((l) => l());
@@ -36,33 +36,7 @@ export function useClients(): ClientsState {
   return useSyncExternalStore((l) => { startClients(); clientListeners.add(l); return () => { clientListeners.delete(l); }; }, () => clientsState);
 }
 
-const norm = (s: string) => s.toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '');
-
-// Lo que más se parece primero: nombre exacto, después los que empiezan con
-// lo escrito y al final los que lo contienen (antes salía en el orden de la
-// colección y «Andar Café» quedaba al fondo).
-export function searchClients(all: Client[], query: string): Client[] {
-  if (!query.trim()) return all.slice(0, 20);
-  const q = norm(query.trim());
-  const qb = baseName(query);
-  const rank = (c: Client) => {
-    const fields = [baseName(c.fantasyName), baseName(c.name)];
-    if (fields.includes(qb)) return 0;
-    if (fields.some((f) => f.startsWith(qb))) return 1;
-    if (fields.some((f) => f.split(' ').some((w) => w.startsWith(qb)))) return 2;
-    return 3;
-  };
-  return all
-    .filter((c) => norm(c.name).includes(q)
-      || norm(c.fantasyName ?? '').includes(q)
-      || norm(c.rut ?? '').includes(q)
-      || (qb.length > 2 && (baseName(c.name).includes(qb) || baseName(c.fantasyName).includes(qb))))
-    .map((c, i) => ({ c, r: rank(c), i }))
-    .sort((a, b) => a.r - b.r || a.i - b.i)
-    .map((x) => x.c)
-    .slice(0, 20);
-}
-
+export { searchClients } from '@/domain/clientSearch';
 // ---------- Espejo de clientes Bsale ----------
 
 // Bsale fields win; app-only fields are preserved. Returns how many docs
@@ -150,6 +124,9 @@ export async function createClientQuick(input: QuickClientInput, by: string): Pr
   const rutClean = input.rut?.trim() ? cleanRut(input.rut) : '';
   if (rutClean && !isValidRut(rutClean)) throw new Error('El RUT no es válido');
   const name = (input.name?.trim() || fantasyName);
+  const existing = await getDocs(collection(db, 'clients'));
+  const duplicate = duplicateClient(existing.docs.map(d => d.data() as Client), { name, fantasyName, rut: rutClean });
+  if (duplicate) throw new Error(`El cliente ya existe: ${duplicate.fantasyName || duplicate.name}${duplicate.rut ? ` · ${duplicate.rut}` : ''}. Búsquelo y selecciónelo para evitar un duplicado.`);
   const invoicingComplete = !!(rutClean && name && input.address?.trim() && input.giro?.trim());
   const remote = await bsale.createClient({
     name,
@@ -267,12 +244,13 @@ export async function updateClientAdmin(client: Client, patch: ClientAdminPatch,
     const own: Record<string, unknown> = {};
     if (patch.receivingHours !== undefined) own.receivingHours = patch.receivingHours.trim() || null;
     if (patch.deliveryMode !== undefined) own.deliveryMode = patch.deliveryMode;
+    if (patch.fantasyName !== undefined) own.fantasyName = patch.fantasyName.trim() || null;
     if (patch.notes !== undefined) own.notes = patch.notes.trim() || null;
     if (patch.ownerUid !== undefined) own.ownerUid = patch.ownerUid || null;
     if (Object.keys(own).length) await updateDoc(doc(db, 'clients', client.id), own);
-    const billingChanged = (['name', 'fantasyName', 'rut', 'giro', 'address', 'phone', 'email'] as const)
+    const billingChanged = (['name', 'rut', 'giro', 'address', 'phone', 'email'] as const)
       .some((k) => (next[k] ?? '') !== ((k === 'phone' ? client.contactPhone : client[k]) ?? ''));
-    if (billingChanged) throw new Error('Se guardaron horario, despacho, notas y cartera. Las escrituras a Bsale están apagadas: corrija nombre, RUT, giro, dirección, teléfono o correo directamente en Bsale y se actualizarán con la próxima sincronización.');
+    if (billingChanged) throw new Error('Se guardaron nombre comercial, horario, despacho, notas y cartera. Las escrituras a Bsale están apagadas: corrija nombre, RUT, giro, dirección, teléfono o correo directamente en Bsale y se actualizarán con la próxima sincronización.');
     return;
   }
   if (client.bsaleClientId) {

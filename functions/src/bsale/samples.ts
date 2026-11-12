@@ -12,7 +12,7 @@ import { send, variantsFor } from './writes';
 // registrar la salida de un pedido solo de muestras.
 
 interface Line { productId: string; formatId: string; productName: string; sample?: boolean; reservedQty: number; packedQty?: number; shortReason?: string }
-interface Order { id: string; clientSnapshot?: { name?: string; fantasyName?: string }; lines: Line[]; samplesConsumption?: unknown }
+interface Order { stockSource?: 'fabrica' | 'tienda'; id: string; clientSnapshot?: { name?: string; fantasyName?: string }; lines: Line[]; samplesConsumption?: unknown }
 
 export async function consumeSamples(api: BsaleApi | null, s: BsaleSettings, by: string, orderId: string) {
   const db = getFirestore();
@@ -33,7 +33,8 @@ export async function consumeSamples(api: BsaleApi | null, s: BsaleSettings, by:
   // Selling must not stop because Bsale writes are off: the sample stays in
   // the app's history and administración can register it later.
   if (!api || !s.enabled || !s.writesEnabled) { await record({ skipped: true, reason: 'escrituras_apagadas' }); return { skipped: true, reason: 'escrituras a Bsale apagadas' }; }
-  const officeId = requireFactory(s);
+  const officeId = order.stockSource === 'tienda' ? s.storeOfficeId : requireFactory(s);
+  if (!officeId) throw new HttpsError('failed-precondition', 'Falta configurar la sucursal de tienda.');
   const items = await variantsFor(lines);
   const client = order.clientSnapshot?.fantasyName ?? order.clientSnapshot?.name ?? '';
   const note = `Muestra · ${client} · ${orderId}`.slice(0, 200);

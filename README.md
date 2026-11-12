@@ -122,7 +122,7 @@ Si las escrituras a Bsale están apagadas, la carga queda «Por cargar en Bsale�
 
 **Lectura** (activa desde el 19-10-2026):
 - sincronización cada 10 minutos de 06:00 a 23:00, más webhooks;
-- catálogo y cruce de variantes (`catalogMap`), stock por sucursal (1 = fábrica «MARCOSI (SALA DE PROCESO)», 2 = tienda), lista de precios 8, clientes compradores y documentos;
+- catálogo y cruce de variantes (`catalogMap`), stock por sucursal (1 = fábrica «MARCOSI (SALA DE PROCESO)», 2 = tienda), lista de precios 8, todos los clientes activos y documentos;
 - historia de ventas comprimida por mes para el Panel ([ADR-0012](docs/adr/0012-hechos-venta-por-mes.md)) y costos promedio diarios a las 05:30.
 
 **Escrituras** (código listo; apagadas en producción, ver [docs/operacion.md](docs/operacion.md#interruptores-de-bsale)):
@@ -178,7 +178,7 @@ Si Gemini falla, el texto cae a un intérprete determinista (`domain/parse/local
 | Colección | Qué es | Quién escribe |
 |---|---|---|
 | `orders/*` | pedidos (líneas, reservas, estados, ventana, aprobación, muestras) | app (transacciones) |
-| `stock/{productId__formatId}` | `onHand` = fábrica según Bsale, `storeOnHand`, `reserved` = reservas de la app | servidor (sync) + transacciones de pedido |
+| `stock/{productId__formatId}` | `onHand` / `storeOnHand` = fábrica / tienda según Bsale; `reserved` / `storeReserved` = reservas de cada origen | servidor (sync) + transacciones de pedido |
 | `stockMovements/*` | bitácora de stock, append-only | app |
 | `productionLog/*` | producción cargada desde Comandas y su estado en Bsale | Producción (crea), supervisión (marca «cargado») |
 | `clients/*` | espejo de Bsale + cartera, horario habitual, notas | servidor + alta rápida |

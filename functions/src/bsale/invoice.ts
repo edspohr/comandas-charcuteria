@@ -18,7 +18,7 @@ import { comunaFromAddress, DEFAULT_CITY, DEFAULT_COMUNA } from './comuna';
 //   details[{ variantId, quantity, netUnitValue, comment }], sellerId.
 
 interface OrderLine { productId: string; productName: string; formatId: string; formatLabel: string; unit: string; qty: number; reservedQty: number; packedQty?: number; packedWeightKg?: number; unitPriceSnapshotCLP?: number; subtotalCLP?: number; notes?: string; shortReason?: string; sample?: boolean }
-interface Order { id: string; kind?: string; status: string; createdBy: string; clientId: string; clientSnapshot: { name: string; rut?: string; address?: string }; lines: OrderLine[]; statusHistory: unknown[]; invoiceRef?: string; totalCLP?: number }
+interface Order { stockSource?: 'fabrica' | 'tienda'; id: string; kind?: string; status: string; createdBy: string; clientId: string; clientSnapshot: { name: string; rut?: string; address?: string }; lines: OrderLine[]; statusHistory: unknown[]; invoiceRef?: string; totalCLP?: number }
 interface Client { name: string; fantasyName?: string; rut?: string; giro?: string; address?: string; bsaleClientId?: string; invoicingComplete?: boolean }
 interface VariantMirror { variantId: string; label: string; description: string; allowDecimal?: boolean; netPriceCLP?: number; priceCLP?: number }
 
@@ -43,10 +43,11 @@ const isKgVariant = (v: VariantMirror | undefined) => !!v && (v.allowDecimal ===
 
 export async function buildInvoice(s: BsaleSettings, orderId: string, wanted?: 'factura' | 'boleta'): Promise<InvoicePreview> {
   const db = getFirestore();
-  const officeId = requireFactory(s);
   const orderSnap = await db.doc(`orders/${orderId}`).get();
   if (!orderSnap.exists) throw new HttpsError('not-found', 'Pedido no encontrado.');
   const order = orderSnap.data() as Order;
+  const officeId = order.stockSource === 'tienda' ? s.storeOfficeId : requireFactory(s);
+  if (!officeId) throw new HttpsError('failed-precondition', 'Falta configurar la sucursal de tienda.');
   const client = ((await db.doc(`clients/${order.clientId}`).get()).data() ?? {}) as Client;
   const warnings: string[] = [];
   const blocking: string[] = [];
@@ -169,7 +170,8 @@ export async function emitInvoice(api: BsaleApi, s: BsaleSettings, by: string, o
     for (const l of order.lines) if (l.reservedQty > 0) release.set(`${l.productId}__${l.formatId}`, (release.get(`${l.productId}__${l.formatId}`) ?? 0) + l.reservedQty);
     const stockSnaps = release.size ? await tx.getAll(...[...release.keys()].map((k) => db.doc(`stock/${k}`))) : [];
     const now = Date.now();
-    for (const snap of stockSnaps) if (snap.exists) tx.update(snap.ref, { reserved: Math.max(0, (snap.data()!.reserved ?? 0) - (release.get(snap.id) ?? 0)) });
+    const heldField = order.stockSource === 'tienda' ? 'storeReserved' : 'reserved';
+    for (const snap of stockSnaps) if (snap.exists) tx.update(snap.ref, { [heldField]: Math.max(0, (snap.data()![heldField] ?? 0) - (release.get(snap.id) ?? 0)) });
     for (const l of order.lines.filter((x) => x.reservedQty > 0)) {
       const mv = db.collection('stockMovements').doc();
       tx.set(mv, { id: mv.id, productId: l.productId, formatId: l.formatId, qty: l.packedQty ?? l.reservedQty, type: 'venta_bsale', orderId, by, at: now, reason: l.sample ? `${number} · muestra` : number });

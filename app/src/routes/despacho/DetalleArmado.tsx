@@ -128,6 +128,7 @@ export default function DetalleArmado() {
         </Link>
       </div>
 
+      <p className="text-xs font-semibold text-charcoal-500 mb-2">Stock de origen: {order.stockSource === 'tienda' ? 'Tienda' : 'Fábrica'}</p>
       <header className="mb-5">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-mono text-[11px] text-charcoal-300 uppercase tracking-display">{order.id}</span>

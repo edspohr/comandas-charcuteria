@@ -61,8 +61,7 @@ export const isSellable = (p: Pick<Product, 'active' | 'discontinued' | 'sellabl
 
 // Stock is a *mirror* of Bsale, not a source of truth. `onHand` is the last
 // quantity Bsale reported for the variant (see syncStockFromBsale); the app
-// never moves it on its own except to pre-apply a sale that was just linked
-// (the next sync overwrites it anyway). `reserved` is app-only: Bsale has no
+// never subtracts a sale from it: the server reads the post-invoice Bsale balance. `reserved` is app-only: Bsale has no
 // notion of reservations, so open orders hold their quantity here and
 // available = onHand − reserved.
 export interface StockDoc {
@@ -72,9 +71,10 @@ export interface StockDoc {
   reserved: number;
   bsaleVariantId?: string;
   // Bsale real: todas las variantes que respaldan este formato y el stock de
-  // la sucursal tienda (solo informativo; los pedidos usan la fábrica).
+  // la sucursal tienda, con reservas independientes por origen.
   bsaleVariantIds?: string[];
   storeOnHand?: number;
+  storeReserved?: number;
   syncedAt?: number;
 }
 
@@ -88,8 +88,10 @@ export function available(stock: Pick<StockDoc, 'onHand' | 'reserved'>): number 
 
 export interface Client {
   id: string;
+  canonicalClientId?: string;
   name: string;
   fantasyName?: string;
+  contactName?: string;
   rut?: string;
   giro?: string;
   address?: string;
@@ -104,7 +106,7 @@ export interface Client {
   invoicingComplete: boolean;
   // Alta rápida desde el wizard / parser. Queda pendiente de revisión por
   // administración hasta completar los datos de facturación.
-  source?: 'seed' | 'app';
+  source?: 'seed' | 'app' | 'bsale';
   createdBy?: string;
   createdAt?: number;
   needsReview?: boolean;
@@ -173,6 +175,7 @@ export interface ChangeNotice { for: 'venta' | 'armado'; at: number; by: string 
 export interface Order {
   id: string;
   kind?: OrderKind;
+  stockSource?: 'fabrica' | 'tienda';
   createdBy: string;
   clientId: string;
   clientSnapshot: Pick<Client, 'name' | 'fantasyName' | 'rut' | 'address'>;

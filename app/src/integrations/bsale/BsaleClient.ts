@@ -52,7 +52,8 @@ export interface BsaleCustomer {
   id: string;
   rut?: string;
   name: string;          // razón social (companyName) or persona
-  fantasyName?: string;  // "activity"/alias in Bsale, nombre comercial para nosotros
+  fantasyName?: string;  // Alias comercial; nunca firstName/lastName ni activity
+  contactName?: string;
   giro?: string;
   address?: string;
   city?: string;
@@ -65,6 +66,7 @@ export interface BsaleCustomerInput {
   name: string;
   fantasyName?: string;
   rut?: string;
+  contactName?: string;
   giro?: string;
   address?: string;
   city?: string;

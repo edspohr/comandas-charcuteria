@@ -1,6 +1,6 @@
 # Cierre técnico: compras, insumos y producción
 
-Implementación local del 16-11-2026. No modifica configuración ni datos productivos.
+Implementación y publicación del 16-11-2026. Se conservaron la configuración de Bsale y los datos productivos.
 
 ## Flujo
 
@@ -28,10 +28,20 @@ Las cargas directas anteriores con planilla/foto siguen disponibles y se identif
 - 8 flujos de pedidos con SDK y Auth/Firestore emulados.
 - Compilación de app/PWA y funciones; git diff --check.
 
-Bsale es ficticio en las pruebas; no se emitieron documentos ni se cambiaron existencias reales. No se hizo despliegue.
+Bsale es ficticio en las pruebas; no se emitieron documentos ni se cambiaron existencias reales. El despliegue productivo se completó el 16-11-2026, después de renovar la sesión de Firebase.
 
 ## Publicación
 
 Publicar funciones, reglas y hosting de la misma revisión. Nuevas funciones: productionStart, productionClose, productionCancel, productionSendToBsale, productionMarkManual y supplyInitialStock. Mantener los interruptores actuales de Bsale: esta entrega no autoriza su activación automática. Las colecciones nuevas son productionBatches y supplyMovements; los lotes antiguos sin consumedKg/consumedUnits empiezan con consumo cero. No se requiere migración destructiva.
 
 Fuera de esta entrega: cobranza, cotizaciones, recetas completas y nuevas funciones comerciales.
+
+## Despliegue verificado
+
+- Proyecto: comandas-charcuteria. Hosting: https://comandas-charcuteria.web.app.
+- Código publicado desde el commit fc3bb815408c30a2b8121073c1720c730482fff0.
+- Funciones, reglas e índices desplegados correctamente; después se publicó hosting.
+- Las seis funciones nuevas responden HTTP 401 / UNAUTHENTICATED a una petición sin sesión. No se generaron movimientos para probarlas en producción.
+- Los 68 archivos publicados coinciden por SHA-256 con el build local, incluido el service worker.
+- Comprobación de configuración en modo lectura: integración Bsale habilitada, escrituras apagadas, simulacro activo y emisión de facturas desde Comandas deshabilitada. No se modificaron estos interruptores.
+- Los cruces particulares del catálogo siguen siendo una revisión de datos dentro de Catálogo; este despliegue no crea equivalencias por similitud.

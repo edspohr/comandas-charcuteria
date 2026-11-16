@@ -100,6 +100,7 @@ export default function Clientes() {
         </div>
       </div>
 
+      {filter === 'cartera' && <p className="text-xs text-charcoal-500 mb-3">Aquí aparecen los clientes asignados a su nombre. Tomar un pedido no cambia el vendedor del cliente. Busque en Todos y abra la ficha para asignarse uno sin dueño.</p>}
       {loading && !error && <p className="text-sm text-charcoal-300">Cargando…</p>}
       {error && <ErrorBanner message={error} />}
 

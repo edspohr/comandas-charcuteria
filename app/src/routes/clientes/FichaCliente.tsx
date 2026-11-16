@@ -5,7 +5,7 @@ import ErrorBanner from '@/components/ui/ErrorBanner';
 import StatusPill from '@/components/ui/StatusPill';
 import EditarClienteDialog from '@/components/clients/EditarClienteDialog';
 import { useCurrentUser } from '@/data/auth';
-import { useClient, useClientOrders } from '@/data/clients';
+import { claimUnassignedClient, useClient, useClientOrders } from '@/data/clients';
 import { useProducts } from '@/data/products';
 import { useUsers } from '@/data/users';
 import { can } from '@/domain/permissions';
@@ -31,6 +31,8 @@ export default function FichaCliente() {
   const { orders } = useClientOrders(clientId ?? null);
   const { products } = useProducts();
   const { settings } = useSettings();
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const [claiming, setClaiming] = useState(false);
   const [editing, setEditing] = useState(false);
 
   const grams = useMemo(() => gramsMap(products), [products]);
@@ -93,10 +95,12 @@ export default function FichaCliente() {
         </div>
         <div className="flex gap-2 shrink-0">
           {can(role, 'order.create') && <Button size="sm" onClick={nuevoPedido}>Nuevo pedido</Button>}
+          {!client.ownerUid && !client.isInternalShop && can(role, 'order.create') && <Button size="sm" variant="secondary" disabled={claiming} onClick={async () => { setClaiming(true); setClaimError(null); try { await claimUnassignedClient(client.id, uid); } catch (e) { setClaimError((e as Error).message); } finally { setClaiming(false); } }}>Asignar a mi cartera</Button>}
           {isAdmin && <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>Editar</Button>}
         </div>
       </header>
 
+      {claimError && <ErrorBanner message={claimError} />}
       <div className="grid gap-4 md:grid-cols-5 mb-4">
         <section className="card p-4 md:col-span-3">
           <p className="eyebrow mb-2">Datos</p>

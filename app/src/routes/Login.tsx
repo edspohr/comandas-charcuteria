@@ -208,6 +208,7 @@ function LoginCard({ onPin }: { onPin: () => void }) {
       <p className="eyebrow">Acceso del equipo</p>
       <h2 className="text-lg font-semibold text-charcoal-900 tracking-display uppercase mt-1 mb-4">Ingresar</h2>
       <div className="space-y-4">
+        <p className="text-xs text-charcoal-500 mb-2">¿Primera vez? Si usa Gmail, continúe con Google y elija el correo invitado. Después creará su propio PIN de 4 dígitos. Su contraseña de Google no se ingresa en este formulario.</p>
         <Button className="w-full" variant="secondary" onClick={() => run('google', signInWithGoogle)} disabled={pending !== null}>
           <GoogleMark /> {pending === 'google' ? 'Ingresando…' : 'Continuar con Google'}
         </Button>

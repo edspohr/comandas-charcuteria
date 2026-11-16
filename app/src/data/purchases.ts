@@ -27,7 +27,7 @@ export const useSupplies = () => {
 export const useSuppliers = () => useCollection<Supplier>('suppliers');
 export const usePurchases = (max = 100) => useCollection<Purchase>('purchases', ['receivedAt', 'desc'], max);
 export const usePurchaseOrders = (max = 200) => useCollection<PurchaseOrder>('purchaseOrders', ['createdAt', 'desc'], max);
-export const useSupplyLots = () => useCollection<SupplyLot>('supplyLots', ['receivedAt', 'desc'], 2000);
+export const useSupplyLots = () => useCollection<SupplyLot>('supplyLots');
 export const useScanTests = (max = 50) => useCollection<ScanTest & { id: string }>('scanTests', ['at', 'desc'], max);
 
 export async function purchaseExists(id: string): Promise<Purchase | null> {

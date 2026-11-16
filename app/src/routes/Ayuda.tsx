@@ -44,7 +44,7 @@ const GUIDES: Record<Role, Guide> = {
       'Si el cliente pide esperar, «Postergar» con la fecha en que vuelve a su agenda. Si no resultó, «Perdida» con el motivo.',
       'Se gana sola cuando el pedido se factura. Para crear una propia: «+ Oportunidad», o «🎤 Dictar»: diga el cliente, qué se busca y cuándo, y confirme lo que la app ordenó.',
     ]],
-    ['Clientes', ['«Clientes» → «Mi cartera»: quién está en riesgo o dejó de comprar. Toque un cliente para ver su historial y lo que compra.']],
+    ['Clientes', ['«Clientes» → «Mi cartera»: quién está en riesgo o dejó de comprar. Toque un cliente para ver su historial y lo que compra. Si no tiene vendedor, «Asignar a mi cartera» lo deja a su nombre; tomar un pedido no cambia su asignación.']],
   ] },
   tienda: { title: 'Tienda', sections: [
     ACCESS,
@@ -82,13 +82,19 @@ const GUIDES: Record<Role, Guide> = {
   produccion: { title: 'Producción', sections: [
     ACCESS,
     ['Qué producir', [
-      '«Producción» abre con lo que esperan los pedidos, separado en «Para hoy», «Para mañana» y «Próximos días». Arriba de cada tarjeta, la cantidad a producir; abajo, cuántos pedidos esperan y el primero en entregarse.',
+      '«Producción» → «Qué producir» muestra lo que esperan los pedidos, separado en «Para hoy», «Para mañana» y «Próximos días». Arriba de cada tarjeta, la cantidad a producir; abajo, cuántos pedidos esperan y el primero en entregarse.',
       'Una franja roja a la izquierda = pedido atrasado. Toque la tarjeta para ver los pedidos.',
       '«Todo el stock» muestra el stock de Bsale, lo reservado y lo disponible de cada formato, con buscador.',
     ]],
-    ['Cargar lo producido', [
+    ['Insumos y producción', [
+      'Al iniciar una elaboración indique el proceso y las cantidades de insumos que utilizará. Confirme con su PIN: se descuentan los lotes más antiguos con saldo y sin vencer. No se permite consumir más de lo disponible.',
+      'La elaboración queda «En proceso». Al terminar, toque «Cargar producción» en esa elaboración y registre cada producto, formato, cantidad y kilos obtenidos. No vuelva a descontar los insumos.',
+      '«Resultados» muestra entradas, salidas, rendimiento y costo neto de los insumos registrados. Si faltan costos, se indica. Los resultados se pueden exportar.',
+      'Si se inició por error y los insumos no se utilizaron, administración puede anularla y devolverlos al stock.',
+    ]],
+    ['Carga directa sin consumo de insumos', [
       '«Fotografiar planilla»: tome la foto, toque «Leer la foto», revise las cantidades (lo dudoso aparece en dorado) y toque «Cargar».',
-      '«Registrar a mano»: busque el producto, elija el formato y escriba la cantidad. Los productos que esperan los pedidos aparecen arriba para agregarlos con un toque. El botón «Registrar» de cada tarjeta deja la cantidad lista.',
+      '«Cargar producto terminado»: busque el producto, elija el formato y escriba la cantidad. Los productos que esperan los pedidos aparecen arriba para agregarlos con un toque. El botón «Registrar» de cada tarjeta deja la cantidad lista.',
       'Toda carga se confirma con su PIN y queda en «Cargado hoy» a su nombre. Con las escrituras a Bsale encendidas entra a Bsale como recepción en la sala de proceso; mientras estén apagadas, la oficina la carga desde «Pendiente en Bsale».',
     ]],
     ['Armar y despachar', [
@@ -108,7 +114,7 @@ const GUIDES: Record<Role, Guide> = {
     ['Compras', [
       '«Compras» → «Por recibir» → «+ Nueva compra»: proveedor, fecha en que llega y cada insumo con su cantidad (kg o unidades) y, si quiere, el precio. Si el insumo no existe, «Insumo nuevo».',
       'La fábrica la recibe contra esa compra y ve lo que falta. Si llega en partes, queda «Parcial»; cuando el proveedor ya no entregará el resto, «Cerrar con diferencia» con el motivo. Una compra sin recepciones se puede «Anular».',
-      '«Recepciones» muestra lo que llegó, con el documento; «Stock de insumos», los lotes por insumo.',
+      '«Recepciones» muestra lo que llegó, con el documento; «Stock de insumos», el saldo por lote descontando lo utilizado. «Registrar existencias iniciales» permite cargar lo que ya estaba en fábrica, con cantidad y costo neto por kg si se conoce.',
     ]],
     ['Todo lo demás', ['Puede tomar pedidos, armar, despachar, ver el Panel y el Catálogo como los perfiles de operación. «Oportunidades» la ve en modo lectura.']],
   ] },
@@ -125,7 +131,7 @@ const GUIDES: Record<Role, Guide> = {
     ['Compras e insumos', [
       '«Por recibir»: las compras que registra administración (también puede registrarlas usted). La fábrica (producción y despacho) recibe contra ellas.',
       '«Recibir»: 1) «Con factura o guía»: foto del documento o «Desde archivo» (foto de la galería o PDF), que queda guardado y la app lee el timbre y las líneas; o «Sin documento», con el proveedor opcional; 2) «Escanear cajas»: cada etiqueta suma peso, lote y vencimiento, y la primera vez un código pregunta qué insumo es; 3) confirmar con su PIN. Cuadrar las líneas del documento con los insumos es opcional.',
-      '«Recepciones»: el historial con su documento (toque la miniatura para abrirlo) y «+ Agregar foto o PDF», también para las compras sin documento. «Stock de insumos»: los lotes por insumo con su vencimiento y «+ Insumo nuevo».',
+      '«Recepciones»: el historial con su documento (toque la miniatura para abrirlo) y «+ Agregar foto o PDF», también para las compras sin documento. «Stock de insumos»: el saldo de los lotes, descontando lo utilizado, con su vencimiento y «+ Insumo nuevo». «Registrar existencias iniciales» carga lo que ya estaba en fábrica.',
       '«Laboratorio»: escanee etiquetas o elija fotos y PDF para ver qué lee la app. No crea compras ni stock.',
     ]],
     ['Personas', ['«Usuarios» → «+ Agregar persona» o «Invitar con su historial» (trae los pedidos y la cartera de WhatsApp). Cada persona crea su PIN al entrar. Aquí se desactiva a alguien o se borra su PIN.']],

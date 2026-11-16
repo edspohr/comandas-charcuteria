@@ -1,3 +1,4 @@
+import { batchCall } from './productionBatches';
 import { useEffect, useState } from 'react';
 import { collection, doc, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from './firebase';
@@ -14,9 +15,10 @@ export interface ProductionLine { productId: string; formatId: string; productNa
 // ok = recepción hecha en Bsale · simulado = Bsale en simulacro (bitácora) ·
 // por_cargar = escrituras apagadas, la oficina la carga en Bsale ·
 // cargado_manual = la oficina marcó que ya la cargó.
-export type ProductionBsaleStatus = 'ok' | 'simulado' | 'por_cargar' | 'cargado_manual';
+export type ProductionBsaleStatus = 'ok' | 'simulado' | 'por_cargar' | 'cargado_manual' | 'enviando' | 'revisar';
 
 export interface ProductionEntry {
+  batchId?: string;
   id: string; at: number; by: string; byName: string;
   lines: ProductionLine[]; note?: string; source: 'foto' | 'texto' | 'manual';
   bsaleStatus: ProductionBsaleStatus; bsaleMarkedBy?: string; bsaleMarkedAt?: number;
@@ -60,6 +62,7 @@ export async function loadProduction(lines: ProductionLine[], user: { uid: strin
 }
 
 export async function markLoadedInBsale(id: string, uid: string) {
+  if (id.startsWith('batch_')) { await batchCall('productionMarkManual', 'Confirmar carga manual en Bsale', { entryId: id }); return; }
   await updateDoc(doc(db, 'productionLog', id), { bsaleStatus: 'cargado_manual', bsaleMarkedBy: uid, bsaleMarkedAt: Date.now() });
 }
 

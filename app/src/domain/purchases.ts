@@ -90,6 +90,8 @@ export interface Purchase {
 }
 
 export interface SupplyLot {
+  consumedKg?: number;
+  consumedUnits?: number;
   id: string;
   supplyId: string;
   supplyName: string;

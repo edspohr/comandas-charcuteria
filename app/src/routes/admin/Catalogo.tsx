@@ -9,7 +9,7 @@ import ErrorBanner from '@/components/ui/ErrorBanner';
 import DataTable, { Pill } from '@/components/ui/DataTable';
 import { useProducts } from '@/data/products';
 import { availableFor, useAllStock, useStockMovements, useSyncState } from '@/data/stock';
-import { categoryLabel, categoryOrder } from '@/domain/categories';
+import { commercialCategory, CATEGORY_LABEL, categoryLabel, categoryOrder } from '@/domain/categories';
 import { formatQty } from '@/lib/format';
 import { formatCLP, unitPriceLabel } from '@/lib/pricing';
 import type { Product, ProductFormat, StockDoc } from '@/domain/types';
@@ -51,7 +51,8 @@ function CatalogoStock() {
   const { products, loading, error: productsError } = useProducts();
   const { stock, error: stockError } = useAllStock();
   const sync = useSyncState();
-  const error = productsError ?? stockError;
+  const [editError, setEditError] = useState<string | null>(null);
+  const error = productsError ?? stockError ?? editError;
   const [q, setQ] = useState('');
   const [onlyIssues, setOnlyIssues] = useState(false);
   const { current } = useCurrentUser();
@@ -63,7 +64,7 @@ function CatalogoStock() {
   const rows = useMemo<FormatRow[]>(() => {
     const needle = norm(q.trim());
     const list = products
-      .filter((p) => !needle || norm(p.name).includes(needle) || (p.aliases ?? []).some((a) => norm(a).includes(needle)) || norm(categoryLabel(p.category)).includes(needle))
+      .filter((p) => !needle || norm(p.name).includes(needle) || (p.aliases ?? []).some((a) => norm(a).includes(needle)) || norm(categoryLabel(p.category)).includes(needle) || p.formats.some(f => norm(f.label).includes(needle)))
       .sort((a, b) => categoryOrder(a.category) - categoryOrder(b.category) || a.name.localeCompare(b.name, 'es'));
     const out: FormatRow[] = [];
     for (const p of list) {
@@ -110,7 +111,10 @@ function CatalogoStock() {
           { key: 'product', label: 'Producto', mobile: true, render: (r) => r.first ? (
             <div>
               <p className="font-semibold text-charcoal-900">{r.product.name}</p>
-              <p className="text-[10px] uppercase tracking-display text-charcoal-300">{categoryLabel(r.product.category)}{r.product.discontinued ? ' · discontinuado' : ''}{!r.product.active ? ' · inactivo' : ''}</p>
+              <p className="text-[10px] uppercase tracking-display text-charcoal-300">{categoryLabel(commercialCategory(r.product.name, r.product.category))}{r.product.discontinued ? ' · discontinuado' : ''}{!r.product.active ? ' · inactivo' : ''}</p>
+              {editable && <label className="block mt-1 text-xs">Familia comercial<select className="field h-8 text-xs" value={r.product.category} onClick={e => e.stopPropagation()} onChange={e => { void updateDoc(doc(db, 'products', r.product.id), { category: e.target.value }).catch(err => setEditError(String(err.message))); }}>
+                {!CATEGORY_LABEL[r.product.category] && <option value={r.product.category}>{r.product.category}</option>}{Object.entries(CATEGORY_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              </select></label>}
               {editable && (
                 <label className="mt-1 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-display text-charcoal-500" onClick={(e) => e.stopPropagation()}>
                   <input type="checkbox" checked={r.product.sellable !== false} onChange={(e) => void setSellable(r.product.id, e.target.checked)} /> En pedidos

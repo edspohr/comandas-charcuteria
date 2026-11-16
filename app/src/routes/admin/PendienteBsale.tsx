@@ -1,3 +1,4 @@
+import { batchCall } from '@/data/productionBatches';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Button from '@/components/ui/Button';
@@ -115,10 +116,12 @@ export default function PendienteBsale() {
             {production.map((e) => (
               <li key={e.id} className="card p-3">
                 <p className="text-xs text-charcoal-500"><span className="font-semibold text-charcoal-900">{new Date(e.at).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}</span> · {e.byName}</p>
-                {e.bsaleError && <p className="text-xs text-red-700 mt-1">Bsale la rechazó: {e.bsaleError}</p>}
+                {e.bsaleError && <p className="text-xs text-red-700 mt-1">El envío requiere revisión: {e.bsaleError}</p>}
                 <ul className="mt-1 text-sm text-charcoal-700">
                   {e.lines.map((l, i) => <li key={i}><span className="font-semibold">{formatQty(l.qty, l.unit)}</span> {l.productName} <span className="text-charcoal-300 text-xs">· {l.formatLabel}</span></li>)}
                 </ul>
+                {e.bsaleStatus === 'enviando' && <p className="text-xs text-brass-700">Envío iniciado. Revise Bsale antes de cargar manualmente.</p>}
+                {e.batchId && canAct && writesOn && e.bsaleStatus === 'por_cargar' && <Button size="sm" className="mt-2 mr-2" disabled={busy != null} onClick={() => run(e.id, async () => { const result = await batchCall<{ message: string }>('productionSendToBsale', 'Enviar elaboración a Bsale', { entryId: e.id }); window.alert(result.message); })}>Enviar a Bsale</Button>}
                 {canAct && <Button size="sm" variant="secondary" className="mt-2" disabled={busy != null} onClick={() => run(e.id, () => markLoadedInBsale(e.id, uid))}>{busy === e.id ? '…' : 'Ya la cargué en Bsale'}</Button>}
               </li>
             ))}

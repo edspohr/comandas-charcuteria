@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { collection, doc, getDocs, onSnapshot, query, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, setDoc, updateDoc, where, writeBatch, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { bsale, isRealBsale } from '@/integrations/bsale/client';
 import type { BsaleCustomer } from '@/integrations/bsale/BsaleClient';
 import { db } from './firebase';
@@ -282,4 +282,14 @@ export async function updateClientAdmin(client: Client, patch: ClientAdminPatch,
     console.error('[clients] mirror update failed after Bsale update', e);
     throw new Error('Bsale quedó actualizado pero la copia local falló. Toque "Sincronizar Bsale" en el tablero para alinearla.');
   }
+}
+
+// Reclamar solo clientes sin dueño; las reglas impiden sobrescribir otra cartera.
+export async function claimUnassignedClient(id: string, uid: string) {
+  await runTransaction(db, async tx => {
+    const ref = doc(db, 'clients', id); const snap = await tx.get(ref);
+    if (!snap.exists() || snap.get('canonicalClientId')) throw new Error('La ficha no está disponible.');
+    if (snap.get('ownerUid')) throw new Error('Este cliente ya tiene vendedor. Pida a administración que revise su asignación.');
+    tx.update(ref, { ownerUid: uid, ownerAssignedBy: uid, ownerAssignedAt: serverTimestamp() });
+  });
 }

@@ -1,3 +1,4 @@
+import { usualFormats } from '@/domain/usualFormats';
 import { withDraftFormats } from '@/domain/orderDraft';
 import { stockForSource, type StockSource } from '@/domain/stockSource';
 import { Backdrop, SHEET_ACTIONS, SHEET_PANEL } from '@/components/ui/Sheet';
@@ -14,7 +15,7 @@ import SemaphoreBadge from '@/components/ui/SemaphoreBadge';
 import Stepper from '@/components/ui/Stepper';
 import SampleTag from '@/components/orders/SampleTag';
 import { useCurrentUser } from '@/data/auth';
-import { useClients, searchClients } from '@/data/clients';
+import { useClients, searchClients, useClientOrders } from '@/data/clients';
 import { clientAltName } from '@/domain/parse/client';
 import { useProducts } from '@/data/products';
 import { useAllStock, availableFor, semaphore } from '@/data/stock';
@@ -27,7 +28,7 @@ import { clearDraft, loadDraft, saveDraft } from '@/lib/draft';
 import { defaultRequestedDate, minRequestedDate } from '@/domain/cutoff';
 import { formatDateLong, formatDateShort, formatQty } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
-import { categoryLabel, categoryOrder } from '@/domain/categories';
+import { commercialCategory, categoryLabel, categoryOrder } from '@/domain/categories';
 import { computeLineSubtotal, formatCLP, unitPriceLabel } from '@/lib/pricing';
 import { formatWindow, parseWindow, windowFilled } from '@/domain/delivery';
 import { autoReasons, EXCEPTION_KINDS, type ExceptionKind } from '@/domain/exceptions';
@@ -115,6 +116,8 @@ export default function NuevoPedido() {
     [clients, draft.clientId, isSelfSamples, selfClient],
   );
   const lastOrder = useLastOrderForClient(uid, draft.clientId);
+  const clientHistory = useClientOrders(draft.clientId);
+  const preferred = useMemo(() => usualFormats(clientHistory.orders, products), [clientHistory.orders, products]);
 
   // «Muestras o pedido» desde una oportunidad: trae el cliente y la liga.
   const [params, setParams] = useSearchParams();
@@ -254,6 +257,7 @@ export default function NuevoPedido() {
           onLines={(lines) => update('lines', lines)}
           onNext={() => goto(3)}
           onBack={() => goto(1)}
+          preferred={preferred}
           lastOrder={lastOrder}
           onRepeat={lastOrder ? () => {
             update('lines', lastOrder.lines.filter((l) => !l.sample).map((l) => ({
@@ -448,7 +452,7 @@ function StepCliente({
 // ---------- Step 2: Productos ----------
 
 function StepProductos({
-  products, stock, lines, onLines, onNext, onBack, lastOrder, onRepeat,
+  products, stock, lines, onLines, onNext, onBack, lastOrder, onRepeat, preferred,
 }: {
   products: Product[];
   stock: Map<string, StockDoc>;
@@ -456,6 +460,7 @@ function StepProductos({
   onLines: (lines: DraftLine[]) => void;
   onNext: () => void;
   onBack: () => void;
+  preferred: Map<string, { formatId: string; date: number }>;
   lastOrder: import('@/domain/types').Order | null;
   onRepeat?: () => void;
 }) {
@@ -464,7 +469,7 @@ function StepProductos({
   const [q, setQ] = useState('');
   const active = products.filter(isSellable);
   const nq = normText(q.trim());
-  const shown = nq ? active.filter((p) => normText(`${p.name} ${(p.aliases ?? []).join(' ')}`).includes(nq)) : active;
+  const shown = nq ? active.filter((p) => normText(`${p.name} ${(p.aliases ?? []).join(' ')} ${p.formats.map(f => f.label).join(' ')}`).includes(nq)) : active;
   const showRepeat = !!(lastOrder && onRepeat && lines.length === 0);
 
   function addOrUpdate(product: Product, format: ProductFormat, qty: number, notes?: string) {
@@ -536,6 +541,7 @@ function StepProductos({
         <FormatPicker
           product={active.find((p) => p.id === openProductId)!}
           stock={stock}
+          preferred={preferred.get(openProductId)}
           existing={lines.filter((l) => !l.sample && l.productId === openProductId)}
           onCommit={(fmt, qty, notes) => {
             const prod = active.find((p) => p.id === openProductId)!;
@@ -552,8 +558,9 @@ function ProductGrid({ products, lines, openId, onOpen }: { products: Product[];
   const byCat = useMemo(() => {
     const m = new Map<string, Product[]>();
     for (const p of products) {
-      const list = m.get(p.category) ?? [];
-      list.push(p); m.set(p.category, list);
+      const category = commercialCategory(p.name, p.category);
+      const list = m.get(category) ?? [];
+      list.push(p); m.set(category, list);
     }
     // Sort categories by the canonical CATEGORY_LABEL order — the map
     // insertion order would otherwise depend on which product loaded first.
@@ -595,11 +602,12 @@ function ProductGrid({ products, lines, openId, onOpen }: { products: Product[];
 }
 
 function FormatPicker({
-  product, stock, existing, onCommit, onClose,
+  product, stock, existing, onCommit, onClose, preferred,
 }: {
   product: Product;
   stock: Map<string, StockDoc>;
   existing: DraftLine[];
+  preferred?: { formatId: string; date: number };
   onCommit: (format: ProductFormat, qty: number, notes?: string) => void;
   onClose: () => void;
 }) {
@@ -628,7 +636,7 @@ function FormatPicker({
         <button onClick={onClose} className="text-charcoal-300 hover:text-charcoal-700 text-xl w-8 h-8 flex items-center justify-center" aria-label="Cerrar">×</button>
       </div>
       <ul className="space-y-4">
-        {product.formats.map((fmt) => {
+        {[...product.formats].sort((a, b) => Number(b.formatId === preferred?.formatId) - Number(a.formatId === preferred?.formatId)).map((fmt) => {
           const av = availableFor(stock, product.id, fmt.formatId);
           const current = pending[fmt.formatId] ?? { qty: 0, notes: '' };
           const sem = semaphore(av, current.qty || 1);
@@ -637,6 +645,7 @@ function FormatPicker({
               <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
                 <div className="min-w-0">
                   <span className="font-medium text-charcoal-700">{fmt.label}</span>
+                  {fmt.formatId === preferred?.formatId && <span className="block text-xs text-emerald-700">Último formato pedido por este cliente · {new Date(preferred.date).toLocaleDateString('es-CL')}</span>}
                   {unitPriceLabel(fmt) && (
                     <span className="ml-2 text-[11px] uppercase tracking-display text-charcoal-500">
                       {unitPriceLabel(fmt)}
@@ -684,7 +693,7 @@ function SamplePicker({ products, stock, onAdd, onClose }: { products: Product[]
   const [grams, setGrams] = useState(SAMPLE_DEFAULT_GRAMS);
   const [notes, setNotes] = useState('');
   const norm = (x: string) => x.toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const candidates = products.filter((p) => sampleSourceFor(p) && (!q || norm(`${p.name} ${(p.aliases ?? []).join(' ')}`).includes(norm(q)))).slice(0, 30);
+  const candidates = products.filter((p) => sampleSourceFor(p) && (!q || norm(`${p.name} ${(p.aliases ?? []).join(' ')} ${p.formats.map(f => f.label).join(' ')}`).includes(norm(q)))).slice(0, 30);
   const product = products.find((p) => p.id === productId);
   const src = product ? sampleSourceFor(product) : null;
   const line = product ? sampleLine(product, grams, notes.trim() || undefined) : null;

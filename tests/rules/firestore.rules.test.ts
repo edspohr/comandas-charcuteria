@@ -7,7 +7,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 // Needs the Firestore emulator (Java). From the repo root:
 //   npm run test:rules:emu
@@ -286,7 +286,7 @@ describe('compras e insumos (ADR-0017 + Fase 4: administración compra, la fábr
     await assertFails(updateDoc(doc(ciro, 'purchases', '761234567-33-10'), { documents: [] }));
     await assertFails(updateDoc(doc(ciro, 'purchases', '761234567-33-10'), { documents: [d1, { ...d1, path: 'x' }], folio: '12' }));
     await assertFails(setDoc(doc(ciro, 'purchases', 'otra'), purchase('u-otro')));
-    await assertSucceeds(setDoc(doc(ciro, 'supplyLots', 'l-1'), { supplyId: 's-1', kg: 12.5, receivedBy: 'u-ciro', receivedAt: 1 }));
+    await assertSucceeds(setDoc(doc(ciro, 'supplyLots', 'l-1'), { supplyId: 's-1', origin: 'compra', kg: 12.5, receivedBy: 'u-ciro', receivedAt: 1 }));
     await assertFails(updateDoc(doc(ciro, 'supplyLots', 'l-1'), { kg: 99 }));
   });
   it('producción y despacho reciben; administración y consultor solo ven; vendedor no ve', async () => {
@@ -331,5 +331,33 @@ describe('reservas por sucursal', () => {
   it('el origen del pedido no cambia después de reservar', async () => {
     await seedOrder('store', 'alice', { stockSource: 'tienda' });
     await assertFails(updateDoc(doc(as('alice', 'vendedor'), 'orders', 'store'), { stockSource: 'fabrica' }));
+  });
+});
+
+ describe('carteras y consumos de producción', () => {
+  it('un vendedor reclama una ficha sin dueño, sin tocar otros campos ni otra cartera', async () => {
+    await seed('clients/free', { name: 'Libre' });
+    await seed('clients/owned', { name: 'Asignado', ownerUid: 'other' });
+    const seller = as('seller', 'vendedor');
+    const patch = { ownerUid: 'seller', ownerAssignedBy: 'seller', ownerAssignedAt: serverTimestamp() };
+    await assertFails(updateDoc(doc(seller, 'clients/free'), { ...patch, name: 'Cambio fiscal' }));
+    await assertSucceeds(updateDoc(doc(seller, 'clients/free'), patch));
+    await assertFails(updateDoc(doc(as('other', 'vendedor'), 'clients/free'), { ownerUid: 'other', ownerAssignedBy: 'other', ownerAssignedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(seller, 'clients/owned'), patch));
+  });
+  it('ni producción ni administración falsifican consumos o elaboraciones desde el navegador', async () => {
+    for (const role of ['produccion', 'admin', 'superAdmin', 'vendedor']) {
+      const db = as('u', role);
+      await assertFails(setDoc(doc(db, 'productionBatches/a'), { by: 'u', status: 'terminada' }));
+      await assertFails(setDoc(doc(db, 'supplyMovements/m'), { by: 'u', qty: 9 }));
+    }
+    const db = as('u', 'produccion');
+    await assertFails(setDoc(doc(db, 'productionLog/fake'), { by: 'u', batchId: 'a', bsaleStatus: 'por_cargar' }));
+    await assertFails(setDoc(doc(db, 'supplyLots/fake'), { origin: 'compra', kg: 10, consumedKg: -10, receivedBy: 'u' }));
+    await assertFails(setDoc(doc(db, 'supplyLots/inventory'), { origin: 'inventario', kg: 10, receivedBy: 'u' }));
+    await seed('supplyLots/l', { kg: 10, consumedKg: 2 });
+    await assertFails(updateDoc(doc(db, 'supplyLots/l'), { consumedKg: 0 }));
+    await seed('productionLog/b', { batchId: 'a', bsaleStatus: 'enviando' });
+    await assertFails(updateDoc(doc(as('a', 'admin'), 'productionLog/b'), { bsaleStatus: 'cargado_manual' }));
   });
 });

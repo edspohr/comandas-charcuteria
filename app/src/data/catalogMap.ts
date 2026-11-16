@@ -1,5 +1,6 @@
+import { commercialCategory } from '@/domain/categories';
 import { useEffect, useState } from 'react';
-import { collection, doc, onSnapshot, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, writeBatch, runTransaction } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Product, ProductFormat } from '@/domain/types';
 
@@ -144,7 +145,7 @@ export async function createProductFromBsale(variants: BsaleVariantMirror[], by:
   const product: Product = {
     id,
     name: title(first.productName),
-    category: (first.productType ?? 'otros').toLowerCase(),
+    category: commercialCategory(first.productName, (first.productType ?? 'otros').toLowerCase()),
     active: true,
     discontinued: false,
     formats,
@@ -183,4 +184,23 @@ export async function pullPricesFromBsale(products: Product[], map: CatalogMapEn
   }
   if (changed) await b.commit();
   return changed;
+}
+
+// Agrega una presentación faltante sin recrear el producto ni alterar pedidos anteriores.
+export async function addVariantFormat(productId: string, variant: BsaleVariantMirror, by: string) {
+  const ref = doc(db, 'products', productId);
+  await runTransaction(db, async tx => {
+    const mapRef = doc(db, 'catalogMap', variant.variantId);
+    const [snap, mapped] = await Promise.all([tx.get(ref), tx.get(mapRef)]);
+    if (!snap.exists()) throw new Error('Producto inexistente.');
+    if (mapped.get('status') === 'confirmado') throw new Error('La variante ya tiene un cruce confirmado. Revíselo antes de cambiarlo.');
+    const product = snap.data() as Product;
+    const format = formatFromVariant(variant);
+    // Distintas variantes por kg (laminado, trozo...) conservan identidad propia.
+    if (product.formats.some(f => f.formatId === format.formatId)) format.formatId = `v-${variant.variantId}`;
+    if (product.formats.some(f => f.formatId === format.formatId)) throw new Error('Ese formato ya existe. Selecciónelo en el cruce.');
+    const clean = Object.fromEntries(Object.entries(format).filter(([, v]) => v !== undefined));
+    tx.update(ref, { formats: [...product.formats, clean] });
+    tx.set(mapRef, { variantId: variant.variantId, productId, formatId: format.formatId, status: 'confirmado', bsaleLabel: variant.label, updatedBy: by, updatedAt: Date.now() }, { merge: true });
+  });
 }

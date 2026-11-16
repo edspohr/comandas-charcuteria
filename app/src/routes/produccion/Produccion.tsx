@@ -16,7 +16,9 @@ import { geminiEnabled, parseWithGemini } from '@/domain/parse/gemini';
 import { addDaysIso, formatDateLong, formatDateShort, formatQty, todayInSantiago } from '@/lib/format';
 import { describeFirestoreError } from '@/lib/errors';
 
-type View = 'hoy' | 'stock' | 'foto' | 'mano';
+import Elaboraciones from './Elaboraciones';
+
+type View = 'hoy' | 'stock' | 'foto' | 'mano' | 'elaboraciones';
 type Photo = { base64: string; mimeType: 'image/jpeg'; dataUrl: string };
 
 // Producción: la herramienta diaria de la planta. «Hoy» dice qué producir
@@ -31,7 +33,7 @@ export default function Produccion() {
   const { rows, loading, error } = useProduccionData();
   const { products } = useProducts();
   const sync = useSyncState();
-  const [view, setView] = useState<View>('hoy');
+  const [view, setView] = useState<View>('elaboraciones');
   const [prefill, setPrefill] = useState<ProductionLine[]>([]);
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -45,7 +47,7 @@ export default function Produccion() {
   const since = useMemo(() => startToday - 6 * 86_400_000, [startToday]);
   const log = useProductionLog(since);
   const loadedToday = log.entries.filter((e) => e.at >= startToday);
-  const toBsale = log.entries.filter((e) => e.bsaleStatus === 'por_cargar');
+  const toBsale = log.entries.filter((e) => ['por_cargar', 'revisar', 'enviando'].includes(e.bsaleStatus));
 
   const todo = useMemo(() => rows.filter((r) => r.toProduce > 0).map((r) => {
     const waiting = r.affectingOrders.filter((a) => a.pendingProductionQty > 0).sort((a, b) => (a.requestedDate + (a.window ?? '')).localeCompare(b.requestedDate + (b.window ?? '')));
@@ -88,7 +90,8 @@ export default function Produccion() {
           <Icon name="chevron" size={16} className="rotate-90" /> Volver a Producción
         </button>
         <h1 className="text-2xl font-semibold text-charcoal-900 tracking-display uppercase mb-1">{view === 'foto' ? 'Cargar con foto' : 'Cargar producción'}</h1>
-        <p className="text-xs text-charcoal-300 mb-4">Revise las cantidades y confirme con su PIN. Queda registrado a su nombre.</p>
+        <p className="text-xs text-charcoal-500 mb-4">Esta carga directa no descuenta insumos. Si ya inició una elaboración, vuelva a «Insumos y producción» y use «Cargar producción» en esa elaboración para terminarla.</p>
+        <button className="text-sm underline mb-4" onClick={() => setView('elaboraciones')}>Ir a Insumos y producción</button>
         {view === 'foto'
           ? <ProduccionIA user={user} photo={photo} onRetake={() => camera.current?.click()} onClearPhoto={() => setPhoto(null)} onDone={done} />
           : <RegistrarProduccion user={user} products={products} initial={prefill} suggestions={todo.map((t) => lineOf(t.row))} onDone={done} />}
@@ -113,7 +116,7 @@ export default function Produccion() {
         )}
       </header>
 
-      {canReceive && (
+      {canReceive && view !== 'elaboraciones' && (
         <div className="grid grid-cols-2 gap-2 mb-4">
           <button onClick={() => camera.current?.click()} className="rounded-xl bg-charcoal-900 text-cream-50 p-4 text-left shadow-soft active:scale-[0.98] transition">
             <Icon name="camera" size={26} className="text-brass-300" />
@@ -122,8 +125,8 @@ export default function Produccion() {
           </button>
           <button onClick={() => registerFor([])} className="rounded-xl bg-white border border-charcoal-200 p-4 text-left shadow-soft active:scale-[0.98] transition">
             <Icon name="pencil" size={26} className="text-brass-600" />
-            <p className="mt-2 font-semibold text-charcoal-900">Registrar a mano</p>
-            <p className="text-[11px] text-charcoal-300">Producto y cantidad</p>
+            <p className="mt-2 font-semibold text-charcoal-900">Cargar producto terminado</p>
+            <p className="text-[11px] text-charcoal-300">Para cargas sin consumo de insumos</p>
           </button>
         </div>
       )}
@@ -140,12 +143,12 @@ export default function Produccion() {
 
       {toBsale.length > 0 && (
         <div className="mb-4 rounded-md bg-brass-50 border border-brass-300 text-brass-800 px-3 py-2 text-xs">
-          {toBsale.length} carga{toBsale.length === 1 ? '' : 's'} por pasar a Bsale. Las escrituras hacia Bsale están apagadas: la oficina las carga en Bsale{supervisor ? ' y las marca aquí abajo' : ''}; el stock se actualiza con la sincronización.
+          {toBsale.length} carga{toBsale.length === 1 ? '' : 's'} por pasar a Bsale. La oficina debe revisar el estado del envío antes de cargarlas manualmente en Bsale{supervisor ? ' y las marca aquí abajo' : ''}; el stock se actualiza con la sincronización.
         </div>
       )}
 
-      <nav className="mb-4 flex gap-1 border-b border-charcoal-100">
-        {([['hoy', 'Qué producir'], ['stock', 'Todo el stock']] as Array<[View, string]>).map(([v, label]) => (
+      <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-charcoal-100">
+        {([['elaboraciones', 'Insumos y producción'], ['hoy', 'Qué producir'], ['stock', 'Todo el stock']] as Array<[View, string]>).map(([v, label]) => (
           <button key={v} onClick={() => setView(v)} className={'px-4 py-2.5 text-xs uppercase tracking-display font-medium border-b-2 transition -mb-px ' + (v === view ? 'border-brass-500 text-charcoal-900' : 'border-transparent text-charcoal-300 hover:text-charcoal-500')}>{label}</button>
         ))}
       </nav>
@@ -174,6 +177,8 @@ export default function Produccion() {
           <ProductionHistory entries={log.entries} startToday={startToday} canMark={supervisor} uid={me.uid} />
         </div>
       )}
+
+      {view === 'elaboraciones' && <Elaboraciones key={me.uid} uid={me.uid} canWrite={canReceive} supervisor={supervisor} />}
 
       {view === 'stock' && !loading && <StockTable rows={rows} />}
     </div>
@@ -241,7 +246,7 @@ function TodoCard({ item, today, tomorrow, onRegister }: { item: { row: DemandRo
 }
 
 const STATUS_PILL: Record<ProductionEntry['bsaleStatus'], [string, 'ok' | 'warn' | 'muted' | 'info']> = {
-  ok: ['En Bsale', 'ok'], cargado_manual: ['Cargado en Bsale', 'ok'], simulado: ['Simulacro', 'muted'], por_cargar: ['Por cargar en Bsale', 'warn'],
+  enviando: ['Envío en curso: no duplicar', 'warn'], revisar: ['Revisar envío en Bsale', 'warn'], ok: ['En Bsale', 'ok'], cargado_manual: ['Cargado en Bsale', 'ok'], simulado: ['Simulacro', 'muted'], por_cargar: ['Por cargar en Bsale', 'warn'],
 };
 const SOURCE: Record<ProductionEntry['source'], string> = { foto: 'foto', texto: 'texto', manual: 'a mano' };
 

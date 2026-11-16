@@ -1,3 +1,5 @@
+import InventarioInicial from './InventarioInicial';
+import { remaining } from '@/data/productionBatches';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Button from '@/components/ui/Button';
@@ -7,7 +9,7 @@ import BarcodeScanner, { LABEL_FORMATS, TIMBRE_FORMATS, readImage, type ScanHit 
 import { DOC_ACCEPT, pageImages } from '@/lib/docFiles';
 import { describeFirestoreError } from '@/lib/errors';
 import { useCurrentUser } from '@/data/auth';
-import { addPurchaseDocuments, createSupply, documentUrl, saveScanTest, usePurchaseOrders, usePurchases, useScanTests, useSupplies, useSupplyLots } from '@/data/purchases';
+import { addPurchaseDocuments, createSupply, documentUrl, saveScanTest, usePurchaseOrders, usePurchases, purchaseExists, useScanTests, useSupplies, useSupplyLots } from '@/data/purchases';
 import { parseLabel, visibleRaw } from '@/domain/gs1';
 import { parseTed } from '@/domain/ted';
 import { DOC_KIND_LABEL, type Purchase, type PurchaseDocument, type Supply, type SupplyLot } from '@/domain/purchases';
@@ -57,7 +59,7 @@ export default function Compras() {
       {tab === 'porRecibir' && <PorRecibir me={me} supplies={supplies} canOrder={canOrder} canReceive={canReceive} onReceive={(po) => setParams((p) => { p.set('tab', 'recibir'); p.set('compra', po.id); return p; }, { replace: true })} />}
       {tab === 'recibir' && <Recibir me={me} supplies={supplies} orders={orders} startOrderId={startOrderId} onStarted={() => setParams((p) => { p.delete('compra'); return p; }, { replace: true })} />}
       {tab === 'compras' && <PurchaseList uid={me.uid} canAdd={canReceive} />}
-      {tab === 'insumos' && <SupplyStock supplies={supplies} uid={me.uid} canCreate={canReceive || canOrder} />}
+      {tab === 'insumos' && <SupplyStock supplies={supplies} uid={me.uid} canCreate={canReceive || canOrder} canInventory={canOrder} />}
       {tab === 'laboratorio' && <Laboratorio uid={me.uid} />}
     </div>
   );
@@ -65,13 +67,18 @@ export default function Compras() {
 
 function PurchaseList({ uid, canAdd }: { uid: string; canAdd: boolean }) {
   const { items, loading, error } = usePurchases(100);
-  const [open, setOpen] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const wanted = params.get('recepcion');
+  const [linked, setLinked] = useState<Purchase | null>(null);
+  useEffect(() => { let active = true; setLinked(null); if (wanted) void purchaseExists(wanted).then(p => { if (active) setLinked(p); }).catch(() => {}); return () => { active = false; }; }, [wanted]);
+  const [open, setOpen] = useState<string | null>(wanted);
+  const visibleItems = linked && !items.some(p => p.id === linked.id) ? [linked, ...items] : items;
   if (loading) return <p className="text-sm text-charcoal-300">Cargando…</p>;
   if (error) return <ErrorBanner message={error} />;
-  if (!items.length) return <p className="text-sm text-charcoal-300">Todavía no hay compras registradas.</p>;
+  if (!visibleItems.length) return <p className="text-sm text-charcoal-300">Todavía no hay compras registradas.</p>;
   return (
     <ul className="space-y-2">
-      {items.map((p) => <PurchaseCard key={p.id} p={p} uid={uid} canAdd={canAdd} open={open === p.id} onToggle={() => setOpen(open === p.id ? null : p.id)} />)}
+      {visibleItems.map((p) => <PurchaseCard key={p.id} p={p} uid={uid} canAdd={canAdd} open={open === p.id} onToggle={() => setOpen(open === p.id ? null : p.id)} />)}
     </ul>
   );
 }
@@ -143,8 +150,8 @@ function PurchaseDocs({ p, uid, canAdd }: { p: Purchase; uid: string; canAdd: bo
   );
 }
 
-function SupplyStock({ supplies, uid, canCreate }: { supplies: Supply[]; uid: string; canCreate: boolean }) {
-  const { items: lots, loading } = useSupplyLots();
+function SupplyStock({ supplies, uid, canCreate, canInventory }: { supplies: Supply[]; uid: string; canCreate: boolean; canInventory: boolean }) {
+  const { items: lots, loading, error } = useSupplyLots();
   const [open, setOpen] = useState<string | null>(null);
   const soon = addDaysIso(todayInSantiago(), 7);
   const today = todayInSantiago();
@@ -152,17 +159,19 @@ function SupplyStock({ supplies, uid, canCreate }: { supplies: Supply[]; uid: st
     const by = new Map<string, SupplyLot[]>();
     for (const l of lots) by.set(l.supplyId, [...(by.get(l.supplyId) ?? []), l]);
     return supplies.map((s) => {
-      const ls = (by.get(s.id) ?? []).sort((a, b) => a.receivedAt - b.receivedAt);
+      const ls = (by.get(s.id) ?? []).filter(l => remaining(l, s.unit) > 0).sort((a, b) => a.receivedAt - b.receivedAt);
       const expiries = ls.map((l) => l.expiry).filter(Boolean).sort() as string[];
-      return { s, lots: ls, kg: ls.reduce((a, l) => a + l.kg, 0), units: ls.reduce((a, l) => a + l.units, 0), boxes: ls.reduce((a, l) => a + l.boxes, 0), next: expiries[0] };
+      return { s, lots: ls, kg: ls.reduce((a, l) => a + remaining(l, 'kg'), 0), units: ls.reduce((a, l) => a + remaining(l, 'unidad'), 0), boxes: ls.reduce((a, l) => a + l.boxes, 0), next: expiries[0] };
     });
   }, [lots, supplies]);
   if (loading) return <p className="text-sm text-charcoal-300">Cargando…</p>;
   return (
     <div className="space-y-2">
+      {error && <ErrorBanner message={error} />}
+      {canInventory && <InventarioInicial key={uid} uid={uid} supplies={supplies} />}
       {canCreate && <NewSupply uid={uid} existing={supplies} />}
       {!supplies.length && <p className="text-sm text-charcoal-300">Los insumos se crean aquí o al recibir una compra.</p>}
-      {supplies.length > 0 && <p className="text-xs text-charcoal-500">Stock = todo lo recibido. El consumo en producción viene en la próxima etapa.</p>}
+      {supplies.length > 0 && <p className="text-xs text-charcoal-500">Saldo = recepciones e inventario inicial menos insumos utilizados en elaboraciones. Los lotes agotados no aparecen.</p>}
       <ul className="space-y-2">
         {rows.map(({ s, lots: ls, kg: k, units, boxes, next }) => (
           <li key={s.id} className="card p-3">
@@ -178,7 +187,7 @@ function SupplyStock({ supplies, uid, canCreate }: { supplies: Supply[]; uid: st
               <ul className="mt-2 divide-y divide-charcoal-100 text-xs">
                 {ls.map((l) => (
                   <li key={l.id} className="py-1.5">
-                    <b>{s.unit === 'unidad' ? `${l.units} un.` : kg(l.kg)}</b> · {l.lot ? `lote ${l.lot}` : 'sin lote'}{l.expiry ? ` · vence ${l.expiry}` : ''} · {l.supplierName ?? l.origin} · {new Date(l.receivedAt).toLocaleDateString('es-CL')}{l.costPerKg ? ` · ${formatCLP(l.costPerKg)}/kg` : ''}
+                    <b>{s.unit === 'unidad' ? `${remaining(l, 'unidad')} un.` : kg(remaining(l, 'kg'))}</b> · {l.lot ? `lote ${l.lot}` : 'sin lote'}{l.expiry ? ` · vence ${l.expiry}` : ''} · {l.supplierName ?? l.origin} · {new Date(l.receivedAt).toLocaleDateString('es-CL')}{l.costPerKg ? ` · ${formatCLP(l.costPerKg)}/kg` : ''}
                   </li>
                 ))}
                 {s.codes.length > 0 && <li className="py-1.5 text-charcoal-300 font-mono break-all">Códigos: {s.codes.join(' · ')}</li>}

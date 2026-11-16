@@ -17,3 +17,4 @@ export {
   bsaleInvoicePreview, bsaleEmitInvoice, bsaleFactsBackfill, bsaleRefreshCosts, bsaleDailyCosts, bsaleConsumeSamples,
 } from './bsale';
 export { opportunityWonOnInvoice } from './opportunities';
+export { productionStart, productionClose, productionCancel, productionSendToBsale, productionMarkManual, supplyInitialStock } from './production';

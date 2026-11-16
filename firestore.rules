@@ -54,7 +54,12 @@ service cloud.firestore {
         // tenía, su nombre de fantasía. Nada más de la ficha.
         || (canCreateOrder()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryWindow', 'receivingHours', 'fantasyName'])
-          && (resource.data.get('fantasyName', '') == '' || unchanged('fantasyName')));
+          && (resource.data.get('fantasyName', '') == '' || unchanged('fantasyName')))
+        || (canCreateOrder() && resource.data.get('ownerUid', null) == null
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerAssignedBy == request.auth.uid
+          && request.resource.data.ownerAssignedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ownerUid', 'ownerAssignedBy', 'ownerAssignedAt']));
       allow delete: if isSupervisor();
     }
 
@@ -165,8 +170,9 @@ service cloud.firestore {
     // -------- Producción cargada desde Comandas (la oficina marca lo que cargó a mano en Bsale)
     match /productionLog/{id} {
       allow read:   if canRead();
-      allow create: if canReceiveProd() && request.resource.data.by == request.auth.uid;
-      allow update: if isSupervisor()
+      allow create: if canReceiveProd() && request.resource.data.by == request.auth.uid
+        && !('batchId' in request.resource.data);
+      allow update: if isSupervisor() && !('batchId' in resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bsaleStatus', 'bsaleMarkedBy', 'bsaleMarkedAt']);
       allow delete: if false;
     }
@@ -246,9 +252,21 @@ service cloud.firestore {
         && request.resource.data.documents.size() > resource.data.get('documents', []).size();
       allow delete: if false;
     }
+    match /productionBatches/{id} {
+      allow read: if canSeePurchases();
+      allow write: if false; // Consumos, cierre y devoluciones: servidor con PIN.
+    }
+    match /supplyMovements/{id} {
+      allow read: if canSeePurchases();
+      allow write: if false;
+    }
     match /supplyLots/{id} {
       allow read: if canSeePurchases();
-      allow create: if canReceivePurchases() && request.resource.data.receivedBy == request.auth.uid && request.resource.data.kg >= 0;
+      allow create: if canReceivePurchases() && request.resource.data.receivedBy == request.auth.uid && request.resource.data.kg >= 0
+        && request.resource.data.get('units', 0) >= 0
+        && request.resource.data.origin == 'compra'
+        && request.resource.data.get('consumedKg', 0) == 0
+        && request.resource.data.get('consumedUnits', 0) == 0;
       allow update, delete: if false;
     }
     match /scanTests/{id} {

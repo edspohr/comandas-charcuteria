@@ -5,7 +5,7 @@ import DataTable, { Pill } from '@/components/ui/DataTable';
 import { useCurrentUser } from '@/data/auth';
 import { useProducts } from '@/data/products';
 import {
-  confirmMany, ignoreMany, createProductFromBsale, pullPricesFromBsale, setMapping, useBsaleVariants, useCatalogMap,
+  addVariantFormat, confirmMany, ignoreMany, createProductFromBsale, pullPricesFromBsale, setMapping, useBsaleVariants, useCatalogMap,
   type BsaleVariantMirror, type CatalogMapEntry, type MapStatus,
 } from '@/data/catalogMap';
 import { can } from '@/domain/permissions';
@@ -156,6 +156,9 @@ export default function CruceBsale() {
         ]}
         expand={editable ? ({ v, m }) => (
           <div className="flex flex-wrap gap-2 text-xs">
+            {m?.status !== 'confirmado' && <label className="block w-full">Agregar esta presentación a un producto existente
+              <select className="field mt-1" value="" onChange={e => { const id = e.target.value; if (id) void act(v.variantId, () => addVariantFormat(id, v, uid)); }}><option value="">Elegir producto para agregar formato…</option>{products.filter(p => p.active && !p.discontinued).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+            </label>}
             {m?.productId && m.status !== 'confirmado' && <Button size="sm" onClick={() => act(v.variantId, () => setMapping(v.variantId, { status: 'confirmado' }, uid))}>Confirmar {productById.get(m.productId)?.name ?? m.productId}</Button>}
             {m?.status !== 'ignorado' && <Button size="sm" variant="ghost" onClick={() => act(v.variantId, () => setMapping(v.variantId, { status: 'ignorado' }, uid))}>Ignorar (no se vende por Comandas)</Button>}
             {m?.status === 'ignorado' && <Button size="sm" variant="ghost" onClick={() => act(v.variantId, () => setMapping(v.variantId, { status: 'sugerido' }, uid))}>Volver a pendiente</Button>}

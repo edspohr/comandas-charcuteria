@@ -906,17 +906,13 @@ export function useLastOrderForClient(vendedorUid: string, clientId: string | nu
     if (!clientId) { setOrder(null); return; }
     const q = query(
       collection(db, 'orders'),
-      where('createdBy', '==', vendedorUid),
       where('clientId', '==', clientId),
-      orderBy('createdAt', 'desc'),
-      limit(1),
     );
     const unsub = onSnapshot(
       q,
       (snap) => {
-        const first = snap.docs[0];
-        const o = first ? (first.data() as Order) : null;
-        setOrder(o && !o.deleted ? o : null);
+        const valid = snap.docs.map(d => d.data() as Order).filter(o => !o.deleted && o.status !== 'anulado').sort((a, b) => b.createdAt - a.createdAt);
+        setOrder(valid[0] ?? null);
       },
       (err) => {
         // Non-fatal for the wizard — just skip the "Repetir último" suggestion.

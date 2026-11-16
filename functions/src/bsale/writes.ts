@@ -66,18 +66,18 @@ async function withCosts<T extends { variantId: number }>(details: T[]): Promise
 }
 
 // POST /v1/stocks/receptions.json — producción terminada entra a la fábrica.
-export async function receiveProduction(api: BsaleApi, s: BsaleSettings, by: string, lines: QtyLine[], note?: string) {
+export async function receiveProduction(api: BsaleApi, s: BsaleSettings, by: string, lines: QtyLine[], note?: string, reference?: string) {
   const officeId = requireFactory(s);
   const items = await variantsFor(lines);
   if (!items.length) throw new HttpsError('invalid-argument', 'No hay cantidades para registrar.');
   const body = {
     document: 'Producción',
     officeId,
-    documentNumber: `COM-${Date.now()}`,
+    documentNumber: reference ?? `COM-${Date.now()}`,
     note: `Comandas · producción${note ? ` · ${note}` : ''}`,
     details: await withCosts(items.map((i) => ({ variantId: i.variantId, quantity: i.qty }))),
   };
-  return send(api, s, 'recepcion_produccion', by, 'POST', '/v1/stocks/receptions.json', body);
+  return send(api, s, 'recepcion_produccion', by, 'POST', '/v1/stocks/receptions.json', body, reference);
 }
 
 // Traslado fábrica → tienda. Modo por defecto: consumo en fábrica +

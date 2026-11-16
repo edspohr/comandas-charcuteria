@@ -27,7 +27,7 @@ export function useOrdersAwaitingDocument(): { orders: Order[]; loading: boolean
 export function useProductionToLoad(): ProductionEntry[] {
   const [items, setItems] = useState<ProductionEntry[]>([]);
   useEffect(() => onSnapshot(
-    query(collection(db, 'productionLog'), where('bsaleStatus', '==', 'por_cargar')),
+    query(collection(db, 'productionLog'), where('bsaleStatus', 'in', ['por_cargar', 'revisar', 'enviando', 'simulado'])),
     (s) => setItems(s.docs.map((d) => d.data() as ProductionEntry).sort((a, b) => a.at - b.at)),
     () => setItems([]),
   ), []);

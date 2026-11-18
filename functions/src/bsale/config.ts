@@ -14,6 +14,7 @@ export interface BsaleSettings {
   // Emitir facturas y boletas desde Comandas. Aparte de writesEnabled: se
   // puede escribir producción y traslados mientras se sigue facturando en el POS.
   invoicesEnabled?: boolean;
+  paymentsEnabled?: boolean;
   factoryOfficeId?: number;   // sucursal cuyo stock respalda los pedidos
   storeOfficeId?: number;     // tienda (recibe traslados, vende por mesón)
   priceListId?: number;       // lista de precios para valorizar pedidos

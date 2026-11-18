@@ -119,6 +119,7 @@ function Conexion() {
           <Toggle label="Sincronización encendida" hint="Cron cada 10 min (06–23 h) y webhooks." checked={settings.enabled} disabled={!editable} onChange={(v) => save({ enabled: v })} />
           <Toggle label="Escrituras hacia Bsale" hint="Recepciones de producción, traslados y clientes." checked={settings.writesEnabled} disabled={!editable} onChange={(v) => save({ writesEnabled: v })} />
           <Toggle label="Simulacro" hint="Registra lo que se enviaría, sin enviarlo." checked={settings.dryRun} disabled={!editable} onChange={(v) => save({ dryRun: v })} />
+          <Toggle label="Registrar pagos desde Comandas" hint="Permite abonar facturas de la cartera a Bsale. Requiere escrituras activas y simulacro apagado." checked={!!settings.paymentsEnabled} disabled={!editable} onChange={(v) => save({ paymentsEnabled: v })} />
           <Toggle label="Facturar desde Comandas" hint="Emite facturas y boletas desde el pedido. Apagado: se emite en el POS y se vincula." checked={!!settings.invoicesEnabled} disabled={!editable} onChange={(v) => save({ invoicesEnabled: v })} />
         </div>
         <label className="block text-xs text-charcoal-500 max-w-md">Cómo registrar el traslado a tienda

@@ -122,6 +122,10 @@ service cloud.firestore {
       allow write: if false;
     }
     // PIN: el hash solo lo ve el servidor; la bitácora de usos, auditoría.
+    match /userUsage/{uid} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
     match /userPins/{uid} {
       allow read, write: if false;
     }

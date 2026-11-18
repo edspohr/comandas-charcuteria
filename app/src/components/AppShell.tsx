@@ -29,6 +29,7 @@ const NAV: NavItem[] = [
   { to: '/admin/pendiente-bsale', label: 'Pendiente en Bsale', short: 'Pendiente', route: 'pendienteBsale', group: 'pedidos', icon: 'sync' },
   { to: '/oportunidades', label: 'Oportunidades', route: 'oportunidades', group: 'clientes', icon: 'sparkle' },
   { to: '/clientes', label: 'Clientes', route: 'clientes', group: 'clientes', icon: 'users' },
+  { to: '/cuentas-por-cobrar', label: 'Cuentas por cobrar', route: 'cuentasPorCobrar', group: 'clientes', icon: 'chart' },
   { to: '/produccion', label: 'Producción', route: 'produccion', group: 'produccion', icon: 'factory' },
   { to: '/compras', label: 'Compras e insumos', short: 'Compras', route: 'compras', group: 'produccion', icon: 'scan' },
   { to: '/admin/panel', label: 'Panel de gestión', short: 'Panel', route: 'panel', group: 'gestion', icon: 'chart' },

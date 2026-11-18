@@ -246,7 +246,7 @@ export async function updateClientAdmin(client: Client, patch: ClientAdminPatch,
     if (patch.deliveryMode !== undefined) own.deliveryMode = patch.deliveryMode;
     if (patch.fantasyName !== undefined) own.fantasyName = patch.fantasyName.trim() || null;
     if (patch.notes !== undefined) own.notes = patch.notes.trim() || null;
-    if (patch.ownerUid !== undefined) own.ownerUid = patch.ownerUid || null;
+    if (patch.ownerUid !== undefined && patch.ownerUid !== (client.ownerUid ?? '')) Object.assign(own, { ownerUid: patch.ownerUid || null, ownerAssignmentSource: 'manual', ownerAssignedBy: by, ownerAssignedAt: serverTimestamp(), ownerAssignmentEvidence: null });
     if (Object.keys(own).length) await updateDoc(doc(db, 'clients', client.id), own);
     const billingChanged = (['name', 'rut', 'giro', 'address', 'phone', 'email'] as const)
       .some((k) => (next[k] ?? '') !== ((k === 'phone' ? client.contactPhone : client[k]) ?? ''));
@@ -275,7 +275,7 @@ export async function updateClientAdmin(client: Client, patch: ClientAdminPatch,
   if (patch.receivingHours !== undefined) mirror.receivingHours = patch.receivingHours.trim() || null;
   if (patch.deliveryMode !== undefined) mirror.deliveryMode = patch.deliveryMode;
   if (patch.notes !== undefined) mirror.notes = patch.notes.trim() || null;
-  if (patch.ownerUid !== undefined) mirror.ownerUid = patch.ownerUid || null;
+  if (patch.ownerUid !== undefined && patch.ownerUid !== (client.ownerUid ?? '')) Object.assign(mirror, { ownerUid: patch.ownerUid || null, ownerAssignmentSource: 'manual', ownerAssignedBy: by, ownerAssignedAt: serverTimestamp(), ownerAssignmentEvidence: null });
   try {
     await updateDoc(doc(db, 'clients', client.id), mirror);
   } catch (e) {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useUsageTracking } from '@/data/usage';
 import Button from '@/components/ui/Button';
 import { isLocked, markUnlocked, signOut, touchActivity, useCurrentUser } from '@/data/auth';
 import { RESPONSIBILITY_TEXT, setOwnPin, unlockWithPin } from '@/data/pin';
@@ -11,6 +12,7 @@ export default function AppLock() {
   const [locked, setLocked] = useState(() => isLocked());
   const [provider, setProvider] = useState<string | null>(null);
   const last = useRef(0);
+  useUsageTracking(current?.appUser.uid, !locked && !!current?.appUser.hasPin && !current?.appUser.pinDisabled);
 
   useEffect(() => {
     if (!current) return;

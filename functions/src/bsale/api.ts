@@ -43,7 +43,7 @@ export class BsaleApi {
 
   get callCount() { return this.calls; }
 
-  private async request<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<T> {
+  private async request<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown, retries = MAX_RETRIES): Promise<T> {
     const url = path.startsWith('http') ? path : `${BASE_URL}${path.startsWith('/v') ? '' : '/v1'}${path}`;
     for (let attempt = 0; ; attempt++) {
       this.calls++;
@@ -57,7 +57,7 @@ export class BsaleApi {
       try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text.slice(0, 2000) }; }
       if (res.ok) return data as T;
       const retriable = res.status === 429 || res.status >= 500;
-      if (retriable && attempt < MAX_RETRIES) {
+      if (retriable && attempt < retries) {
         const wait = Number(res.headers.get('retry-after')) * 1000 || 500 * 2 ** attempt;
         logger.warn(`[bsale] ${res.status} ${method} ${path}, reintento en ${wait} ms`);
         await sleep(wait);
@@ -85,6 +85,8 @@ export class BsaleApi {
     }
     return out;
   }
+
+  postOnce<T>(path: string, body: unknown): Promise<T> { return this.request<T>('POST', path, body, 0); }
 
   post<T>(path: string, body: unknown): Promise<T> { return this.request<T>('POST', path, body); }
   put<T>(path: string, body: unknown): Promise<T> { return this.request<T>('PUT', path, body); }

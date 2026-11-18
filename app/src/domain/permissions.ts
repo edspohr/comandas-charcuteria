@@ -116,10 +116,11 @@ export const ROLE_DESCRIPTION: Record<Role, string> = {
 // lectura; las pantallas esconden sus acciones con `can()`.
 export type RouteKey =
   | 'tablero' | 'nuevoPedido' | 'pedidoIA' | 'detallePedido' | 'armado' | 'clientes' | 'fichaCliente' | 'produccion'
-  | 'panel' | 'catalogo' | 'usuarios' | 'bsaleConsola' | 'bsaleExplorer' | 'pendienteBsale' | 'oportunidades' | 'compras' | 'ayuda';
+  | 'panel' | 'catalogo' | 'usuarios' | 'bsaleConsola' | 'bsaleExplorer' | 'pendienteBsale' | 'oportunidades' | 'compras' | 'ayuda' | 'cuentasPorCobrar';
 
 const everyone = () => true;
 export const ROUTE_ACCESS: Record<RouteKey, (role: Role) => boolean> = {
+  cuentasPorCobrar: r => ['vendedor', 'tienda', 'admin', 'superAdmin'].includes(r),
   tablero: everyone,
   ayuda: everyone,
   nuevoPedido: (r) => canAny(r, ['order.create', 'order.createTransfer']),

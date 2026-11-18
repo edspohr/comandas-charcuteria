@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/ui/Button';
 import ErrorBanner from '@/components/ui/ErrorBanner';
 import StatusPill from '@/components/ui/StatusPill';
+import AsignarCartera from '@/components/clients/AsignarCartera';
 import EditarClienteDialog from '@/components/clients/EditarClienteDialog';
 import { useCurrentUser } from '@/data/auth';
 import { claimUnassignedClient, useClient, useClientOrders } from '@/data/clients';
@@ -100,6 +101,7 @@ export default function FichaCliente() {
         </div>
       </header>
 
+      {role === 'superAdmin' && <AsignarCartera key={`${client.id}:${client.ownerUid ?? ''}`} client={client} />}
       {claimError && <ErrorBanner message={claimError} />}
       <div className="grid gap-4 md:grid-cols-5 mb-4">
         <section className="card p-4 md:col-span-3">

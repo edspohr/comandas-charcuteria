@@ -1,3 +1,4 @@
+import Adopcion from './Adopcion';
 import { resetUserPin } from '@/data/pin';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -36,6 +37,7 @@ export default function Usuarios() {
   const manage = can(me.role, 'users.manage');
   const { users, loading } = useUsers();
   const invites = useInvites();
+  const [view, setView] = useState<'users' | 'usage'>('users');
   const [orders, setOrders] = useState<Order[]>([]);
   const { clients } = useClients();
   const [adding, setAdding] = useState<false | { displayName?: string; role?: Role; legacyUid?: string }>(false);
@@ -89,6 +91,11 @@ export default function Usuarios() {
         {manage && <Button size="sm" onClick={() => setAdding({})}>+ Agregar persona</Button>}
       </header>
 
+      {me.role === 'superAdmin' && <div className="flex gap-2 mb-4" role="group" aria-label="Vista de usuarios">
+        <Button size="sm" variant={view === 'users' ? 'primary' : 'secondary'} onClick={() => setView('users')}>Usuarios</Button>
+        <Button size="sm" variant={view === 'usage' ? 'primary' : 'secondary'} onClick={() => setView('usage')}>Adopción</Button>
+      </div>}
+      {me.role === 'superAdmin' && view === 'usage' ? <Adopcion users={users} /> : <>
       {flash && <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm mb-3">{flash}</div>}
       {error && <div className="mb-3"><ErrorBanner message={error} /></div>}
       {loading && <p className="text-sm text-charcoal-300">Cargando…</p>}
@@ -161,6 +168,8 @@ export default function Usuarios() {
           ))}
         </div>
       </section>
+
+      </>}
 
       {adding && <AgregarDialog preset={adding} onClose={() => setAdding(false)} onDone={(m) => { setAdding(false); setFlash(m); }} />}
       {editing && <EditarDialog user={editing} isSelf={editing.uid === me.uid} onClose={() => setEditing(null)} onDone={(m) => { setEditing(null); setFlash(m); }} />}

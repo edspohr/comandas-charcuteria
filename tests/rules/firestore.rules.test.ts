@@ -361,3 +361,16 @@ describe('reservas por sucursal', () => {
     await assertFails(updateDoc(doc(as('a', 'admin'), 'productionLog/b'), { bsaleStatus: 'cargado_manual' }));
   });
 });
+
+describe('reporte de adopción', () => {
+  it('solo superadmin lee uso y ningún cliente puede modificarlo', async () => {
+    await seed('userUsage/u', { firstSeenAt: 1, lastSeenAt: 2, days: ['2026-11-18'] });
+    await assertSucceeds(getDoc(doc(as('s', 'superAdmin'), 'userUsage/u')));
+    for (const role of ['superAdmin', 'admin', 'consultor', 'vendedor', 'tienda', 'produccion', 'despacho', 'reparto']) {
+      const db = as('u', role);
+      if (role !== 'superAdmin') await assertFails(getDoc(doc(db, 'userUsage/u')));
+      await assertFails(setDoc(doc(db, 'userUsage/u'), { lastSeenAt: 999 }));
+    }
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'userUsage/u')));
+  });
+});

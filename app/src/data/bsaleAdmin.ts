@@ -13,6 +13,7 @@ export interface BsaleSettings {
   writesEnabled: boolean;
   dryRun: boolean;
   invoicesEnabled?: boolean;
+  paymentsEnabled?: boolean;
   factoryOfficeId?: number;
   storeOfficeId?: number;
   priceListId?: number;

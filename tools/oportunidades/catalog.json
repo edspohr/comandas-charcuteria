@@ -1,0 +1,4036 @@
+[
+ {
+  "sku": "LC001",
+  "nombre": "Butifarra coctel (Pedido 20kg)",
+  "formato": "-",
+  "categoria": "Longanizas y vienesas ahumadas",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$10.400"
+  ],
+  "menu_keywords": [
+   "butifarra coctel",
+   "mini butifarra",
+   "butifarrita",
+   "choripan coctel",
+   "picoteo de longaniza"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1817,
+    "codigo": "72968947230949",
+    "etiqueta": "Butifarra Coctel",
+    "activa": false
+   },
+   {
+    "variante_id": 3786,
+    "codigo": "75596022208752",
+    "etiqueta": "Butifarra Coctel LC Kilo",
+    "activa": false
+   },
+   {
+    "variante_id": 5259,
+    "codigo": "78459420644634",
+    "etiqueta": "Longaniza Kg Butifarra Coctel",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC002",
+  "nombre": "Chistorra",
+  "formato": "Sachet 6 unid. (400gr)",
+  "categoria": "Longanizas y vienesas ahumadas",
+  "precios_pdf": [
+   "-",
+   "$12.000"
+  ],
+  "menu_keywords": [
+   "chistorra",
+   "txistorra"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5267,
+    "codigo": "78459567516192",
+    "etiqueta": "Chistorra Ahumada sachet",
+    "activa": true
+   },
+   {
+    "variante_id": 5557,
+    "codigo": "78768400743391",
+    "etiqueta": "Chistorra Blanca sachet",
+    "activa": true
+   },
+   {
+    "variante_id": 4112,
+    "codigo": "76054920846096",
+    "etiqueta": "Chistorra Ahumada LC sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 4117,
+    "codigo": "76063643069232",
+    "etiqueta": "Chistorra Ahumada LC Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5263,
+    "codigo": "78459482319595",
+    "etiqueta": "Chistorra Kg",
+    "activa": true
+   },
+   {
+    "variante_id": 5612,
+    "codigo": "78862067239223",
+    "etiqueta": "Chistorra Kg Blanca",
+    "activa": true
+   },
+   {
+    "variante_id": 5268,
+    "codigo": "1",
+    "etiqueta": "Chistorra pagina",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC003",
+  "nombre": "Longanizas Butifarra",
+  "formato": "Sachet 4 unid. (400gr)",
+  "categoria": "Longanizas y vienesas ahumadas",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$10.400"
+  ],
+  "menu_keywords": [
+   "butifarra",
+   "choripan"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 3229,
+    "codigo": "74904622802636",
+    "etiqueta": "Butifarra LC Kilo",
+    "activa": false
+   },
+   {
+    "variante_id": 1795,
+    "codigo": "72927628523666",
+    "etiqueta": "Longaniza Butifarra LC sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 5260,
+    "codigo": "78459450782575",
+    "etiqueta": "Longaniza Kg Butifarra",
+    "activa": true
+   },
+   {
+    "variante_id": 5274,
+    "codigo": "78459651289688",
+    "etiqueta": "Longaniza sachet Butifarra",
+    "activa": true
+   },
+   {
+    "variante_id": 5269,
+    "codigo": "78459603405225",
+    "etiqueta": "Longanizas sachet pagina Butifarra",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC004",
+  "nombre": "Longanizas Tipo Chillan",
+  "formato": "Sachet 4 unid. (400gr)",
+  "categoria": "Longanizas y vienesas ahumadas",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$10.400"
+  ],
+  "menu_keywords": [
+   "longaniza",
+   "longaniza de chillan",
+   "longaniza chillaneja",
+   "choripan",
+   "prieta y longaniza"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 2652,
+    "codigo": "73954593768016",
+    "etiqueta": "Longaniza Chillan (kilo)",
+    "activa": false
+   },
+   {
+    "variante_id": 815,
+    "codigo": "70420831386332",
+    "etiqueta": "Longaniza Chillan LC sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 5261,
+    "codigo": "78459454355615",
+    "etiqueta": "Longaniza Kg Chillan",
+    "activa": true
+   },
+   {
+    "variante_id": 5275,
+    "codigo": "78459656370601",
+    "etiqueta": "Longaniza sachet Chillan",
+    "activa": true
+   },
+   {
+    "variante_id": 5270,
+    "codigo": "78459609943720",
+    "etiqueta": "Longanizas sachet pagina Chillan",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC005",
+  "nombre": "Mix de longanizas",
+  "formato": "Sachet 4 unid. (400gr)",
+  "categoria": "Longanizas y vienesas ahumadas",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$10.400"
+  ],
+  "menu_keywords": [
+   "longanizas",
+   "mix de longanizas",
+   "parrillada",
+   "tabla parrillera"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5262,
+    "codigo": "78459477019414",
+    "etiqueta": "Longaniza Kg Mix",
+    "activa": true
+   },
+   {
+    "variante_id": 5276,
+    "codigo": "78459658482749",
+    "etiqueta": "Longaniza sachet Mix",
+    "activa": true
+   },
+   {
+    "variante_id": 5272,
+    "codigo": "78459615603857",
+    "etiqueta": "Longanizas sachet pagina Mix",
+    "activa": true
+   },
+   {
+    "variante_id": 1098,
+    "codigo": "713281481334257",
+    "etiqueta": "Mix Longaniza LC Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 3792,
+    "codigo": "75596474688750",
+    "etiqueta": "Mix Longaniza LC sachet",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC006",
+  "nombre": "Prieta",
+  "formato": "Sachet 2 unid. (210gr)",
+  "categoria": "Longanizas y vienesas ahumadas",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$10.400"
+  ],
+  "menu_keywords": [
+   "prieta",
+   "morcilla",
+   "ñachi prieta"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5264,
+    "codigo": "78459499543741",
+    "etiqueta": "Prieta Kg",
+    "activa": true
+   },
+   {
+    "variante_id": 5273,
+    "codigo": "78459621788053",
+    "etiqueta": "Prieta pagina",
+    "activa": true
+   },
+   {
+    "variante_id": 5279,
+    "codigo": "78459725791402",
+    "etiqueta": "Prieta sachet",
+    "activa": true
+   },
+   {
+    "variante_id": 1048,
+    "codigo": "71033999132270",
+    "etiqueta": "Prietas LC sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 4073,
+    "codigo": "75993312032353",
+    "etiqueta": "Prietas LC kilo",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC007",
+  "nombre": "Vienesa Frankfurt",
+  "formato": "Sachet 5 unid. (350gr)",
+  "categoria": "Longanizas y vienesas ahumadas",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$10.350"
+  ],
+  "menu_keywords": [
+   "vienesa",
+   "salchicha",
+   "frankfurt",
+   "hot dog",
+   "completo",
+   "salchicha alemana"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1040,
+    "codigo": "70992932922953",
+    "etiqueta": "Salchicha Frankfurt LC delgadas",
+    "activa": false
+   },
+   {
+    "variante_id": 773,
+    "codigo": "70420710258560",
+    "etiqueta": "Salchicha Frankfurt LC",
+    "activa": false
+   },
+   {
+    "variante_id": 818,
+    "codigo": "70490382882451",
+    "etiqueta": "Salchicha Frankfurt LC sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 903,
+    "codigo": "70439406496850",
+    "etiqueta": "Salchicha Frankfurt LC F",
+    "activa": false
+   },
+   {
+    "variante_id": 3794,
+    "codigo": "75596590564453",
+    "etiqueta": "Salchicha Frankfurt LC Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 1111,
+    "codigo": "71476185637702",
+    "etiqueta": "Salchicha LC Frankfurt Por kilo",
+    "activa": false
+   },
+   {
+    "variante_id": 5280,
+    "codigo": "78459750769013",
+    "etiqueta": "Vienesa Frankfurt pagina",
+    "activa": true
+   },
+   {
+    "variante_id": 5278,
+    "codigo": "78459708502781",
+    "etiqueta": "Vienesa Frankfurt sachet",
+    "activa": true
+   },
+   {
+    "variante_id": 5265,
+    "codigo": "78459507427652",
+    "etiqueta": "Vienesa Kg Frankfurt",
+    "activa": true
+   },
+   {
+    "variante_id": 1215,
+    "codigo": "72167537243750",
+    "etiqueta": "Vienesas Frankfurt LC Kilo",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC008",
+  "nombre": "Bresaola",
+  "formato": "1,5/ 2 kg",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "3.000,00",
+   "$30.000",
+   "$27.370"
+  ],
+  "menu_keywords": [
+   "bresaola",
+   "cecina de vacuno",
+   "carpaccio curado"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5281,
+    "codigo": "78459771139065",
+    "etiqueta": "Bresaola Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5282,
+    "codigo": "78459774406126",
+    "etiqueta": "Bresaola Kg pieza entera",
+    "activa": true
+   },
+   {
+    "variante_id": 1051,
+    "codigo": "71042614429446",
+    "etiqueta": "Bresaola LC laminada Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 4340,
+    "codigo": "76520693541815",
+    "etiqueta": "Bresaola LC pieza Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 1116,
+    "codigo": "71528266682952",
+    "etiqueta": "Bresaola LC sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 5314,
+    "codigo": "78460091493895",
+    "etiqueta": "Bresaola sachet 100gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC009",
+  "nombre": "Cabanossi Polaco",
+  "formato": "unidad 20 gr",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$650"
+  ],
+  "menu_keywords": [
+   "cabanossi",
+   "kabanos",
+   "cabanos"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5647,
+    "codigo": "78888726035585",
+    "etiqueta": "cabanossi kg",
+    "activa": true
+   },
+   {
+    "variante_id": 5310,
+    "codigo": "78459998706727",
+    "etiqueta": "Cabanossi Polaco",
+    "activa": true
+   },
+   {
+    "variante_id": 5311,
+    "codigo": "CABANOSSI-12UN",
+    "etiqueta": "Cabanossi Polaco pack x 12",
+    "activa": true
+   },
+   {
+    "variante_id": 1791,
+    "codigo": "72917940995278",
+    "etiqueta": "Cabanossi Polaco pagina pack x 3",
+    "activa": true
+   },
+   {
+    "variante_id": 844,
+    "codigo": " 70420898449023 ",
+    "etiqueta": "Cabanossi LC Unidad",
+    "activa": false
+   },
+   {
+    "variante_id": 2452,
+    "codigo": " 73712981878814 ",
+    "etiqueta": "Cabanossi LC 12 und",
+    "activa": false
+   },
+   {
+    "variante_id": 2939,
+    "codigo": " 74413930210231 ",
+    "etiqueta": "CABANOSSI",
+    "activa": false
+   },
+   {
+    "variante_id": 4123,
+    "codigo": " 76070230992780 ",
+    "etiqueta": "Cabanossi Polaco pagina Und",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC010",
+  "nombre": "Coppa",
+  "formato": "1,5/ 2 kg",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "2.480,00",
+   "$24.800",
+   "$23.800"
+  ],
+  "menu_keywords": [
+   "coppa",
+   "capocollo",
+   "bondiola curada"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5283,
+    "codigo": "78459799778876",
+    "etiqueta": "Coppa Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5284,
+    "codigo": "78459802991913",
+    "etiqueta": "Coppa Kg pieza entera",
+    "activa": true
+   },
+   {
+    "variante_id": 2721,
+    "codigo": "74068624292030",
+    "etiqueta": "Coppa kg sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 830,
+    "codigo": "70420871428326",
+    "etiqueta": "Coppa LC pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 832,
+    "codigo": "70420873809228",
+    "etiqueta": "Coppa LC sachet 100gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2488,
+    "codigo": "73755333272322",
+    "etiqueta": "Coppa LC laminado Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5315,
+    "codigo": "78460101406833",
+    "etiqueta": "Coppa sachet 100gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5328,
+    "codigo": " 78460258682738 ",
+    "etiqueta": "Coppa sachet pagina",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC011",
+  "nombre": "Chorizo Español",
+  "formato": "2/ 2,5 kg",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "1.690,00",
+   "$16.900",
+   "$15.600"
+  ],
+  "menu_keywords": [
+   "chorizo español",
+   "chorizo iberico",
+   "chorizo curado",
+   "chorizo riojano",
+   "chorizo"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5316,
+    "codigo": "78460106955149",
+    "etiqueta": "Chorizo Español sachet 100gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5430,
+    "codigo": "78461028619702",
+    "etiqueta": "Chorizo Español pieza pequeña",
+    "activa": true
+   },
+   {
+    "variante_id": 5436,
+    "codigo": "78461146144101",
+    "etiqueta": "Chorizo Español sachet 500gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5285,
+    "codigo": "78459813318563",
+    "etiqueta": "Chorizo Español Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5286,
+    "codigo": "78459816033125",
+    "etiqueta": "Chorizo Español Kg pieza entera",
+    "activa": true
+   },
+   {
+    "variante_id": 1114,
+    "codigo": "71511440308216",
+    "etiqueta": "Chorizo Español LC pieza peq",
+    "activa": false
+   },
+   {
+    "variante_id": 1532,
+    "codigo": "72564819807697",
+    "etiqueta": "Chorizo Español LC 100gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2514,
+    "codigo": "73782115964662",
+    "etiqueta": "Chorizo Español LC Pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 4410,
+    "codigo": "76599941219132",
+    "etiqueta": "Chorizo Español LC Kilo laminado",
+    "activa": false
+   },
+   {
+    "variante_id": 5184,
+    "codigo": "78249243062606",
+    "etiqueta": "Chorizo Español LC 500gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2281,
+    "codigo": "73498346079330",
+    "etiqueta": "chorizo español picante",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC012",
+  "nombre": "Fuet español",
+  "formato": "unidad 90 gr",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$1.700"
+  ],
+  "menu_keywords": [
+   "fuet",
+   "espetec"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5308,
+    "codigo": "78459976528739",
+    "etiqueta": "Fuet Español tradicional",
+    "activa": true
+   },
+   {
+    "variante_id": 1217,
+    "codigo": "72167856439910",
+    "etiqueta": "Fuet español LC Unidad",
+    "activa": false
+   },
+   {
+    "variante_id": 2451,
+    "codigo": "73712973000856",
+    "etiqueta": "Fuet español LC (20 und)",
+    "activa": false
+   },
+   {
+    "variante_id": 952,
+    "codigo": "70482405527219",
+    "etiqueta": "Fuet Español LC Kilo",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC013",
+  "nombre": "Fuet Cranberry",
+  "formato": "unidad 90 gr",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$2.350"
+  ],
+  "menu_keywords": [
+   "fuet",
+   "fuet con arandanos",
+   "fuet cranberry"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 845,
+    "codigo": "70420903015654",
+    "etiqueta": "Fuet con Arándanos Rojos LC Kilo",
+    "activa": false
+   },
+   {
+    "variante_id": 846,
+    "codigo": "70420907308168",
+    "etiqueta": "Fuet con Arándanos Rojos LC Unidad",
+    "activa": false
+   },
+   {
+    "variante_id": 5309,
+    "codigo": "78459980616177",
+    "etiqueta": "Fuet Español cranberry",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC014",
+  "nombre": "Guanciale Madurado (normal/condimentado)",
+  "formato": "1 - 2 kg",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$22.000"
+  ],
+  "menu_keywords": [
+   "guanciale",
+   "carbonara",
+   "amatriciana",
+   "gricia"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5289,
+    "codigo": "78459839196216",
+    "etiqueta": "Guanciale sachet",
+    "activa": true
+   },
+   {
+    "variante_id": 5287,
+    "codigo": "78459826534450",
+    "etiqueta": "Guanciale Kg",
+    "activa": true
+   },
+   {
+    "variante_id": 5288,
+    "codigo": "78459828491474",
+    "etiqueta": "Guanciale Kg condimentado",
+    "activa": true
+   },
+   {
+    "variante_id": 807,
+    "codigo": "70420798947792",
+    "etiqueta": "Guanciale LC kg",
+    "activa": false
+   },
+   {
+    "variante_id": 1812,
+    "codigo": "72961173710164",
+    "etiqueta": "Guanciale LC Condimentado kg",
+    "activa": false
+   },
+   {
+    "variante_id": 808,
+    "codigo": "2345235342",
+    "etiqueta": "Guanciale LC sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5317,
+    "codigo": "78460139250883",
+    "etiqueta": "Guanciale pagina tradicional 500gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5318,
+    "codigo": "78460141227505",
+    "etiqueta": "Guanciale pagina condimentado 500gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC015",
+  "nombre": "Lomo Embuchado",
+  "formato": "1/ 1,5 kg",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "1.900,00",
+   "$19.000",
+   "$18.000"
+  ],
+  "menu_keywords": [
+   "lomo embuchado",
+   "lomo curado",
+   "lomo iberico",
+   "cana de lomo"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5290,
+    "codigo": "78459847526174",
+    "etiqueta": "Lomo Embuchado Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5291,
+    "codigo": "78459849305230",
+    "etiqueta": "Lomo Embuchado Kg pieza entera",
+    "activa": true
+   },
+   {
+    "variante_id": 5319,
+    "codigo": "78460152893481",
+    "etiqueta": "Lomo Embuchado sachet 100gr",
+    "activa": true
+   },
+   {
+    "variante_id": 840,
+    "codigo": " 70420886733849 ",
+    "etiqueta": "Lomo Embuchado LC Pieza Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 842,
+    "codigo": " 70420889065359 ",
+    "etiqueta": "Lomo Embuchado LC sachet 100 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 4447,
+    "codigo": " 76624183045959 ",
+    "etiqueta": "Lomo Embuchado LC Laminado Kg",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC016",
+  "nombre": "Panceta Madurado",
+  "formato": "4/ 5 kg",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "2.480,00",
+   "$24.800",
+   "$23.800"
+  ],
+  "menu_keywords": [
+   "panceta curada",
+   "pancetta",
+   "panceta",
+   "pancetta arrotolata",
+   "carbonara"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 982,
+    "codigo": "70569291733606",
+    "etiqueta": "Panceta Madurada",
+    "activa": false
+   },
+   {
+    "variante_id": 5292,
+    "codigo": "78459857522798",
+    "etiqueta": "Panceta Madurada Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5293,
+    "codigo": "78459859709853",
+    "etiqueta": "Panceta Madurada Kg pieza entera",
+    "activa": true
+   },
+   {
+    "variante_id": 1194,
+    "codigo": "72080698260008",
+    "etiqueta": "Panceta Madurada LC sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 2877,
+    "codigo": "74257589008586",
+    "etiqueta": "PANCETA MADURADA PZA",
+    "activa": false
+   },
+   {
+    "variante_id": 5320,
+    "codigo": "78460178462867",
+    "etiqueta": "Panceta Madurada sachet 100gr",
+    "activa": true
+   },
+   {
+    "variante_id": 1050,
+    "codigo": "71042613127259",
+    "etiqueta": "Pancetta madurada",
+    "activa": false
+   },
+   {
+    "variante_id": 1682,
+    "codigo": "72805364245485",
+    "etiqueta": "Pancetta madurada cubos lc",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC017",
+  "nombre": "Pastirma de Vacuno",
+  "formato": "1,5/ 2 kg",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "3.000,00",
+   "$30.000",
+   "$27.370"
+  ],
+  "menu_keywords": [
+   "pastirma",
+   "basturma",
+   "pastrami curado"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 960,
+    "codigo": "70490918817643",
+    "etiqueta": "Pastirma de Vacuno LC sachet 100 gr",
+    "activa": true
+   },
+   {
+    "variante_id": 2839,
+    "codigo": "74196731789792",
+    "etiqueta": "Pastirma de Vacuno LC Kg",
+    "activa": true
+   },
+   {
+    "variante_id": 5296,
+    "codigo": "78459877673487",
+    "etiqueta": "Pastirma Vacuno Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5297,
+    "codigo": "78459880078949",
+    "etiqueta": "Pastirma Vacuno Kg pieza entera",
+    "activa": true
+   },
+   {
+    "variante_id": 5322,
+    "codigo": "78460189195442",
+    "etiqueta": "Pastirma Vacuno sachet 100gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC018",
+  "nombre": "Pepperoni Madurado",
+  "formato": "2 / 2,3 kg",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "1.660,00",
+   "$16.600",
+   "$15.600"
+  ],
+  "menu_keywords": [
+   "pepperoni",
+   "peperoni",
+   "pizza pepperoni",
+   "salame picante"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 760,
+    "codigo": "70420680114808",
+    "etiqueta": "PEPPERONI",
+    "activa": false
+   },
+   {
+    "variante_id": 884,
+    "codigo": "70428865899214",
+    "etiqueta": "PEPPERONI  RAFFAELLA",
+    "activa": false
+   },
+   {
+    "variante_id": 953,
+    "codigo": "70482458213857",
+    "etiqueta": "Pepperoni  LC sachet 100gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5298,
+    "codigo": "78459904452508",
+    "etiqueta": "Pepperoni Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5299,
+    "codigo": "78459906128466",
+    "etiqueta": "Pepperoni Kg pieza entera",
+    "activa": true
+   },
+   {
+    "variante_id": 1082,
+    "codigo": "71269518492561",
+    "etiqueta": "Pepperoni LC Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 4887,
+    "codigo": "77549994489806",
+    "etiqueta": "Pepperoni LC Kg laminado",
+    "activa": false
+   },
+   {
+    "variante_id": 5323,
+    "codigo": "78460196957259",
+    "etiqueta": "Pepperoni sachet 100gr",
+    "activa": true
+   },
+   {
+    "variante_id": 2605,
+    "codigo": "73904728262275",
+    "etiqueta": "Pepperonni Madurado LC pieza",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC019",
+  "nombre": "Salame Angus",
+  "formato": "2/ 2,5 kg",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "2.066,00",
+   "$20.660",
+   "$19.660"
+  ],
+  "menu_keywords": [
+   "salame angus",
+   "salame de vacuno"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5302,
+    "codigo": "78459925018933",
+    "etiqueta": "Salame Angus Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5303,
+    "codigo": "78459926869262",
+    "etiqueta": "Salame Angus Kg pieza entera",
+    "activa": true
+   },
+   {
+    "variante_id": 2542,
+    "codigo": "73817914801229",
+    "etiqueta": "Salame Angus LC sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 2727,
+    "codigo": "74074997678207",
+    "etiqueta": "Salame Angus LC kilo",
+    "activa": false
+   },
+   {
+    "variante_id": 5325,
+    "codigo": "78460233865722",
+    "etiqueta": "Salame Angus sachet 100gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC020",
+  "nombre": "Salame Italiano",
+  "formato": "2/ 2,5 kg",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "1.690,00",
+   "$16.600",
+   "$15.600"
+  ],
+  "menu_keywords": [
+   "salame",
+   "salami",
+   "salame italiano",
+   "salame milano",
+   "salchichon"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5326,
+    "codigo": "78460239722004",
+    "etiqueta": "Salame Italiano sachet 100gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5431,
+    "codigo": "78461042535777",
+    "etiqueta": "Salame Italiano pieza pequeña",
+    "activa": true
+   },
+   {
+    "variante_id": 5437,
+    "codigo": "78461193912550",
+    "etiqueta": "Salame Italiano 500gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5581,
+    "codigo": "78828213508231",
+    "etiqueta": "Salame Italiano Ahumado",
+    "activa": true
+   },
+   {
+    "variante_id": 5429,
+    "codigo": "78461022677067",
+    "etiqueta": "Salame Italiano pieza pequeña",
+    "activa": false
+   },
+   {
+    "variante_id": 5304,
+    "codigo": "78459939198716",
+    "etiqueta": "Salame Italiano Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5305,
+    "codigo": "78459940367164",
+    "etiqueta": "Salame Italiano Kg pieza entera",
+    "activa": true
+   },
+   {
+    "variante_id": 1321,
+    "codigo": "72321637630765",
+    "etiqueta": "Salame Italiano LC 500 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 836,
+    "codigo": "70420881480173",
+    "etiqueta": "Salame Italiano LC Ahumado",
+    "activa": false
+   },
+   {
+    "variante_id": 951,
+    "codigo": "70482385195625",
+    "etiqueta": "Salame Italiano LC laminado Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 837,
+    "codigo": "70420883945116",
+    "etiqueta": "Salame Italiano LC sachet 100gr",
+    "activa": false
+   },
+   {
+    "variante_id": 1855,
+    "codigo": "73021079136024",
+    "etiqueta": "Salame Italiano LC pequeña",
+    "activa": false
+   },
+   {
+    "variante_id": 2517,
+    "codigo": "73782137592316",
+    "etiqueta": "Salame Italiano LC pza entera",
+    "activa": false
+   },
+   {
+    "variante_id": 2572,
+    "codigo": "73858669317952",
+    "etiqueta": "Salamin LC Italiano pieza peq",
+    "activa": true
+   },
+   {
+    "variante_id": 2767,
+    "codigo": "74118933766705",
+    "etiqueta": "Salamin LC Angus",
+    "activa": false
+   },
+   {
+    "variante_id": 4714,
+    "codigo": "77144311365202",
+    "etiqueta": "Salamin LC Italiano peq Kg",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC021",
+  "nombre": "Jamon Serrano",
+  "formato": "500gr",
+  "categoria": "Madurados",
+  "precios_pdf": [
+   "15.000,00",
+   "$30.000",
+   "-"
+  ],
+  "menu_keywords": [
+   "jamon serrano",
+   "jamon crudo",
+   "prosciutto",
+   "jamon iberico"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 4744,
+    "codigo": "77204752644369",
+    "etiqueta": "Jamón Serrano LC sachet 500gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5078,
+    "codigo": "77989332505249",
+    "etiqueta": "Jamón Serrano LC 100gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5175,
+    "codigo": "78224762614933",
+    "etiqueta": "Jamón Serrano LC sachet 100gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5338,
+    "codigo": "78460307869458",
+    "etiqueta": "Jamon Serrano pagina sachet 100gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5339,
+    "codigo": "78460309153899",
+    "etiqueta": "Jamon Serrano pagina sachet 500gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5306,
+    "codigo": "78459963072807",
+    "etiqueta": "Jamón Serrano sachet 500gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5307,
+    "codigo": "78459964635633",
+    "etiqueta": "Jamón Serrano sachet 100gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5813,
+    "codigo": "79311112366598",
+    "etiqueta": "Jamón Serrano sachet 200 gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5615,
+    "codigo": "78862126249689",
+    "etiqueta": "Pierna de Jamon serrano",
+    "activa": true
+   },
+   {
+    "variante_id": 4743,
+    "codigo": " 77204728977710 ",
+    "etiqueta": "Jamón Serrano LC sachet 100gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5140,
+    "codigo": " 78170859411467 ",
+    "etiqueta": "Jamón Serrano LC sachet 100gr",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC022",
+  "nombre": "Charqui Vacuno",
+  "formato": "30 gr",
+  "categoria": "Charqui",
+  "precios_pdf": [
+   "2.700,00",
+   "-",
+   "$89.100"
+  ],
+  "menu_keywords": [
+   "charqui",
+   "charqui de vacuno",
+   "beef jerky",
+   "jerky"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5772,
+    "codigo": "CHARQUI-VAC-5X30",
+    "etiqueta": "Charqui 5x30g Vacuno",
+    "activa": true
+   },
+   {
+    "variante_id": 2937,
+    "codigo": "74412614202208",
+    "etiqueta": "CHARQUI DE VACUNO 30 GR",
+    "activa": false
+   },
+   {
+    "variante_id": 2940,
+    "codigo": "74413947616544",
+    "etiqueta": "Charqui de vacuno 30 GR",
+    "activa": false
+   },
+   {
+    "variante_id": 847,
+    "codigo": "70420932550417",
+    "etiqueta": "Charqui de Vacuno LC Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 1811,
+    "codigo": "634240253454",
+    "etiqueta": "Charqui de Vacuno LC sachet 30gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5340,
+    "codigo": "78460337317520",
+    "etiqueta": "Charqui Kg vacuno",
+    "activa": true
+   },
+   {
+    "variante_id": 5344,
+    "codigo": "78460366132704",
+    "etiqueta": "Charqui pagina sachet 30 vacuno",
+    "activa": true
+   },
+   {
+    "variante_id": 5346,
+    "codigo": "78460370605210",
+    "etiqueta": "Charqui pagina sachet 50gr vacuno",
+    "activa": true
+   },
+   {
+    "variante_id": 5342,
+    "codigo": "78460346924409",
+    "etiqueta": "Charqui sachet 30gr vacuno",
+    "activa": true
+   },
+   {
+    "variante_id": 2873,
+    "codigo": "71709576546316",
+    "etiqueta": "Charqui vacuno pagina",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC023",
+  "nombre": "Charqui Cerdo",
+  "formato": "30 gr",
+  "categoria": "Charqui",
+  "precios_pdf": [
+   "2.100,00",
+   "-",
+   "$60.000"
+  ],
+  "menu_keywords": [
+   "charqui de cerdo",
+   "charqui",
+   "jerky de cerdo"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 795,
+    "codigo": "70420761845244",
+    "etiqueta": "Charqui Cerdo Pagina sachet 100 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2089,
+    "codigo": "73316471940137",
+    "etiqueta": "Charqui cerdo pagina",
+    "activa": false
+   },
+   {
+    "variante_id": 5790,
+    "codigo": "CHARQUI-CER-5X30",
+    "etiqueta": "Charqui de cerdo 5x30g",
+    "activa": true
+   },
+   {
+    "variante_id": 848,
+    "codigo": "70420934783710",
+    "etiqueta": "Charqui de Cerdo LC Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 2850,
+    "codigo": "74222342915630",
+    "etiqueta": "Charqui de Cerdo LC sachet 30 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5341,
+    "codigo": "78460339627434",
+    "etiqueta": "Charqui Kg cerdo",
+    "activa": true
+   },
+   {
+    "variante_id": 5345,
+    "codigo": "78460368122745",
+    "etiqueta": "Charqui pagina sachet 30 cerdo",
+    "activa": true
+   },
+   {
+    "variante_id": 5347,
+    "codigo": "78460372302915",
+    "etiqueta": "Charqui pagina sachet 50gr cerdo",
+    "activa": true
+   },
+   {
+    "variante_id": 5343,
+    "codigo": "78460348729892",
+    "etiqueta": "Charqui sachet 30gr cerdo",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC024",
+  "nombre": "Porchetta (min 1 pieza)",
+  "formato": "4-5kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$23.520"
+  ],
+  "menu_keywords": [
+   "porchetta",
+   "porqueta"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5350,
+    "codigo": "78460398355810",
+    "etiqueta": "Porchetta Kg",
+    "activa": true
+   },
+   {
+    "variante_id": 5351,
+    "codigo": "78460405530140",
+    "etiqueta": "Porchetta sachet",
+    "activa": true
+   },
+   {
+    "variante_id": 879,
+    "codigo": "70422238593706",
+    "etiqueta": "Porchetta LC Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 2125,
+    "codigo": "73376826866118",
+    "etiqueta": "Porchetta 200 gr sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 2126,
+    "codigo": "73376829197265",
+    "etiqueta": "Porchetta 1 kg",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC025",
+  "nombre": "Chicharron",
+  "formato": "Granel 1 kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$30.000"
+  ],
+  "menu_keywords": [
+   "chicharron",
+   "chicharrones",
+   "torreja de chicharron"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5352,
+    "codigo": "78460411832031",
+    "etiqueta": "Chicharron kg",
+    "activa": true
+   },
+   {
+    "variante_id": 5539,
+    "codigo": "78741541417705",
+    "etiqueta": "Chicharron Chicharron vaso",
+    "activa": true
+   },
+   {
+    "variante_id": 849,
+    "codigo": "70420938094758",
+    "etiqueta": "Chicharron LC kilo",
+    "activa": false
+   },
+   {
+    "variante_id": 850,
+    "codigo": "70420943688271",
+    "etiqueta": "Chicharron LC vaso",
+    "activa": false
+   },
+   {
+    "variante_id": 5353,
+    "codigo": "78460416284364",
+    "etiqueta": "Chicharron pagina 50gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC026",
+  "nombre": "Chuleta Kassler",
+  "formato": "5-6kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "2 Und",
+   "$9.000",
+   "$8.490"
+  ],
+  "menu_keywords": [
+   "kassler",
+   "chuleta ahumada",
+   "chuleta kassler",
+   "chuleta de cerdo ahumada"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 804,
+    "codigo": "70420779210191",
+    "etiqueta": "Chuleta Ahumada",
+    "activa": false
+   },
+   {
+    "variante_id": 851,
+    "codigo": "70420946389683",
+    "etiqueta": "Chuleta Ahumada LC Kilo",
+    "activa": false
+   },
+   {
+    "variante_id": 3806,
+    "codigo": "75598619530991",
+    "etiqueta": "Chuleta Ahumada LC Pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 5354,
+    "codigo": "78460427803908",
+    "etiqueta": "Chuleta Kassler Kg pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5355,
+    "codigo": "78460430228801",
+    "etiqueta": "Chuleta Kassler Kg laminada",
+    "activa": true
+   },
+   {
+    "variante_id": 5356,
+    "codigo": "78460438167413",
+    "etiqueta": "Chuleta Kassler pagina 350 gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC027",
+  "nombre": "jamon de pierna cocido",
+  "formato": "4/ 5 kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "2.500,00",
+   "$12.000",
+   "$12.000"
+  ],
+  "menu_keywords": [
+   "jamon",
+   "jamon cocido",
+   "jamon de pierna",
+   "jamon york",
+   "jamon queso",
+   "croque monsieur",
+   "barros jarpa"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5357,
+    "codigo": "78460451430878",
+    "etiqueta": "Jamón Cocido Kg pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5358,
+    "codigo": "78460453590669",
+    "etiqueta": "Jamón Cocido Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 782,
+    "codigo": "70420741460001",
+    "etiqueta": "Jamón Cocido LC pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 783,
+    "codigo": "70420743722504",
+    "etiqueta": "Jamón Cocido LC sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2492,
+    "codigo": "73755358335657",
+    "etiqueta": "Jamón Cocido LC sachet 500gr",
+    "activa": false
+   },
+   {
+    "variante_id": 3796,
+    "codigo": "75597037308901",
+    "etiqueta": "Jamón Cocido LC bandeja",
+    "activa": false
+   },
+   {
+    "variante_id": 3211,
+    "codigo": "74888898397867",
+    "etiqueta": "Jamón Cocido LC laminado Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5359,
+    "codigo": "78460499173502",
+    "etiqueta": "Jamón Cocido sachet 200gr",
+    "activa": true
+   },
+   {
+    "variante_id": 752,
+    "codigo": "70420662692082",
+    "etiqueta": "Jamon de Pierna Cocido",
+    "activa": false
+   },
+   {
+    "variante_id": 823,
+    "codigo": "70420852851248",
+    "etiqueta": "Jamon de Pierna Cocido (SACHET 200GR)",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC028",
+  "nombre": "Jamon de pechuga de Pavo cocido",
+  "formato": "5-6kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "3.600,00",
+   "$17.990",
+   "$15.490"
+  ],
+  "menu_keywords": [
+   "jamon de pavo",
+   "pechuga de pavo",
+   "pavo ahumado",
+   "pavo laminado"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5747,
+    "codigo": "79209279451794",
+    "etiqueta": "Jamón Pavo Cocido sachet",
+    "activa": true
+   },
+   {
+    "variante_id": 5748,
+    "codigo": "79209281689759",
+    "etiqueta": "Jamón Pavo Ahumado sachet",
+    "activa": true
+   },
+   {
+    "variante_id": 4211,
+    "codigo": "76288386810014",
+    "etiqueta": "Jamón Pavo Kg pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5812,
+    "codigo": "79311107918166",
+    "etiqueta": "Jamón Pavo Kg Laminado",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC029",
+  "nombre": "Jamón de pierna ahumado artesanal",
+  "formato": "4/ 5 kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "2.600,00",
+   "$12.500",
+   "$12.500"
+  ],
+  "menu_keywords": [
+   "jamon ahumado",
+   "jamon cocido ahumado",
+   "prosciutto cotto affumicato",
+   "jamon artesanal",
+   "jamon de pierna ahumado",
+   "jamon selva negra"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5361,
+    "codigo": "78460487964182",
+    "etiqueta": "Jamón Ahumado Kg pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5362,
+    "codigo": "78460489821034",
+    "etiqueta": "Jamón Ahumado Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 777,
+    "codigo": "70420726471116",
+    "etiqueta": "Jamón Ahumado LC Pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 778,
+    "codigo": "70420729635804",
+    "etiqueta": "Jamón Ahumado LC sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2491,
+    "codigo": "73755355346736",
+    "etiqueta": "Jamón Ahumado LC sachet 500gr",
+    "activa": false
+   },
+   {
+    "variante_id": 4736,
+    "codigo": "77195813168067",
+    "etiqueta": "Jamón Ahumado LC pieza kg",
+    "activa": false
+   },
+   {
+    "variante_id": 3939,
+    "codigo": "75787559132639",
+    "etiqueta": "Jamón Ahumado LC laminado Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 1629,
+    "codigo": "72745456979218",
+    "etiqueta": "jamon ahumado pagina sachet (200gr)",
+    "activa": false
+   },
+   {
+    "variante_id": 5363,
+    "codigo": "78460499173495",
+    "etiqueta": "Jamón Ahumado sachet 200gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC030",
+  "nombre": "Lomo Kassler",
+  "formato": "1,5/ 2 kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "2.600,00",
+   "$13.000",
+   "$11.650"
+  ],
+  "menu_keywords": [
+   "kassler",
+   "lomo kassler",
+   "lomo ahumado",
+   "lomo de cerdo ahumado"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5369,
+    "codigo": "78460559397999",
+    "etiqueta": "Lomo Kassler Kg pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5371,
+    "codigo": "78460575615178",
+    "etiqueta": "Lomo Kassler Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5370,
+    "codigo": "78460566088686",
+    "etiqueta": "Lomo Kassler sachet 200gr",
+    "activa": true
+   },
+   {
+    "variante_id": 735,
+    "codigo": " 70420557879511 ",
+    "etiqueta": "Lomo Kassler LC x 10",
+    "activa": false
+   },
+   {
+    "variante_id": 736,
+    "codigo": " 70420573507148 ",
+    "etiqueta": "Lomo Kassler  LC sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2486,
+    "codigo": " 73755326034282 ",
+    "etiqueta": "Lomo Kassler  LC Kg laminado",
+    "activa": false
+   },
+   {
+    "variante_id": 3781,
+    "codigo": " 75589778244324 ",
+    "etiqueta": "Lomo Kassler Premium LC pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 3797,
+    "codigo": " 75597040978255 ",
+    "etiqueta": "Lomo Kassler  LC bandeja",
+    "activa": false
+   },
+   {
+    "variante_id": 3807,
+    "codigo": " 75598634100750 ",
+    "etiqueta": "Lomo Kassler  LC pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 4589,
+    "codigo": " 76883486019836 ",
+    "etiqueta": "Lomo Kassler LC sachet 200gr **",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC031",
+  "nombre": "Lomo Kassler (Medallon)",
+  "formato": "10 und",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "$8.990",
+   "-"
+  ],
+  "menu_keywords": [
+   "medallon de kassler",
+   "medallon ahumado",
+   "medallones de lomo ahumado"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5372,
+    "codigo": "78460588394322",
+    "etiqueta": "Lomo Kassler Kg medallon",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC032",
+  "nombre": "Mortadella ahumada tipo Italiana con pistacho",
+  "formato": "4 kg aprox",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "2.500,00",
+   "$12.500",
+   "$11.990"
+  ],
+  "menu_keywords": [
+   "mortadela",
+   "mortadella",
+   "mortadela con pistacho",
+   "mortadela bologna"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 4028,
+    "codigo": "75951824708628",
+    "etiqueta": "Mortadela Ahumada LC pieza kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5083,
+    "codigo": "77991261508274",
+    "etiqueta": "Mortadela Ahumada LC laminada kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5089,
+    "codigo": "78008348839820",
+    "etiqueta": "Mortadela Ahumada LC sachet 200 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5378,
+    "codigo": "70420636932972",
+    "etiqueta": "Mortadella con pistacho sachet 200 gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5379,
+    "codigo": "78460634758404",
+    "etiqueta": "Mortadella con pistacho tradicional",
+    "activa": false
+   },
+   {
+    "variante_id": 5380,
+    "codigo": "78460639776650",
+    "etiqueta": "Mortadella con pistacho pagina",
+    "activa": true
+   },
+   {
+    "variante_id": 5374,
+    "codigo": "78460607059787",
+    "etiqueta": "Mortadella con pistacho Kg tradicional pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 5375,
+    "codigo": "78460610488807",
+    "etiqueta": "Mortadella con pistacho Kg pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5376,
+    "codigo": "78460613112822",
+    "etiqueta": "Mortadella con pistacho Kg laminada",
+    "activa": true
+   },
+   {
+    "variante_id": 5377,
+    "codigo": "78460617595568",
+    "etiqueta": "Mortadella con pistacho Kg tradicional laminada",
+    "activa": false
+   },
+   {
+    "variante_id": 2649,
+    "codigo": "73953454977659",
+    "etiqueta": "Mortadella en trozos 500 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2650,
+    "codigo": "73953456075254",
+    "etiqueta": "Mortadella en trozos 1 kg",
+    "activa": false
+   },
+   {
+    "variante_id": 738,
+    "codigo": "70420630624365",
+    "etiqueta": "Mortadella Italiana con Pistacho LC pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 3822,
+    "codigo": "75630653642970",
+    "etiqueta": "Mortadella Italiana con Pistacho LC",
+    "activa": false
+   },
+   {
+    "variante_id": 3955,
+    "codigo": "75847706114889",
+    "etiqueta": "Mortadella Italiana con Pistacho LC Pieza kg",
+    "activa": false
+   },
+   {
+    "variante_id": 2722,
+    "codigo": "74068668893343",
+    "etiqueta": "Mortadella Italiana con Pistacho LC laminada Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 739,
+    "codigo": " 70420636932972 ",
+    "etiqueta": "Mortadella Italiana con Pistacho  LC sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2487,
+    "codigo": " 73755329817864 ",
+    "etiqueta": "Mortadella Italiana con Pistacho  LC sachet 500gr",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC033",
+  "nombre": "Pastrami de cerdo",
+  "formato": "1,5/ 2 kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "$2.500",
+   "$12.500",
+   "$11.890"
+  ],
+  "menu_keywords": [
+   "pastrami de cerdo"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5381,
+    "codigo": "78460646169590",
+    "etiqueta": "Pastrami Cerdo Kg pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5382,
+    "codigo": "78460647605744",
+    "etiqueta": "Pastrami Cerdo Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5383,
+    "codigo": "78460653574700",
+    "etiqueta": "Pastrami Cerdo sachet 200gr",
+    "activa": true
+   },
+   {
+    "variante_id": 741,
+    "codigo": "70420641878484",
+    "etiqueta": "Pastrami de Cerdo LC pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 4601,
+    "codigo": "76917701222216",
+    "etiqueta": "Pastrami de Cerdo LC sachet Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 744,
+    "codigo": "70420649402751",
+    "etiqueta": "Pastrami de Cerdo LC sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 3799,
+    "codigo": "75597075642718",
+    "etiqueta": "Pastrami de Cerdo LC bandeja",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC034",
+  "nombre": "Pastrami de vacuno",
+  "formato": "2/ 2,5 kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "$4.200",
+   "$21.000",
+   "$20.500"
+  ],
+  "menu_keywords": [
+   "pastrami",
+   "pastrami de vacuno",
+   "reuben"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 746,
+    "codigo": "70420652898927",
+    "etiqueta": "Pastrami de Vacuno LC pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 749,
+    "codigo": "70420656420099",
+    "etiqueta": "Pastrami de Vacuno LC sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2489,
+    "codigo": "73755336288772",
+    "etiqueta": "Pastrami de Vacuno LC 500gr",
+    "activa": false
+   },
+   {
+    "variante_id": 3800,
+    "codigo": "75597086903419",
+    "etiqueta": "Pastrami de Vacuno LC bandeja",
+    "activa": false
+   },
+   {
+    "variante_id": 1518,
+    "codigo": "72547573478894",
+    "etiqueta": "Pastrami de Vacuno LC",
+    "activa": false
+   },
+   {
+    "variante_id": 2549,
+    "codigo": "73824850687283",
+    "etiqueta": "Pastrami de Vacuno LC laminado Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5153,
+    "codigo": "78181043524943",
+    "etiqueta": "Pastrami de Vacuno LC untable tubo",
+    "activa": false
+   },
+   {
+    "variante_id": 5385,
+    "codigo": "78460665280944",
+    "etiqueta": "Pastrami Vacuno Kg pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5386,
+    "codigo": "78460668012558",
+    "etiqueta": "Pastrami Vacuno Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5387,
+    "codigo": "78460674211377",
+    "etiqueta": "Pastrami Vacuno sachet 200gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC035",
+  "nombre": "Panceta ahumada",
+  "formato": "4/ 5 kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "$3.500",
+   "$17.500",
+   "$17.500"
+  ],
+  "menu_keywords": [
+   "tocino",
+   "tocineta",
+   "bacon",
+   "tocino ahumado",
+   "panceta ahumada",
+   "panceta",
+   "carbonara",
+   "bacon cheese"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5389,
+    "codigo": "78460686235895",
+    "etiqueta": "Tocino Ahumado Kg pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5390,
+    "codigo": "78460687836112",
+    "etiqueta": "Tocino Ahumado Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5391,
+    "codigo": "78460692639999",
+    "etiqueta": "Tocino Ahumado sachet 200gr",
+    "activa": true
+   },
+   {
+    "variante_id": 774,
+    "codigo": " 70420713809177 ",
+    "etiqueta": "Tocino Ahumado LC kilo",
+    "activa": false
+   },
+   {
+    "variante_id": 776,
+    "codigo": " 70420719771548 ",
+    "etiqueta": "Tocino Ahumado LC sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2470,
+    "codigo": " 73737923609370 ",
+    "etiqueta": "Tocino Ahumado LC sachet 500gr",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC036",
+  "nombre": "Pastrami Americano Angus",
+  "formato": "3/4 kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$27.700"
+  ],
+  "menu_keywords": [
+   "pastrami",
+   "pastrami angus",
+   "reuben",
+   "new york pastrami"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5393,
+    "codigo": "78460705779870",
+    "etiqueta": "Pastrami Americano Angus Kg",
+    "activa": true
+   },
+   {
+    "variante_id": 5394,
+    "codigo": "78460712177360",
+    "etiqueta": "Pastrami Americano Angus pagina 500gr",
+    "activa": true
+   },
+   {
+    "variante_id": 856,
+    "codigo": "70420976691764",
+    "etiqueta": "Pastrami Angus",
+    "activa": false
+   },
+   {
+    "variante_id": 3429,
+    "codigo": "75114341238728",
+    "etiqueta": "Pastrami Angus LC Kg",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC037",
+  "nombre": "Queso cabra ahumado",
+  "formato": "4 kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "$3.446",
+   "$17.230",
+   "$16.730"
+  ],
+  "menu_keywords": [
+   "queso de cabra ahumado",
+   "queso cabra",
+   "queso de cabra"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1153,
+    "codigo": "71743963934275",
+    "etiqueta": "Queso Cabra Ahumado",
+    "activa": false
+   },
+   {
+    "variante_id": 797,
+    "codigo": "70420766559914",
+    "etiqueta": "Queso Cabra Ahumado",
+    "activa": false
+   },
+   {
+    "variante_id": 1320,
+    "codigo": "72321620946207",
+    "etiqueta": "QUESO CABRA AHUMADO",
+    "activa": false
+   },
+   {
+    "variante_id": 853,
+    "codigo": "849616",
+    "etiqueta": "Queso de Cabra Ahumado LC kilo",
+    "activa": false
+   },
+   {
+    "variante_id": 5402,
+    "codigo": "78460815972427",
+    "etiqueta": "Queso pagina cabra ahumado 200gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC038",
+  "nombre": "Queso gouda ahumado",
+  "formato": "3,5/ 4 kg",
+  "categoria": "Cocidos",
+  "precios_pdf": [
+   "3.250,00",
+   "$16.250",
+   "$16.053"
+  ],
+  "menu_keywords": [
+   "queso ahumado",
+   "gouda ahumado",
+   "queso gouda"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1103,
+    "codigo": "71328171062374",
+    "etiqueta": "Queso Gouda Ahumado sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 799,
+    "codigo": "70420768737086",
+    "etiqueta": "QUESO GOUDA AHUMADO",
+    "activa": false
+   },
+   {
+    "variante_id": 889,
+    "codigo": "70429574674819",
+    "etiqueta": "QUESO GOUDA AHUMADO  F",
+    "activa": false
+   },
+   {
+    "variante_id": 1877,
+    "codigo": "73057676446416",
+    "etiqueta": "Queso Gouda Ahumado LC pieza kg",
+    "activa": false
+   },
+   {
+    "variante_id": 4508,
+    "codigo": "76651694412488",
+    "etiqueta": "Queso Gouda Ahumado LC laminado kg",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC039",
+  "nombre": "Pepperoni Untable",
+  "formato": "110gr",
+  "categoria": "Untables",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$19.990"
+  ],
+  "menu_keywords": [
+   "nduja",
+   "'nduja",
+   "pepperoni untable",
+   "untable de pepperoni"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 2181,
+    "codigo": "73437762332427",
+    "etiqueta": "Pepperoni LC untable tubo",
+    "activa": false
+   },
+   {
+    "variante_id": 5451,
+    "codigo": "78551011442569",
+    "etiqueta": "Untables Kg Pepperoni",
+    "activa": true
+   },
+   {
+    "variante_id": 5411,
+    "codigo": "78460919325422",
+    "etiqueta": "Untables pagina Pepperoni",
+    "activa": true
+   },
+   {
+    "variante_id": 5407,
+    "codigo": "78460902366742",
+    "etiqueta": "Untables tubo Pepperoni",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC040",
+  "nombre": "Sobrasada Untable",
+  "formato": "200gr",
+  "categoria": "Untables",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$22.500"
+  ],
+  "menu_keywords": [
+   "sobrasada",
+   "sobrassada"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1833,
+    "codigo": "72987058225292",
+    "etiqueta": "Sobrasada untable",
+    "activa": false
+   },
+   {
+    "variante_id": 1835,
+    "codigo": "72987287544977",
+    "etiqueta": "Sobrasada untable Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 2516,
+    "codigo": "73782126305558",
+    "etiqueta": "Sobrasada untable tubo gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5452,
+    "codigo": "78551012761736",
+    "etiqueta": "Untables Kg Sobrasada",
+    "activa": true
+   },
+   {
+    "variante_id": 5412,
+    "codigo": "78460920399260",
+    "etiqueta": "Untables pagina Sobrasada",
+    "activa": true
+   },
+   {
+    "variante_id": 5408,
+    "codigo": "78460904055137",
+    "etiqueta": "Untables tubo Sobrasada",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC041",
+  "nombre": "Tocino Aleman Untable",
+  "formato": "110gr",
+  "categoria": "Untables",
+  "precios_pdf": [
+   "-",
+   "-",
+   "$19.990"
+  ],
+  "menu_keywords": [
+   "untable de tocino",
+   "tocino untable",
+   "griebenschmalz",
+   "schmalz",
+   "manteca de tocino"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5453,
+    "codigo": "78551014099307",
+    "etiqueta": "Untables Kg Tocino Aleman",
+    "activa": true
+   },
+   {
+    "variante_id": 5413,
+    "codigo": "78460922653725",
+    "etiqueta": "Untables pagina Tocino Aleman",
+    "activa": true
+   },
+   {
+    "variante_id": 5409,
+    "codigo": "78460906345261",
+    "etiqueta": "Untables tubo Tocino Aleman",
+    "activa": true
+   },
+   {
+    "variante_id": 2051,
+    "codigo": " 73272491803728 ",
+    "etiqueta": "Tocino Alemán Ahumado LC untable tubo",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC042",
+  "nombre": "Paté de campo",
+  "formato": "125 gr",
+  "categoria": "Untables",
+  "precios_pdf": [
+   "-",
+   "$12.000"
+  ],
+  "menu_keywords": [
+   "pate",
+   "pate de campo",
+   "pate rustico",
+   "terrina",
+   "pate de cerdo"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 862,
+    "codigo": "799192166099",
+    "etiqueta": "Pate de Campo LC unidad",
+    "activa": false
+   },
+   {
+    "variante_id": 4588,
+    "codigo": "76849902559562",
+    "etiqueta": "Pate de Campo LC Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5450,
+    "codigo": "78551010089924",
+    "etiqueta": "Untables Kg Pate de Campo",
+    "activa": true
+   },
+   {
+    "variante_id": 5410,
+    "codigo": "78460918102747",
+    "etiqueta": "Untables pagina Pate de Campo",
+    "activa": true
+   },
+   {
+    "variante_id": 5406,
+    "codigo": "78460898873163",
+    "etiqueta": "Untables tubo Pate de Campo",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC043",
+  "nombre": "Pepperoni Untable Frasco",
+  "formato": "100 gr",
+  "categoria": "Untables",
+  "precios_pdf": [
+   "2.500,00",
+   "-",
+   "-"
+  ],
+  "menu_keywords": [
+   "nduja",
+   "'nduja",
+   "pepperoni untable"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 2073,
+    "codigo": "73297911349113",
+    "etiqueta": "Pepperoni LC untable frasco 100gr",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC044",
+  "nombre": "Sobrasada Untable Frasco",
+  "formato": "100 gr",
+  "categoria": "Untables",
+  "precios_pdf": [
+   "2.990,00",
+   "-",
+   "-"
+  ],
+  "menu_keywords": [
+   "sobrasada",
+   "sobrassada"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1856,
+    "codigo": "73021168731486",
+    "etiqueta": "Sobrasada LC untable frasco 100 gr",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC045",
+  "nombre": "Tocino Aleman Untable Frasco",
+  "formato": "100 gr",
+  "categoria": "Untables",
+  "precios_pdf": [
+   "2.500,00",
+   "-",
+   "-"
+  ],
+  "menu_keywords": [
+   "untable de tocino",
+   "tocino untable",
+   "manteca de tocino"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1858,
+    "codigo": " 73021413349812 ",
+    "etiqueta": "Tocino Alemán Ahumado LC untable frasco 100 gr",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC046",
+  "nombre": "Tabla Charcuteras 150 grs",
+  "formato": "150 grs",
+  "categoria": "Tablas",
+  "precios_pdf": [
+   "3.490,00",
+   "-",
+   "-"
+  ],
+  "menu_keywords": [
+   "tabla de charcuteria",
+   "tabla de quesos y embutidos",
+   "tabla de fiambres",
+   "charcuterie",
+   "picada",
+   "tabla mixta"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5414,
+    "codigo": "78460934300396",
+    "etiqueta": "Tablas Charcuteras 150gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5416,
+    "codigo": "78460943914363",
+    "etiqueta": "Tablas Charcuteras 150gr Lomo E",
+    "activa": true
+   },
+   {
+    "variante_id": 1075,
+    "codigo": "71225268296292",
+    "etiqueta": "Tablas Charcuteras LC 150 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5254,
+    "codigo": "78442595685561",
+    "etiqueta": "Tablas Charcuteras LC 150 gr Lomo E",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC047",
+  "nombre": "Tabla Charcuteras 200 grs.",
+  "formato": "200 grs.",
+  "categoria": "Tablas",
+  "precios_pdf": [
+   "4.550,00",
+   "-",
+   "-"
+  ],
+  "menu_keywords": [
+   "tabla de charcuteria",
+   "tabla de quesos y embutidos",
+   "tabla de fiambres",
+   "charcuterie",
+   "picada",
+   "tabla mixta"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5415,
+    "codigo": "78460936903226",
+    "etiqueta": "Tablas Charcuteras 200gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5448,
+    "codigo": "78490899735988",
+    "etiqueta": "Tablas Charcuteras 200gr Lomo E",
+    "activa": true
+   },
+   {
+    "variante_id": 1076,
+    "codigo": "71225273817325",
+    "etiqueta": "Tablas Charcuteras LC 200 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5418,
+    "codigo": " 78460951713290 ",
+    "etiqueta": "Tablas Charcuteras pagina 200gr",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC101",
+  "nombre": "Roast Beef",
+  "formato": "kg o sachet 200 g",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "roast beef",
+   "rosbif",
+   "roastbeef"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1003,
+    "codigo": "70594245989714",
+    "etiqueta": "Roast Beff kg",
+    "activa": true
+   },
+   {
+    "variante_id": 5592,
+    "codigo": "78837223236865",
+    "etiqueta": "Roast Beff sachet 200gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC102",
+  "nombre": "Jamón Gran Biscotto",
+  "formato": "kg o sachet 200 g",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "prosciutto cotto",
+   "jamon italiano",
+   "jamon biscotto",
+   "jamon cotto"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5365,
+    "codigo": "78460530350103",
+    "etiqueta": "Jamón Gran Biscotto Kg pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5366,
+    "codigo": "78460532478925",
+    "etiqueta": "Jamón Gran Biscotto Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 4745,
+    "codigo": "77204885253841",
+    "etiqueta": "Jamón Gran Biscotto LC Cocido sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 4746,
+    "codigo": "77204887488151",
+    "etiqueta": "Jamón Gran Biscotto LC Ahumado sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 4826,
+    "codigo": "77385531438741",
+    "etiqueta": "Jamón Gran Biscotto LC pieza Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5081,
+    "codigo": "77990176756556",
+    "etiqueta": "Jamón Gran Biscotto LC laminado kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5367,
+    "codigo": "78460544164754",
+    "etiqueta": "Jamón Gran Biscotto sachet 200gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC103",
+  "nombre": "Prosciutto",
+  "formato": "sachet 100/500 g",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "prosciutto",
+   "prosciutto crudo",
+   "jamon de parma",
+   "parma"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1109,
+    "codigo": "71474554178223",
+    "etiqueta": "Prosciutto",
+    "activa": false
+   },
+   {
+    "variante_id": 4921,
+    "codigo": "77637166289569",
+    "etiqueta": "Prosciutto sachet 500gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5094,
+    "codigo": "78042657913101",
+    "etiqueta": "Prosciutto sachet 100gr",
+    "activa": true
+   },
+   {
+    "variante_id": 1106,
+    "codigo": "71382019661312",
+    "etiqueta": "Prosciutto LC sachet 100gr",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC104",
+  "nombre": "Salame Milano",
+  "formato": "kg o sachet 100 g",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "salame milano",
+   "salami milano"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5300,
+    "codigo": "78459911488183",
+    "etiqueta": "Salame Milano Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5301,
+    "codigo": "78459913051263",
+    "etiqueta": "Salame Milano Kg pieza entera",
+    "activa": true
+   },
+   {
+    "variante_id": 785,
+    "codigo": "70420748618602",
+    "etiqueta": "Salame Milano LC",
+    "activa": false
+   },
+   {
+    "variante_id": 833,
+    "codigo": "70420874793355",
+    "etiqueta": "Salame Milano LC (SACHET 100GR)",
+    "activa": false
+   },
+   {
+    "variante_id": 885,
+    "codigo": "70429310176782",
+    "etiqueta": "Salame Milano LC F",
+    "activa": false
+   },
+   {
+    "variante_id": 834,
+    "codigo": "70420876476174",
+    "etiqueta": "Salame Milano LC pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 835,
+    "codigo": "70420878975973",
+    "etiqueta": "Salame Milano LC sachet 100gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5098,
+    "codigo": "78050759021505",
+    "etiqueta": "Salame Milano LC laminado Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5324,
+    "codigo": "78460228323596",
+    "etiqueta": "Salame Milano sachet 100gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC105",
+  "nombre": "Pastirma de cerdo",
+  "formato": "kg o sachet 100 g",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "pastirma de cerdo",
+   "pastirma",
+   "bondiola curada"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5294,
+    "codigo": "78459869469526",
+    "etiqueta": "Pastirma Cerdo Kg laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5295,
+    "codigo": "78459871654379",
+    "etiqueta": "Pastirma Cerdo Kg pieza entera",
+    "activa": true
+   },
+   {
+    "variante_id": 5321,
+    "codigo": "78460183685169",
+    "etiqueta": "Pastirma Cerdo sachet 100gr",
+    "activa": true
+   },
+   {
+    "variante_id": 1406,
+    "codigo": "72469487678312",
+    "etiqueta": "Pastirma de bondiola pagina 100 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 3047,
+    "codigo": "74595397351747",
+    "etiqueta": "Pastirma de Cerdo kg pieza",
+    "activa": false
+   },
+   {
+    "variante_id": 1542,
+    "codigo": "72589362297935",
+    "etiqueta": "Pastirma de Cerdo LC sachet 100gr",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC106",
+  "nombre": "Pastirma Angus",
+  "formato": "kg o sachet 100 g",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "pastirma angus",
+   "pastirma"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5435,
+    "codigo": "78461071222647",
+    "etiqueta": "Pastirma Angus sachet 100gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5122,
+    "codigo": "78118636051618",
+    "etiqueta": "Pastirma Angus sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 5256,
+    "codigo": "78442717243486",
+    "etiqueta": "Pastirma Angus kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5444,
+    "codigo": "78461532664313",
+    "etiqueta": "Pastirma Angus Kg pieza",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC107",
+  "nombre": "Pastirma de lomo",
+  "formato": "kg o sachet 100 g",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "pastirma de lomo",
+   "pastirma"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5631,
+    "codigo": "78878128242985",
+    "etiqueta": "Pastirma de Lomo kg pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5445,
+    "codigo": "78464480819378",
+    "etiqueta": "Pastirma de Lomo sachet 100gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC108",
+  "nombre": "Costillar ahumado",
+  "formato": "kg",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "costillar ahumado",
+   "costilla ahumada",
+   "ribs ahumadas",
+   "costillas de cerdo ahumadas"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5434,
+    "codigo": "78461065994927",
+    "etiqueta": "Costilla Ahumada Kg",
+    "activa": true
+   },
+   {
+    "variante_id": 750,
+    "codigo": "70420657840824",
+    "etiqueta": "Costillar Ahumado",
+    "activa": false
+   },
+   {
+    "variante_id": 772,
+    "codigo": "70420704980239",
+    "etiqueta": "Costillar Ahumado LC",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC109",
+  "nombre": "Mix de madurados",
+  "formato": "sachet 150/200 g",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "mix de cecinas",
+   "selección de embutidos",
+   "antipasto",
+   "antipasti"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 858,
+    "codigo": "70420985632797",
+    "etiqueta": "Mix Madurado LC sachet 150gr",
+    "activa": false
+   },
+   {
+    "variante_id": 2789,
+    "codigo": "74136452843731",
+    "etiqueta": "Mix Madurado LC sachet 200gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5443,
+    "codigo": "78461524827379",
+    "etiqueta": "Mix Madurados sachet 200gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC110",
+  "nombre": "Longaniza Angus",
+  "formato": "kg o sachet",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "longaniza angus",
+   "longaniza de vacuno"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 3099,
+    "codigo": "74672853541440",
+    "etiqueta": "Longaniza Angus kg",
+    "activa": false
+   },
+   {
+    "variante_id": 1792,
+    "codigo": "079919216614.3",
+    "etiqueta": "Longaniza Angus LC sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 3787,
+    "codigo": "75596062532765",
+    "etiqueta": "Longaniza Angus LC bandeja",
+    "activa": false
+   },
+   {
+    "variante_id": 5754,
+    "codigo": "79226562467118",
+    "etiqueta": "Longaniza Kg Angus",
+    "activa": true
+   },
+   {
+    "variante_id": 5755,
+    "codigo": "79226565105082",
+    "etiqueta": "Longaniza sachet Angus",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC111",
+  "nombre": "Longaniza Polaca",
+  "formato": "kg o sachet",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "longaniza polaca",
+   "kielbasa"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5266,
+    "codigo": "78459515658655",
+    "etiqueta": "Longaniza Kg Polaca",
+    "activa": true
+   },
+   {
+    "variante_id": 1796,
+    "codigo": "72927638419740",
+    "etiqueta": "Longaniza Polaca LC",
+    "activa": false
+   },
+   {
+    "variante_id": 1797,
+    "codigo": "72927639646410",
+    "etiqueta": "Longaniza Polaca LC sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 3791,
+    "codigo": "75596463778650",
+    "etiqueta": "Longaniza Polaca LC bandeja",
+    "activa": false
+   },
+   {
+    "variante_id": 798,
+    "codigo": "70420768418072",
+    "etiqueta": "Longaniza Polaca sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 5277,
+    "codigo": "78459663286399",
+    "etiqueta": "Longaniza sachet Polaca",
+    "activa": true
+   },
+   {
+    "variante_id": 5271,
+    "codigo": "78459611662920",
+    "etiqueta": "Longanizas sachet pagina Polaca",
+    "activa": true
+   },
+   {
+    "variante_id": 4751,
+    "codigo": " 77211725943616 ",
+    "etiqueta": "Longaniza Polaca LC kg",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC112",
+  "nombre": "Salchicha Angus",
+  "formato": "kg o sachet",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "salchicha angus",
+   "hot dog angus",
+   "completo angus"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1793,
+    "codigo": "72918998571758",
+    "etiqueta": "Salchicha ANGUS sachet",
+    "activa": true
+   },
+   {
+    "variante_id": 2750,
+    "codigo": "74101886397684",
+    "etiqueta": "SALCHICHA ANGUS PREMIUN SACHET",
+    "activa": false
+   },
+   {
+    "variante_id": 3065,
+    "codigo": "74628871988807",
+    "etiqueta": "Salchicha Angus V",
+    "activa": false
+   },
+   {
+    "variante_id": 5750,
+    "codigo": "79217095874655",
+    "etiqueta": "Vienesa Kg ANGUS",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC113",
+  "nombre": "Salchicha Polaca",
+  "formato": "kg o sachet",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "salchicha polaca",
+   "kielbasa"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 975,
+    "codigo": "70566795771992",
+    "etiqueta": "Salchicha Polaco F",
+    "activa": false
+   },
+   {
+    "variante_id": 5688,
+    "codigo": "79008974242727",
+    "etiqueta": "Vienesa Kg Polaca",
+    "activa": true
+   },
+   {
+    "variante_id": 5541,
+    "codigo": "78742264091872",
+    "etiqueta": "Vienesa Polaca sachet",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC114",
+  "nombre": "Bratwurst",
+  "formato": "kg",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "bratwurst",
+   "salchicha alemana",
+   "salchicha blanca"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 4680,
+    "codigo": "77081927549318",
+    "etiqueta": "Bratwurst",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC115",
+  "nombre": "Cervelat",
+  "formato": "pieza o sachet 200 g",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "cervelat"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1074,
+    "codigo": "71225244390089",
+    "etiqueta": "Cervelat LC sachet 200 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 3136,
+    "codigo": "74732631278621",
+    "etiqueta": "Cervelat LC pieza peq",
+    "activa": false
+   },
+   {
+    "variante_id": 3804,
+    "codigo": "75598575652448",
+    "etiqueta": "Cervelat LC Angus",
+    "activa": false
+   },
+   {
+    "variante_id": 3805,
+    "codigo": "75598578879768",
+    "etiqueta": "Cervelat LC",
+    "activa": false
+   },
+   {
+    "variante_id": 1062,
+    "codigo": "71087477066632",
+    "etiqueta": "Cervelat Pagina",
+    "activa": false
+   },
+   {
+    "variante_id": 2354,
+    "codigo": "73592721516272",
+    "etiqueta": "Cervelat Pagina Angus",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC116",
+  "nombre": "Krakowska",
+  "formato": "kg",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "krakowska"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 983,
+    "codigo": "70569311458228",
+    "etiqueta": "Krakowska Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 863,
+    "codigo": "70421040632475",
+    "etiqueta": "Krakowska LC",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC117",
+  "nombre": "Arrollado Huaso",
+  "formato": "kg o 200 g",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "arrollado",
+   "arrollado huaso",
+   "arrollado de chancho"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 791,
+    "codigo": "70420756499319",
+    "etiqueta": "Arrollado Huaso Kg",
+    "activa": true
+   },
+   {
+    "variante_id": 4091,
+    "codigo": "76011554027489",
+    "etiqueta": "Arrollado Huaso 200 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 4092,
+    "codigo": "76011554604284",
+    "etiqueta": "Arrollado Huaso 400 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 794,
+    "codigo": "70420759779397",
+    "etiqueta": "Arrollado Huaso Pagina 200 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 1809,
+    "codigo": "72960944660174",
+    "etiqueta": "Arrollado Huaso Pagina 400 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 1810,
+    "codigo": "72960947016744",
+    "etiqueta": "Arrollado Huaso Pagina 1 kg",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC118",
+  "nombre": "Papada ahumada",
+  "formato": "kg",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "papada",
+   "papada ahumada"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 748,
+    "codigo": "70420655668139",
+    "etiqueta": "Papada Ahumada",
+    "activa": false
+   },
+   {
+    "variante_id": 769,
+    "codigo": "70420696239829",
+    "etiqueta": "Papada Ahumada LC",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC119",
+  "nombre": "Pernil ahumado",
+  "formato": "pieza",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "pernil",
+   "pernil ahumado",
+   "codillo"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1032,
+    "codigo": "70888418781545",
+    "etiqueta": "Pernil ahumado pieza",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC120",
+  "nombre": "Chorizo Sarta",
+  "formato": "pieza",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "chorizo sarta",
+   "chorizo a la sidra"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 4020,
+    "codigo": "75941373153186",
+    "etiqueta": "Chorizo Sarta LC pieza",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC121",
+  "nombre": "Lengua sous vide",
+  "formato": "sachet",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "lengua",
+   "lengua de vacuno"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 2216,
+    "codigo": "73454874918706",
+    "etiqueta": "Lengua Sous Vide LC sachet",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC122",
+  "nombre": "Cabanossi saborizado",
+  "formato": "unidad",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "cabanossi",
+   "cabanossi merken"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 4749,
+    "codigo": " 77211636341361 ",
+    "etiqueta": "Cabanossi Merken",
+    "activa": false
+   },
+   {
+    "variante_id": 4750,
+    "codigo": " 77211641447518 ",
+    "etiqueta": "Cabanossi Pepperoni",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC123",
+  "nombre": "Untable de salame o pastrami",
+  "formato": "kg o tubo",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "untable de salame",
+   "untable de pastrami"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5616,
+    "codigo": "78862357586538",
+    "etiqueta": "Untables Kg Salame",
+    "activa": true
+   },
+   {
+    "variante_id": 5617,
+    "codigo": "78862362416189",
+    "etiqueta": "Untables Kg Pastrami",
+    "activa": true
+   },
+   {
+    "variante_id": 5454,
+    "codigo": "78551927210833",
+    "etiqueta": "Untables tubo Salame",
+    "activa": true
+   },
+   {
+    "variante_id": 5482,
+    "codigo": "78672134238409",
+    "etiqueta": "Untables tubo Pastrami",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC124",
+  "nombre": "Manteca de cerdo",
+  "formato": "frasco",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "manteca de cerdo"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 2731,
+    "codigo": "74077012307182",
+    "etiqueta": "Manteca de Cerdo LC frasco",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC125",
+  "nombre": "Pollo ahumado",
+  "formato": "kg o sachet",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "pollo ahumado",
+   "pechuga ahumada"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5446,
+    "codigo": "78466170676278",
+    "etiqueta": "Pollo Ahumado sachet",
+    "activa": true
+   },
+   {
+    "variante_id": 5614,
+    "codigo": "78862096605712",
+    "etiqueta": "Pollo Ahumado kilo",
+    "activa": true
+   },
+   {
+    "variante_id": 1045,
+    "codigo": "71033946974737",
+    "etiqueta": "Pollo Ahumado LC sachet",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC126",
+  "nombre": "Salmón ahumado",
+  "formato": "kg",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "salmon ahumado"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5404,
+    "codigo": "78460881636125",
+    "etiqueta": "Pescado Ahumado al frio Kg Salmon",
+    "activa": true
+   },
+   {
+    "variante_id": 1134,
+    "codigo": "71589021616246",
+    "etiqueta": "Salmon Ahumado LC Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 4602,
+    "codigo": "76918443111325",
+    "etiqueta": "Salmon Ahumado LC untable tubo",
+    "activa": false
+   },
+   {
+    "variante_id": 5405,
+    "codigo": "78460886940930",
+    "etiqueta": "Salmon Ahumado pagina Kg",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC127",
+  "nombre": "Trucha ahumada",
+  "formato": "kg",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "trucha ahumada"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5699,
+    "codigo": "79026795103766",
+    "etiqueta": "Pescado Ahumado al frio Kg Trucha",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC128",
+  "nombre": "Queso de cabra",
+  "formato": "kg",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "queso de cabra"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5397,
+    "codigo": "78460752998135",
+    "etiqueta": "Queso Kg Cabra",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC129",
+  "nombre": "Queso gouda",
+  "formato": "kg o sachet 200 g",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "queso gouda",
+   "gouda"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5400,
+    "codigo": "78460769641429",
+    "etiqueta": "Queso Gouda sachet 200gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5395,
+    "codigo": "78460744926302",
+    "etiqueta": "Queso Kg Gouda pieza",
+    "activa": true
+   },
+   {
+    "variante_id": 5396,
+    "codigo": "78460748553381",
+    "etiqueta": "Queso Kg Gouda laminado",
+    "activa": true
+   },
+   {
+    "variante_id": 5401,
+    "codigo": "78460807285862",
+    "etiqueta": "Queso pagina gouda laminado 200gr",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC130",
+  "nombre": "Queso pecorino",
+  "formato": "kg o sachet",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "pecorino",
+   "pecorino romano",
+   "cacio e pepe"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5399,
+    "codigo": "78460762365204",
+    "etiqueta": "Queso Kg Pecorino Romano",
+    "activa": true
+   },
+   {
+    "variante_id": 5403,
+    "codigo": "78460817977809",
+    "etiqueta": "Queso pagina pecorino romano 200gr",
+    "activa": true
+   },
+   {
+    "variante_id": 2768,
+    "codigo": "74119835831201",
+    "etiqueta": "Queso Pecorino sachet 150gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5206,
+    "codigo": "78308982947370",
+    "etiqueta": "Queso Pecorino x Kg",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC131",
+  "nombre": "Queso pecorino ahumado",
+  "formato": "kg",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "pecorino ahumado"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5698,
+    "codigo": "79026784584906",
+    "etiqueta": "Queso Kg Pecorino Ahumado",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC132",
+  "nombre": "Queso guayanés o de mano",
+  "formato": "kg",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "queso de mano",
+   "queso guayanes",
+   "tequeño",
+   "cachapa"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1028,
+    "codigo": "651651651",
+    "etiqueta": "Queso Guayanes / De Mano Kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5398,
+    "codigo": "78460756970531",
+    "etiqueta": "Queso Kg Guayanes/Mano",
+    "activa": true
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC133",
+  "nombre": "Tablas charcuteras otros formatos",
+  "formato": "100/120/250 g y por pliego",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "tabla de charcuteria",
+   "picada",
+   "tabla mixta"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 5449,
+    "codigo": "78543042593038",
+    "etiqueta": "Tablas Charcuteras 100 gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5470,
+    "codigo": "78612469214220",
+    "etiqueta": "Tablas Charcuteras 250 gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5477,
+    "codigo": "78646644825756",
+    "etiqueta": "Tablas Charcuteras 120gr",
+    "activa": true
+   },
+   {
+    "variante_id": 2439,
+    "codigo": "73705509318412",
+    "etiqueta": "Tablas Charcuteras LC 1 pag",
+    "activa": false
+   },
+   {
+    "variante_id": 2440,
+    "codigo": "73705510512252",
+    "etiqueta": "Tablas Charcuteras LC 2 pag",
+    "activa": false
+   },
+   {
+    "variante_id": 2441,
+    "codigo": "73705512241672",
+    "etiqueta": "Tablas Charcuteras LC 3 pag",
+    "activa": false
+   },
+   {
+    "variante_id": 2442,
+    "codigo": "73705518906501",
+    "etiqueta": "Tablas Charcuteras LC 4 pag",
+    "activa": false
+   },
+   {
+    "variante_id": 2443,
+    "codigo": "73705520692320",
+    "etiqueta": "Tablas Charcuteras LC 5 pag",
+    "activa": false
+   },
+   {
+    "variante_id": 2444,
+    "codigo": "73705521499969",
+    "etiqueta": "Tablas Charcuteras LC 6 pag",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ },
+ {
+  "sku": "LC134",
+  "nombre": "Recortes y despuntes",
+  "formato": "kg o sachet",
+  "categoria": "Fuera del PDF",
+  "precios_pdf": [],
+  "menu_keywords": [
+   "pizza",
+   "tortilla",
+   "relleno",
+   "pure con tocino",
+   "quiche"
+  ],
+  "variantes_bsale": [
+   {
+    "variante_id": 1023,
+    "codigo": "70844165411773",
+    "etiqueta": "Despuntes Ahumados 250 gr",
+    "activa": false
+   },
+   {
+    "variante_id": 5583,
+    "codigo": "78828280086957",
+    "etiqueta": "Recorte Madurados",
+    "activa": true
+   },
+   {
+    "variante_id": 1686,
+    "codigo": "72805404616780",
+    "etiqueta": "Recorte de Cecina sachet",
+    "activa": false
+   },
+   {
+    "variante_id": 5251,
+    "codigo": "78442428474593",
+    "etiqueta": "Recorte de Cecina kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5249,
+    "codigo": "78442359060555",
+    "etiqueta": "Recorte de Madurados kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5250,
+    "codigo": "78442416572682",
+    "etiqueta": "Recorte Pastrami Vacuno kg",
+    "activa": false
+   },
+   {
+    "variante_id": 5419,
+    "codigo": "78460961454255",
+    "etiqueta": "Recortes Kg Mix de Madurados",
+    "activa": true
+   },
+   {
+    "variante_id": 5420,
+    "codigo": "78460963616484",
+    "etiqueta": "Recortes Kg Pastrami",
+    "activa": true
+   },
+   {
+    "variante_id": 5421,
+    "codigo": "78460966321051",
+    "etiqueta": "Recortes Kg Tocino",
+    "activa": true
+   },
+   {
+    "variante_id": 5422,
+    "codigo": "78460967431310",
+    "etiqueta": "Recortes Kg Lomo",
+    "activa": true
+   },
+   {
+    "variante_id": 5423,
+    "codigo": "78460973480592",
+    "etiqueta": "Recortes Kg Cecina",
+    "activa": true
+   },
+   {
+    "variante_id": 5608,
+    "codigo": "78861917130869",
+    "etiqueta": "Recortes kg (Sin cortar) Madurados",
+    "activa": true
+   },
+   {
+    "variante_id": 5610,
+    "codigo": "78861978457446",
+    "etiqueta": "Recortes kg (Sin cortar) Cocidos",
+    "activa": true
+   },
+   {
+    "variante_id": 5425,
+    "codigo": "78460990862937",
+    "etiqueta": "Recortes sachet Cecinas 250gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5426,
+    "codigo": "78460993823359",
+    "etiqueta": "Recortes sachet Despunte Lomo 250gr",
+    "activa": true
+   },
+   {
+    "variante_id": 5427,
+    "codigo": "78460998721145",
+    "etiqueta": "Recortes sachet Tocino Ahumado 200gr",
+    "activa": true
+   },
+   {
+    "variante_id": 3803,
+    "codigo": " 75598522966920 ",
+    "etiqueta": "Despuntes Ahumados kilo",
+    "activa": false
+   },
+   {
+    "variante_id": 4926,
+    "codigo": " 77644749000361 ",
+    "etiqueta": "Recorte Tocino sachet 200 gr",
+    "activa": false
+   }
+  ],
+  "cruce": "ok"
+ }
+]
